@@ -1,0 +1,40 @@
+[package]
+name    = "synapi"
+version = "0.0.1"
+authors = ["Will <will@kentik.com>"]
+edition = "2018"
+
+[dependencies]
+ed25519-dalek = "1.0.0-pre.3"
+hex           = "0.4.2"
+rand          = "0.7.3"
+time          = "0.1.42"
+
+[dependencies.async-compression]
+version  = "0.3.2"
+features = ["futures-write", "gzip"]
+default-features = false
+
+[dependencies.futures]
+version  = "0.3.4"
+features = ["std"]
+default-features = false
+
+
+[dependencies.reqwest]
+version  = "0.10.4"
+features = ["gzip", "json", "rustls-tls"]
+default-features = false
+
+[dependencies.serde]
+version  = "1.0.106"
+features = ["derive"]
+
+[dev-dependencies]
+anyhow     = "1.0.28"
+log        = "0.4.8"
+env_logger = "0.7.1"
+
+[dev-dependencies.tokio]
+version  = "0.2.18"
+features = ["full"]

@@ -1,0 +1,25 @@
+[package]
+name    = "synag"
+version = "0.0.1"
+authors = ["Will <will@kentik.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow        = "1.0.28"
+ed25519-dalek = "1.0.0-pre.3"
+env_logger    = "0.7.1"
+futures       = "0.3.4"
+log           = "0.4.8"
+rand          = "0.7.3"
+signal-hook   = "0.1.13"
+
+[dependencies.clap]
+version  = "2.33.0"
+features = ["yaml"]
+
+[dependencies.tokio]
+version  = "0.2.18"
+features = ["rt-threaded", "net"]
+
+[dependencies.synapi]
+path = "synapi"

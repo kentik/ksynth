@@ -42,7 +42,7 @@ fn main() -> Result<()> {
     let agent   = Agent::new(client, keys);
 
     runtime.spawn(async move {
-        if let Some(e) = agent.exec().await {
+        if let Err(e) = agent.exec().await {
             error!("agent failed: {:?}", e);
             process::exit(1);
         }

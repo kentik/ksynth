@@ -17,7 +17,7 @@ impl Trace {
     pub async fn exec(self) -> Result<()> {
         let delay = Duration::from_secs(60);
         loop {
-            debug!("{}: testing {}", self.id, self.addr);
+            debug!("{}: target {}", self.id, self.addr);
             delay_for(delay).await;
         }
     }

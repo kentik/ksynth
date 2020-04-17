@@ -16,19 +16,22 @@ impl Agent {
         Self { client, keys }
     }
 
-    pub async fn exec(self) -> Option<Error> {
+    pub async fn exec(self) -> Result<()> {
         let client = self.client;
         let keys   = self.keys;
 
         let (tx, mut rx) = channel(16);
 
         let (watcher, tasks) = Watcher::new(client, keys);
-        let executor = Executor::new(tasks);
+        let executor = Executor::new(tasks)?;
 
         spawn(watcher.exec(),  tx.clone());
         spawn(executor.exec(), tx.clone());
 
-        rx.recv().await
+        match rx.recv().await {
+            Some(e) => Err(e),
+            None    => Ok(()),
+        }
     }
 }
 

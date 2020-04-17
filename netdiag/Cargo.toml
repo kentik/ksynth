@@ -1,0 +1,27 @@
+[package]
+name        = "netdiag"
+version     = "0.0.1"
+edition     = "2018"
+
+authors     = ["Will <will@kentik.com>"]
+description = "Network diagnostics"
+
+[dependencies]
+anyhow      = "1.0.28"
+etherparse  = "0.9.0"
+futures     = "0.3.4"
+libc        = "0.2.69"
+rand        = "0.7.3"
+tokio-raw   = "0.0.2"
+
+[dependencies.tokio]
+version     = "0.2.18"
+features    = ["net"]
+default-features = false
+
+[dev-dependencies]
+
+[dev-dependencies.tokio]
+version     = "0.2.18"
+features    = ["full"]
+

@@ -1,24 +1,31 @@
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use log::{debug, error};
 use tokio::net::lookup_host;
 use tokio::sync::mpsc::Receiver;
 use synapi::tasks::{Group, State, Config};
 use synapi::tasks::{PingConfig, TraceConfig, FetchConfig};
+use netdiag::Pinger;
 use crate::task::{spawn, Handle, Ping, Trace, Fetch};
+use crate::task::Fetcher;
 
 pub struct Executor {
-    tasks: HashMap<u64, Handle>,
-    rx:    Receiver<Vec<Group>>,
+    tasks:   HashMap<u64, Handle>,
+    rx:      Receiver<Vec<Group>>,
+    pinger:  Arc<Pinger>,
+    fetcher: Arc<Fetcher>,
 }
 
 impl Executor {
-    pub fn new(rx: Receiver<Vec<Group>>) -> Self {
-        Self {
-            tasks: HashMap::new(),
-            rx:    rx,
-        }
+    pub fn new(rx: Receiver<Vec<Group>>) -> Result<Self> {
+        Ok(Self {
+            tasks:   HashMap::new(),
+            rx:      rx,
+            pinger:  Arc::new(Pinger::new()?),
+            fetcher: Arc::new(Fetcher::new()?),
+        })
     }
 
     pub async fn exec(mut self) -> Result<()> {
@@ -62,8 +69,10 @@ impl Executor {
 
 
     async fn ping(&self, id: u64, cfg: PingConfig) -> Result<Handle> {
-        let addr = resolve(&cfg.target).await?;
-        let ping = Ping::new(id, addr);
+        let addr   = resolve(&cfg.target).await?;
+        let pinger = self.pinger.clone();
+
+        let ping = Ping::new(id, addr, pinger);
         Ok(spawn(id, ping.exec()))
     }
 
@@ -74,8 +83,10 @@ impl Executor {
     }
 
     async fn fetch(&self, id: u64, cfg: FetchConfig) -> Result<Handle> {
-        let addr  = resolve(&cfg.target).await?;
-        let fetch = Fetch::new(id, addr);
+        let target = cfg.target;
+        let client = self.fetcher.clone();
+
+        let fetch = Fetch::new(id, &target, client);
         Ok(spawn(id, fetch.exec()))
     }
 

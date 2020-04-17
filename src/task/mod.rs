@@ -3,7 +3,7 @@ pub use task::Handle;
 
 pub use ping::Ping;
 pub use trace::Trace;
-pub use fetch::Fetch;
+pub use fetch::{Fetch, Fetcher};
 
 mod task;
 mod ping;

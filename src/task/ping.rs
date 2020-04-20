@@ -12,16 +12,17 @@ use netdiag::{self, Pinger};
 pub struct Ping {
     id:     u64,
     addr:   Ipv4Addr,
+    period: Duration,
     pinger: Arc<Pinger>,
 }
 
 impl Ping {
     pub fn new(id: u64, addr: Ipv4Addr, pinger: Arc<Pinger>) -> Self {
-        Self { id, addr, pinger }
+        let period = Duration::from_secs(10);
+        Self { id, addr, period, pinger }
     }
 
     pub async fn exec(self) -> Result<()> {
-        let delay = Duration::from_secs(10);
         loop {
             debug!("{}: target {}", self.id, self.addr);
 
@@ -38,7 +39,7 @@ impl Ping {
                 Err(_)      => warn!("timeout"),
             };
 
-            delay_for(delay).await;
+            delay_for(self.period).await;
         }
     }
 

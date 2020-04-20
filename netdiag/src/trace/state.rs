@@ -36,9 +36,8 @@ impl State {
     }
 
     pub async fn reserve(&self, src: Ipv4Addr, dst: Ipv4Addr) -> (Lease<'_>, SocketAddrV4) {
-        let mut rng = thread_rng();
         loop {
-            let port = rng.sample(self.range);
+            let port = thread_rng().sample(self.range);
             let src  = SocketAddrV4::new(src, port);
             let dst  = SocketAddrV4::new(dst, PORT_MIN);
 

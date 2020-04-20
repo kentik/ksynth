@@ -9,17 +9,18 @@ use tokio::time::delay_for;
 pub struct Fetch {
     id:     u64,
     target: String,
+    period: Duration,
     client: Arc<Fetcher>,
 }
 
 impl Fetch {
     pub fn new(id: u64, target: &str, client: Arc<Fetcher>) -> Self {
         let target = format!("https://{}", target);
-        Self { id, target, client }
+        let period = Duration::from_secs(30);
+        Self { id, target, period, client }
     }
 
     pub async fn exec(self) -> Result<()> {
-        let delay = Duration::from_secs(30);
         loop {
             debug!("{}: target {}", self.id, self.target);
 
@@ -28,7 +29,7 @@ impl Fetch {
                 Err(e)    => warn!("{}", e),
             }
 
-            delay_for(delay).await;
+            delay_for(self.period).await;
         }
     }
 

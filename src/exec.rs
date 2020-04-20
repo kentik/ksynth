@@ -7,7 +7,7 @@ use tokio::net::lookup_host;
 use tokio::sync::mpsc::Receiver;
 use synapi::tasks::{Group, State, Config};
 use synapi::tasks::{PingConfig, TraceConfig, FetchConfig};
-use netdiag::Pinger;
+use netdiag::{Pinger, Tracer};
 use crate::task::{spawn, Handle, Ping, Trace, Fetch};
 use crate::task::Fetcher;
 
@@ -15,15 +15,17 @@ pub struct Executor {
     tasks:   HashMap<u64, Handle>,
     rx:      Receiver<Vec<Group>>,
     pinger:  Arc<Pinger>,
+    tracer:  Arc<Tracer>,
     fetcher: Arc<Fetcher>,
 }
 
 impl Executor {
-    pub fn new(rx: Receiver<Vec<Group>>) -> Result<Self> {
+    pub async fn new(rx: Receiver<Vec<Group>>) -> Result<Self> {
         Ok(Self {
             tasks:   HashMap::new(),
             rx:      rx,
             pinger:  Arc::new(Pinger::new()?),
+            tracer:  Arc::new(Tracer::new().await?),
             fetcher: Arc::new(Fetcher::new()?),
         })
     }
@@ -77,8 +79,10 @@ impl Executor {
     }
 
     async fn trace(&self, id: u64, cfg: TraceConfig) -> Result<Handle> {
-        let addr  = resolve(&cfg.target).await?;
-        let trace = Trace::new(id, addr);
+        let addr   = resolve(&cfg.target).await?;
+        let tracer = self.tracer.clone();
+
+        let trace = Trace::new(id, addr, tracer);
         Ok(spawn(id, trace.exec()))
     }
 

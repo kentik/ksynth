@@ -40,15 +40,20 @@ impl Watcher {
     }
 
     async fn watch(&mut self) -> Result<()> {
-        let wait = Duration::from_secs(1);
+        let wait = Duration::from_secs(30);
         let ver  = env!("CARGO_PKG_VERSION");
         loop {
             match self.client.auth(&self.keys, ver).await? {
                 Auth::Ok(s) => self.tasks(&s).await?,
-                Auth::Wait  => delay_for(wait).await,
+                Auth::Wait  => self.wait(wait).await,
                 Auth::Deny  => Err(Unauthorized)?,
             }
         }
+    }
+
+    async fn wait(&mut self, delay: Duration) {
+        debug!("waiting for authorization");
+        delay_for(delay).await;
     }
 
     async fn tasks(&mut self, session: &str) -> Result<()> {

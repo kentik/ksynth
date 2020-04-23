@@ -1,29 +1,30 @@
 use std::collections::HashMap;
-use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use log::{debug, error};
-use tokio::net::lookup_host;
 use tokio::sync::mpsc::Receiver;
 use synapi::tasks::{Group, State, Config};
 use synapi::tasks::{PingConfig, TraceConfig, FetchConfig};
 use netdiag::{Pinger, Tracer};
+use crate::export::{Exporter, Envoy, Target};
 use crate::task::{spawn, Handle, Ping, Trace, Fetch};
 use crate::task::Fetcher;
 
 pub struct Executor {
     tasks:   HashMap<u64, Handle>,
     rx:      Receiver<Vec<Group>>,
+    ex:      Arc<Exporter>,
     pinger:  Arc<Pinger>,
     tracer:  Arc<Tracer>,
     fetcher: Arc<Fetcher>,
 }
 
 impl Executor {
-    pub async fn new(rx: Receiver<Vec<Group>>) -> Result<Self> {
+    pub async fn new(rx: Receiver<Vec<Group>>, ex: Arc<Exporter>) -> Result<Self> {
         Ok(Self {
             tasks:   HashMap::new(),
             rx:      rx,
+            ex:      ex,
             pinger:  Arc::new(Pinger::new()?),
             tracer:  Arc::new(Tracer::new().await?),
             fetcher: Arc::new(Fetcher::new()?),
@@ -33,11 +34,20 @@ impl Executor {
     pub async fn exec(mut self) -> Result<()> {
         while let Some(update) = self.rx.recv().await {
             for group in update {
+                let target = Arc::new(Target {
+                    company: group.company,
+                    device:  group.device,
+                    email:   group.kentik.email,
+                    token:   group.kentik.token,
+                });
+
                 for task in group.tasks {
+                    let envoy = self.ex.envoy(target.clone());
+
                     let result = match task.state {
-                        State::Created => self.insert(task.id, task.config).await,
+                        State::Created => self.insert(task.id, task.config, envoy).await,
                         State::Deleted => self.delete(task.id),
-                        State::Updated => self.insert(task.id, task.config).await,
+                        State::Updated => self.insert(task.id, task.config, envoy).await,
                     };
 
                     match result {
@@ -50,11 +60,11 @@ impl Executor {
         Ok(())
     }
 
-    async fn insert(&mut self, id: u64, cfg: Config) -> Result<()> {
+    async fn insert(&mut self, id: u64, cfg: Config, envoy: Envoy) -> Result<()> {
         let handle = match cfg {
-            Config::Ping(cfg)  => self.ping(id, cfg).await?,
-            Config::Trace(cfg) => self.trace(id, cfg).await?,
-            Config::Fetch(cfg) => self.fetch(id, cfg).await?,
+            Config::Ping(cfg)  => self.ping(id, cfg, envoy).await?,
+            Config::Trace(cfg) => self.trace(id, cfg, envoy).await?,
+            Config::Fetch(cfg) => self.fetch(id, cfg, envoy).await?,
             _                  => Err(anyhow!("unsupported type"))?,
         };
 
@@ -70,38 +80,28 @@ impl Executor {
     }
 
 
-    async fn ping(&self, id: u64, cfg: PingConfig) -> Result<Handle> {
-        let addr   = resolve(&cfg.target).await?;
+    async fn ping(&self, id: u64, cfg: PingConfig, envoy: Envoy) -> Result<Handle> {
+        let target = cfg.target;
         let pinger = self.pinger.clone();
 
-        let ping = Ping::new(id, addr, pinger);
+        let ping = Ping::new(id, target, envoy, pinger);
         Ok(spawn(id, ping.exec()))
     }
 
-    async fn trace(&self, id: u64, cfg: TraceConfig) -> Result<Handle> {
-        let addr   = resolve(&cfg.target).await?;
+    async fn trace(&self, id: u64, cfg: TraceConfig, envoy: Envoy) -> Result<Handle> {
+        let target = cfg.target;
         let tracer = self.tracer.clone();
 
-        let trace = Trace::new(id, addr, tracer);
+        let trace = Trace::new(id, target, envoy, tracer);
         Ok(spawn(id, trace.exec()))
     }
 
-    async fn fetch(&self, id: u64, cfg: FetchConfig) -> Result<Handle> {
+    async fn fetch(&self, id: u64, cfg: FetchConfig, envoy: Envoy) -> Result<Handle> {
         let target = cfg.target;
         let client = self.fetcher.clone();
 
-        let fetch = Fetch::new(id, &target, client);
+        let fetch = Fetch::new(id, target, envoy, client);
         Ok(spawn(id, fetch.exec()))
     }
 
-}
-
-async fn resolve(host: &str) -> Result<Ipv4Addr> {
-    let addr = format!("{}:0", host);
-    for addr in lookup_host(&addr).await? {
-        if let SocketAddr::V4(addr) = addr {
-            return Ok(*addr.ip());
-        }
-    }
-    Err(anyhow!("no IPv4 addr for {}", host))
 }

@@ -1,9 +1,11 @@
 use std::future::Future;
+use std::sync::Arc;
 use anyhow::{Error, Result};
 use ed25519_dalek::Keypair;
 use tokio::sync::mpsc::{channel, Sender};
 use synapi::Client;
 use crate::exec::Executor;
+use crate::export::Exporter;
 use crate::watch::Watcher;
 
 pub struct Agent {
@@ -22,10 +24,12 @@ impl Agent {
 
         let (tx, mut rx) = channel(16);
 
-        let (watcher, tasks) = Watcher::new(client, keys);
-        let executor = Executor::new(tasks).await?;
+        let (watcher, tasks) = Watcher::new(client.clone(), keys);
+        let exporter = Arc::new(Exporter::new(client));
+        let executor = Executor::new(tasks, exporter.clone()).await?;
 
         spawn(watcher.exec(),  tx.clone());
+        spawn(exporter.exec(), tx.clone());
         spawn(executor.exec(), tx.clone());
 
         match rx.recv().await {

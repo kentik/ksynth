@@ -88,16 +88,19 @@ impl Client {
         }).await?)
     }
 
-    pub async fn export(&self, sid: &str, flow: &[u8]) -> Result<(), Error> {
+    pub async fn export(&self, sid: &str, email: &str, token: &str, flow: &[u8]) -> Result<(), Error> {
         let url = format!("{}?sid=0&sender_id={}", self.submit, sid);
 
         let mut e = GzipEncoder::new(Vec::new());
         e.write_all(flow).await?;
+        e.close().await?;
         let flow = e.into_inner();
 
         let req = self.client.post(&url)
             .header(CONTENT_TYPE, "application/binary")
             .header(CONTENT_ENCODING, "gzip")
+            .header(AUTH_EMAIL, email)
+            .header(AUTH_TOKEN, token)
             .body(flow)
             .build()?;
 
@@ -126,3 +129,6 @@ impl From<Failure> for Error {
         Error::Application(status, msg)
     }
 }
+
+const AUTH_EMAIL: &str = "X-CH-Auth-Email";
+const AUTH_TOKEN: &str = "X-CH-Auth-API-Token";

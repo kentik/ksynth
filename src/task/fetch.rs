@@ -1,51 +1,70 @@
+use std::fmt;
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use anyhow::Result;
+use anyhow::{Error, Result};
 use bytes::Bytes;
 use reqwest::{Client, StatusCode};
 use log::{debug, warn};
-use tokio::time::delay_for;
+use tokio::time::{delay_for, timeout};
+use crate::export::{record, Envoy};
 
 pub struct Fetch {
     id:     u64,
     target: String,
     period: Duration,
+    envoy:  Envoy,
     client: Arc<Fetcher>,
 }
 
 impl Fetch {
-    pub fn new(id: u64, target: &str, client: Arc<Fetcher>) -> Self {
-        let target = format!("https://{}", target);
+    pub fn new(id: u64, target: String, envoy: Envoy, client: Arc<Fetcher>) -> Self {
         let period = Duration::from_secs(30);
-        Self { id, target, period, client }
+        Self { id, target, period, envoy, client }
     }
 
     pub async fn exec(self) -> Result<()> {
         loop {
             debug!("{}: target {}", self.id, self.target);
 
-            match self.client.get(&self.target).await {
-                Ok(stats) => self.report(stats),
-                Err(e)    => warn!("{}", e),
+            let expiry = Duration::from_secs(1);
+            let result = self.client.get(&self.target);
+
+            match timeout(expiry, result).await {
+                Ok(Ok(stats)) => self.success(stats).await,
+                Ok(Err(e))    => self.failure(e).await,
+                Err(_)        => self.timeout().await,
             }
 
             delay_for(self.period).await;
         }
     }
 
-    fn report(&self, stats: Stats) {
-        let rtt  = stats.rtt;
-        let code = stats.status.as_u16();
-        let size = stats.body.len();
-        debug!("{}: rtt: {:.2?}, status: {}, bytes: {}", self.id, rtt, code, size);
+    async fn success(&self, stats: Stats) {
+        debug!("{}: {}", self.id, stats);
+        self.envoy.export(record::Fetch {
+            id:     self.id,
+            addr:   stats.addr,
+            status: stats.status.as_u16(),
+            rtt:    stats.rtt,
+            size:   stats.body.len(),
+        }).await;
     }
-}
 
-#[derive(Debug)]
-pub struct Stats {
-    status: StatusCode,
-    rtt:    Duration,
-    body:   Bytes,
+    async fn failure(&self, err: Error) {
+        warn!("{}: error: {}", self.id, err);
+        self.envoy.export(record::Error {
+            id:    self.id,
+            cause: err.to_string(),
+        }).await;
+    }
+
+    async fn timeout(&self) {
+        warn!("{}: timeout", self.id);
+        self.envoy.export(record::Timeout {
+            id: self.id,
+        }).await;
+    }
 }
 
 #[derive(Clone)]
@@ -56,7 +75,7 @@ pub struct Fetcher {
 impl Fetcher {
     pub fn new() -> Result<Self> {
         let mut client = Client::builder();
-        client = client.timeout(Duration::from_secs(2));
+        client = client.timeout(Duration::from_secs(10));
         let client = client.build()?;
 
         Ok(Self { client })
@@ -66,10 +85,30 @@ impl Fetcher {
         let time = Instant::now();
         let res = self.client.get(url).send().await?;
 
+        let addr = match res.remote_addr() {
+            Some(sa) => sa.ip(),
+            None     => IpAddr::V4(0.into()),
+        };
+
         let status = res.status();
         let body   = res.bytes().await?;
         let rtt    = time.elapsed();
 
-        Ok(Stats { status, rtt, body })
+        Ok(Stats { addr, status, rtt, body })
+    }
+}
+
+#[derive(Debug)]
+pub struct Stats {
+    addr:   IpAddr,
+    status: StatusCode,
+    rtt:    Duration,
+    body:   Bytes,
+}
+
+impl fmt::Display for Stats {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let Self { rtt, status, body, .. } = self;
+        write!(f, "rtt: {:.2?}, status: {}, bytes: {}", rtt, status, body.len())
     }
 }

@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 anyhow        = "1.0.28"
 bytes         = "0.5.4"
+capnp         = "0.12.1"
 ed25519-dalek = "1.0.0-pre.3"
 env_logger    = "0.7.1"
 futures       = "0.3.4"
@@ -32,3 +33,6 @@ path = "netdiag"
 
 [dependencies.synapi]
 path = "synapi"
+
+[build-dependencies]
+capnpc = "0.12.1"

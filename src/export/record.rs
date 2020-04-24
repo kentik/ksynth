@@ -33,10 +33,11 @@ pub struct Fetch {
 pub struct Ping {
     pub id:   u64,
     pub addr: IpAddr,
+    pub sent: u32,
+    pub lost: u32,
     pub min:  Duration,
     pub max:  Duration,
     pub avg:  Duration,
-    pub loss: f64,
 }
 
 #[derive(Debug)]

@@ -7,30 +7,35 @@ use bytes::Bytes;
 use reqwest::{Client, StatusCode};
 use log::{debug, warn};
 use tokio::time::{delay_for, timeout};
+use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
 
 pub struct Fetch {
     id:     u64,
     target: String,
     period: Duration,
+    expiry: Duration,
     envoy:  Envoy,
     client: Arc<Fetcher>,
 }
 
 impl Fetch {
-    pub fn new(id: u64, target: String, envoy: Envoy, client: Arc<Fetcher>) -> Self {
-        let period = Duration::from_secs(30);
-        Self { id, target, period, envoy, client }
+    pub fn new(id: u64, cfg: FetchConfig, envoy: Envoy, client: Arc<Fetcher>) -> Self {
+        let FetchConfig { target, period, expiry } = cfg;
+
+        let period = Duration::from_secs(period);
+        let expiry = Duration::from_millis(expiry);
+
+        Self { id, target, period, expiry, envoy, client }
     }
 
     pub async fn exec(self) -> Result<()> {
         loop {
             debug!("{}: target {}", self.id, self.target);
 
-            let expiry = Duration::from_secs(1);
             let result = self.client.get(&self.target);
 
-            match timeout(expiry, result).await {
+            match timeout(self.expiry, result).await {
                 Ok(Ok(stats)) => self.success(stats).await,
                 Ok(Err(e))    => self.failure(e).await,
                 Err(_)        => self.timeout().await,
@@ -109,6 +114,8 @@ pub struct Stats {
 impl fmt::Display for Stats {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let Self { rtt, status, body, .. } = self;
-        write!(f, "rtt: {:.2?}, status: {}, bytes: {}", rtt, status, body.len())
+        let status = status.as_u16();
+        let size   = body.len();
+        write!(f, "rtt: {:.2?}, status: {}, bytes: {}", rtt, status, size)
     }
 }

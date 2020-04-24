@@ -9,6 +9,7 @@ use log::{debug, warn};
 use rand::random;
 use tokio::time::{delay_for, timeout};
 use netdiag::{self, Pinger};
+use synapi::tasks::PingConfig;
 use crate::export::{record, Envoy};
 use super::resolve;
 
@@ -16,24 +17,30 @@ pub struct Ping {
     id:     u64,
     target: String,
     period: Duration,
+    count:  usize,
+    expiry: Duration,
     envoy:  Envoy,
     pinger: Arc<Pinger>,
 }
 
 impl Ping {
-    pub fn new(id: u64, target: String, envoy: Envoy, pinger: Arc<Pinger>) -> Self {
-        let period = Duration::from_secs(10);
-        Self { id, target, period, envoy, pinger }
+    pub fn new(id: u64, cfg: PingConfig, envoy: Envoy, pinger: Arc<Pinger>) -> Self {
+        let PingConfig { target, period, count, expiry } = cfg;
+
+        let period = Duration::from_secs(period);
+        let count  = count as usize;
+        let expiry = Duration::from_millis(expiry);
+
+        Self { id, target, period, count, expiry, envoy, pinger }
     }
 
     pub async fn exec(self) -> Result<()> {
         loop {
             debug!("{}: target {}", self.id, self.target);
 
-            let expiry = Duration::from_secs(1);
-            let result = self.ping();
+            let result = self.ping(self.count);
 
-            match timeout(expiry, result).await {
+            match timeout(self.expiry, result).await {
                 Ok(Ok(rtt)) => self.success(rtt).await,
                 Ok(Err(e))  => self.failure(e).await,
                 Err(_)      => self.timeout().await,
@@ -43,33 +50,30 @@ impl Ping {
         }
     }
 
-    async fn ping(&self) -> Result<Stats> {
+    async fn ping(&self, count: usize) -> Result<Stats> {
         let pinger = self.pinger.clone();
 
-        let addr  = resolve(&self.target).await?;
-        let count = 10;
+        let addr = resolve(&self.target).await?;
 
         let rtt  = ping(pinger, addr).take(count).try_collect::<Vec<_>>().await?;
-        let sent = rtt.len();
+        let sent = rtt.len() as u32;
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();
+        let lost = sent - rtt.len() as u32;
 
         let zero = Duration::from_secs(0);
         let min  = rtt.iter().min().unwrap_or(&zero);
         let max  = rtt.iter().max().unwrap_or(&zero);
         let sum  = rtt.iter().sum::<Duration>();
 
-        let avg = sum.checked_div(sent as u32).unwrap_or(zero);
-
-        let sent  = sent  as f64;
-        let count = count as f64;
-        let loss  = (sent - count) / sent * 100.0;
+        let avg = sum.checked_div(sent).unwrap_or(zero);
 
         Ok(Stats {
             addr: IpAddr::V4(addr),
+            sent: sent,
+            lost: lost,
             min:  *min,
             max:  *max,
             avg:  avg,
-            loss: loss,
         })
     }
 
@@ -78,10 +82,11 @@ impl Ping {
         self.envoy.export(record::Ping {
             id:   self.id,
             addr: stats.addr,
+            sent: stats.sent,
+            lost: stats.lost,
             min:  stats.min,
             max:  stats.max,
             avg:  stats.avg,
-            loss: stats.loss,
         }).await;
     }
 
@@ -120,15 +125,17 @@ fn ping(pinger: Arc<Pinger>, addr: Ipv4Addr) -> impl Stream<Item = Result<Option
 #[derive(Debug)]
 struct Stats {
     addr: IpAddr,
+    sent: u32,
+    lost: u32,
     min:  Duration,
     max:  Duration,
     avg:  Duration,
-    loss: f64,
 }
 
 impl fmt::Display for Stats {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self { min, max, avg, loss, .. } = self;
-        write!(f, "min rtt {:.2?}, max {:.2?}, avg {:.2?}, loss: {:0.2}%", min, max, avg, loss)
+        let Self { sent, lost, min, max, avg, .. } = self;
+        let good = sent - lost;
+        write!(f, "{}/{} min rtt {:.2?}, max {:.2?}, avg {:.2?}", good, sent, min, max, avg)
     }
 }

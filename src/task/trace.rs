@@ -6,6 +6,7 @@ use anyhow::{Error, Result};
 use log::{debug, warn};
 use tokio::time::{delay_for, timeout};
 use netdiag::{self, Node, Tracer};
+use synapi::tasks::TraceConfig;
 use crate::export::{record, Envoy};
 use super::resolve;
 
@@ -13,24 +14,30 @@ pub struct Trace {
     id:     u64,
     target: String,
     period: Duration,
+    limit:  usize,
+    expiry: Duration,
     envoy:  Envoy,
     tracer: Arc<Tracer>,
 }
 
 impl Trace {
-    pub fn new(id: u64, target: String, envoy: Envoy, tracer: Arc<Tracer>) -> Self {
-        let period = Duration::from_secs(10);
-        Self { id, target, period, envoy, tracer }
+    pub fn new(id: u64, cfg: TraceConfig, envoy: Envoy, tracer: Arc<Tracer>) -> Self {
+        let TraceConfig { target, period, limit, expiry } = cfg;
+
+        let period = Duration::from_secs(period);
+        let limit  = limit as usize;
+        let expiry = Duration::from_millis(expiry);
+
+        Self { id, target, period, limit, expiry, envoy, tracer }
     }
 
     pub async fn exec(self) -> Result<()> {
         loop {
             debug!("{}: target {}", self.id, self.target);
 
-            let expiry = Duration::from_secs(60);
             let result = self.trace();
 
-            match timeout(expiry, result).await {
+            match timeout(self.expiry, result).await {
                 Ok(Ok(stats)) => self.success(stats).await,
                 Ok(Err(e))    => self.failure(e).await,
                 Err(_)        => self.timeout().await,
@@ -47,7 +54,7 @@ impl Trace {
         let route = self.tracer.route(netdiag::Trace {
             addr:   addr,
             probes: 3,
-            limit:  32,
+            limit:  self.limit,
             expiry: Duration::from_millis(250),
         }).await?;
 

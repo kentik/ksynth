@@ -35,16 +35,24 @@ pub enum Config {
 #[derive(Debug, Deserialize)]
 pub struct PingConfig {
     pub target: String,
+    pub period: u64,
+    pub count:  u64,
+    pub expiry: u64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TraceConfig {
     pub target: String,
+    pub period: u64,
+    pub limit:  u64,
+    pub expiry: u64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct FetchConfig {
     pub target: String,
+    pub period: u64,
+    pub expiry: u64,
 }
 
 #[derive(Debug)]
@@ -163,7 +171,7 @@ impl<'d> Deserialize<'d> for Kind {
             1 => Ok(Kind::U64),
             2 => Ok(Kind::String),
             3 => Ok(Kind::Addr),
-            n => Err(Error::invalid_value(Unexpected::Unsigned(n), &"0..2")),
+            n => Err(Error::invalid_value(Unexpected::Unsigned(n), &"0..3")),
         }
     }
 }

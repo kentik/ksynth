@@ -79,29 +79,21 @@ impl Executor {
         Ok(())
     }
 
-
     async fn ping(&self, id: u64, cfg: PingConfig, envoy: Envoy) -> Result<Handle> {
-        let target = cfg.target;
         let pinger = self.pinger.clone();
-
-        let ping = Ping::new(id, target, envoy, pinger);
+        let ping = Ping::new(id, cfg, envoy, pinger);
         Ok(spawn(id, ping.exec()))
     }
 
     async fn trace(&self, id: u64, cfg: TraceConfig, envoy: Envoy) -> Result<Handle> {
-        let target = cfg.target;
         let tracer = self.tracer.clone();
-
-        let trace = Trace::new(id, target, envoy, tracer);
+        let trace = Trace::new(id, cfg, envoy, tracer);
         Ok(spawn(id, trace.exec()))
     }
 
     async fn fetch(&self, id: u64, cfg: FetchConfig, envoy: Envoy) -> Result<Handle> {
-        let target = cfg.target;
         let client = self.fetcher.clone();
-
-        let fetch = Fetch::new(id, target, envoy, client);
+        let fetch = Fetch::new(id, cfg, envoy, client);
         Ok(spawn(id, fetch.exec()))
     }
-
 }

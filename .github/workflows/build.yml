@@ -4,11 +4,16 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.builder }}
     strategy:
       matrix:
-        target:
-          - x86_64-unknown-linux-musl
+        include:
+          - target: x86_64-unknown-linux-musl
+            builder: ubuntu-latest
+            cross: true
+          - target: x86_64-apple-darwin
+            builder: macos-latest
+            cross: false
     steps:
       - uses: actions-rs/toolchain@v1
         with:
@@ -27,9 +32,12 @@ jobs:
           push: false
         env:
           DOCKER_BUILDKIT: 1
+        if: ${{ matrix.cross }}
+      - run: brew install capnp
+        if: ${{ startsWith(matrix.builder, 'macos') }}
       - uses: actions-rs/cargo@v1
         with:
-          use-cross: true
+          use-cross: ${{ matrix.cross }}
           command: build
           args: --release --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v1

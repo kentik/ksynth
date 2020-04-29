@@ -124,7 +124,7 @@ impl<'d> Deserialize<'d> for Task {
     fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
         #[derive(Debug, Deserialize)]
         struct TaskContainer {
-            #[serde(deserialize_with = "id")]
+            #[serde(rename = "task_id", deserialize_with = "id")]
             pub id:    u64,
             pub ping:  Option<PingConfig>,
             #[serde(rename = "traceroute")]

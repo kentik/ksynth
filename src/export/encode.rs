@@ -39,9 +39,19 @@ pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
 }
 
 struct Columns {
-    kind:  u32,
-    id:    u32,
-    cause: u32,
+    kind:   u32,
+    id:     u32,
+    cause:  u32,
+    status: u32,
+    rtt:    u32,
+    size:   u32,
+    sent:   u32,
+    lost:   u32,
+    min:    u32,
+    max:    u32,
+    avg:    u32,
+    route:  u32,
+    time:   u32,
 }
 
 impl Columns {
@@ -55,43 +65,79 @@ impl Columns {
         };
 
         Ok(Self {
-            kind:  lookup("APP_PROTOCOL")?,
-            id:    lookup("INT64_00")?,
-            cause: lookup("STR00")?,
+            kind:   lookup("APP_PROTOCOL")?,
+            id:     lookup("INT64_00")?,
+            cause:  lookup("STR00")?,
+            status: lookup("INT00")?,
+            rtt:    lookup("INT64_01")?,
+            size:   lookup("INT64_02")?,
+            sent:   lookup("INT00")?,
+            lost:   lookup("INT01")?,
+            min:    lookup("INT64_01")?,
+            max:    lookup("INT64_02")?,
+            avg:    lookup("INT64_03")?,
+            route:  lookup("STR00")?,
+            time:   lookup("INT64_01")?,
         })
     }
 
     fn fetch(&self, mut msg: Builder, data: &Fetch) {
-        match data.addr {
+        let Fetch { id, addr, status, rtt, size, .. } = *data;
+
+        let rtt  = rtt.as_micros() as u64;
+        let size = size            as u64;
+
+        match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new(msg.init_custom(2));
-        customs.next(self.kind, |v| v.set_uint32_val(0));
-        customs.next(self.id,   |v| v.set_uint64_val(data.id));
+        let mut customs = Customs::new(msg.init_custom(5));
+        customs.next(self.kind,   |v| v.set_uint32_val(0));
+        customs.next(self.id,     |v| v.set_uint64_val(id));
+        customs.next(self.status, |v| v.set_uint16_val(status));
+        customs.next(self.rtt,    |v| v.set_uint64_val(rtt));
+        customs.next(self.size,   |v| v.set_uint64_val(size));
     }
 
     fn ping(&self, mut msg: Builder, data: &Ping) {
-        match data.addr {
+        let Ping { id, addr, sent, lost, min, max, avg, .. } = *data;
+
+        let min = min.as_micros() as u64;
+        let max = max.as_micros() as u64;
+        let avg = avg.as_micros() as u64;
+
+        match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new(msg.init_custom(2));
+        let mut customs = Customs::new(msg.init_custom(7));
         customs.next(self.kind, |v| v.set_uint32_val(0));
-        customs.next(self.id,   |v| v.set_uint64_val(data.id));
+        customs.next(self.id,   |v| v.set_uint64_val(id));
+        customs.next(self.sent, |v| v.set_uint32_val(sent));
+        customs.next(self.lost, |v| v.set_uint32_val(lost));
+        customs.next(self.min,  |v| v.set_uint64_val(min));
+        customs.next(self.max,  |v| v.set_uint64_val(max));
+        customs.next(self.avg,  |v| v.set_uint64_val(avg));
     }
 
     fn trace(&self, mut msg: Builder, data: &Trace) {
-        match data.addr {
+        let Trace { id, addr, time, .. } = *data;
+
+        let time  = time.as_micros() as u64;
+        let route = "[]";
+
+        match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new(msg.init_custom(2));
-        customs.next(self.kind, |v| v.set_uint32_val(0));
-        customs.next(self.id,   |v| v.set_uint64_val(data.id));
+        let mut customs = Customs::new(msg.init_custom(4));
+        customs.next(self.kind,  |v| v.set_uint32_val(0));
+        customs.next(self.id,    |v| v.set_uint64_val(id));
+        customs.next(self.route, |v| v.set_str_val(route));
+        customs.next(self.time,  |v| v.set_uint64_val(time));
     }
 
     fn error(&self, msg: Builder, data: &Error) {

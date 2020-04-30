@@ -1,32 +1,33 @@
 use std::convert::{TryFrom, TryInto};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 use anyhow::Result;
 use etherparse::{Ipv4Header, IpTrafficClass};
 use tokio::sync::{Mutex, oneshot::channel};
 use tokio_raw::{Domain, Type, Protocol, RawSocket, RawSend, RawRecv};
 use rand::prelude::*;
-use crate::icmp::{self, IcmpV4Packet};
+use crate::icmp::{ping4, ping6, IcmpV4Packet, IcmpV6Packet};
 use super::pong::Pong;
 use super::state::State;
 
 #[derive(Debug)]
 pub struct Ping {
-    pub addr:  Ipv4Addr,
+    pub addr:  IpAddr,
     pub id:    u16,
     pub seq:   u16,
     pub token: Token,
 }
 
 impl Ping {
-    pub fn new(addr: Ipv4Addr, id: u16, seq: u16) -> Self {
+    pub fn new(addr: IpAddr, id: u16, seq: u16) -> Self {
         let token = Token(random());
         Self { addr, id, seq, token }
     }
 }
 
 pub struct Pinger {
-    sock:  Mutex<RawSend>,
+    sock4: Mutex<RawSend>,
+    sock6: Mutex<RawSend>,
     state: State,
 }
 
@@ -35,19 +36,24 @@ pub struct Token([u8; 16]);
 
 impl Pinger {
     pub fn new() -> Result<Self> {
-        let ipv4 = Domain::ipv4();
-        let raw  = Type::raw();
-        let icmp = Protocol::icmpv4();
-
-        let sock = RawSocket::new(ipv4, raw, Some(icmp))?;
-
-        let (rx, tx) = sock.split();
-        let sock  = Mutex::new(tx);
         let state = State::default();
 
-        tokio::spawn(recv(rx, state.clone()));
+        let raw   = Type::raw();
+        let icmp4 = Protocol::icmpv4();
+        let icmp6 = Protocol::icmpv6();
 
-        Ok(Self { sock, state })
+        let sock4 = RawSocket::new(Domain::ipv4(), raw, Some(icmp4))?;
+        let sock6 = RawSocket::new(Domain::ipv6(), raw, Some(icmp6))?;
+
+        let (rx, tx) = sock4.split();
+        let sock4 = Mutex::new(tx);
+        tokio::spawn(recv4(rx, state.clone()));
+
+        let (rx, tx) = sock6.split();
+        let sock6 = Mutex::new(tx);
+        tokio::spawn(recv6(rx, state.clone()));
+
+        Ok(Self { sock4, sock6, state })
     }
 
     pub async fn ping(&self, ping: &Ping) -> Result<Duration> {
@@ -55,27 +61,30 @@ impl Pinger {
         let token = ping.token;
 
         let (tx, rx) = channel();
-        state.insert(ping.token, tx).await;
+        state.insert(token, tx).await;
 
-        let sent = send(&self.sock, ping).await?;
+        let sent = send(&self.sock4, &self.sock6, ping).await?;
         Pong::new(rx, sent, state, token).await
     }
 }
 
-async fn send(sock: &Mutex<RawSend>, ping: &Ping) -> Result<Instant> {
-    let mut pkt = [0u8; 64];
-
+async fn send(sock4: &Mutex<RawSend>, sock6: &Mutex<RawSend>, ping: &Ping) -> Result<Instant> {
     let Ping { addr, id, seq, token } = *ping;
-    let pkt  = icmp::ping(&mut pkt, id, seq, &token.0)?;
-    let addr = SocketAddr::new(IpAddr::V4(addr), 0);
 
+    let mut pkt = [0u8; 64];
+    let (sock, pkt) = match addr {
+        IpAddr::V4(..) => (sock4, ping4(&mut pkt, id, seq, &token.0)?),
+        IpAddr::V6(..) => (sock6, ping6(&mut pkt, id, seq, &token.0)?),
+    };
+
+    let addr = SocketAddr::new(addr, 0);
     let mut sock = sock.lock().await;
     sock.send_to(&pkt, &addr).await?;
 
     Ok(Instant::now())
 }
 
-async fn recv(mut sock: RawRecv, state: State) -> Result<()> {
+async fn recv4(mut sock: RawRecv, state: State) -> Result<()> {
     let mut pkt = [0u8; 64];
     loop {
         let (n, _) = sock.recv_from(&mut pkt).await?;
@@ -83,7 +92,7 @@ async fn recv(mut sock: RawRecv, state: State) -> Result<()> {
         let now = Instant::now();
         let pkt = Ipv4Header::read_from_slice(&pkt[..n])?;
 
-        if let (Ipv4Header { protocol: ICMP, .. }, tail) = pkt {
+        if let (Ipv4Header { protocol: ICMP4, .. }, tail) = pkt {
             if let IcmpV4Packet::EchoReply(echo) = IcmpV4Packet::try_from(tail)? {
                 if let Ok(token) = echo.data.try_into().map(Token) {
                     if let Some(tx) = state.remove(&token).await {
@@ -95,4 +104,22 @@ async fn recv(mut sock: RawRecv, state: State) -> Result<()> {
     }
 }
 
-const ICMP: u8 = IpTrafficClass::Icmp as u8;
+async fn recv6(mut sock: RawRecv, state: State) -> Result<()> {
+    let mut pkt = [0u8; 64];
+    loop {
+        let (n, _) = sock.recv_from(&mut pkt).await?;
+
+        let now = Instant::now();
+        let pkt = IcmpV6Packet::try_from(&pkt[..n])?;
+
+        if let IcmpV6Packet::EchoReply(echo) = pkt {
+            if let Ok(token) = echo.data.try_into().map(Token) {
+                if let Some(tx) = state.remove(&token).await {
+                    let _ = tx.send(now);
+                }
+            }
+        }
+    }
+}
+
+const ICMP4: u8 = IpTrafficClass::Icmp as u8;

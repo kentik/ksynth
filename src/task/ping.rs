@@ -1,5 +1,5 @@
 use std::fmt;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Error,Result}  ;
@@ -53,7 +53,7 @@ impl Ping {
     async fn ping(&self, count: usize) -> Result<Stats> {
         let pinger = self.pinger.clone();
 
-        let addr = resolve(&self.target).await?;
+        let addr = IpAddr::V4(resolve(&self.target).await?);
 
         let rtt  = ping(pinger, addr).take(count).try_collect::<Vec<_>>().await?;
         let sent = rtt.len() as u32;
@@ -68,7 +68,7 @@ impl Ping {
         let avg = sum.checked_div(sent).unwrap_or(zero);
 
         Ok(Stats {
-            addr: IpAddr::V4(addr),
+            addr: addr,
             sent: sent,
             lost: lost,
             min:  *min,
@@ -106,7 +106,7 @@ impl Ping {
     }
 }
 
-fn ping(pinger: Arc<Pinger>, addr: Ipv4Addr) -> impl Stream<Item = Result<Option<Duration>>> {
+fn ping(pinger: Arc<Pinger>, addr: IpAddr) -> impl Stream<Item = Result<Option<Duration>>> {
     unfold((pinger, addr, 0), |(pinger, addr, seq)| async move {
         let expiry = Duration::from_millis(250);
         let ident  = random();

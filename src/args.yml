@@ -4,36 +4,48 @@ usage: agent
 global_settings:
   - DeriveDisplayOrder
 
+settings:
+  - DisableHelpSubcommand
+  - SubcommandRequiredElseHelp
+  - VersionlessSubcommands
+
 help_message: print help
 version_message: print version
 
 args:
-  - id:
-      short: i
-      long: id
-      env: IDENTITY
-      help: agent ID
-      takes_value: true
-      required: true
-  - company:
-      long: company
-      env: KENTIK_COMPANY
-      help: company ID
-      takes_value: true
-  - proxy:
-      long: proxy
-      env: PROXY
-      help: HTTP proxy
-      takes_value: true
-  - region:
-      long: region
-      env: KENTIK_REGION
-      help: region
-      takes_value: true
-      default_value: "US"
-      required: true
   - verbose:
       short: v
       long: verbose
       help: verbose output
       multiple: true
+      global: true
+
+subcommands:
+  - agent:
+      about: run agent
+      help_message: print help
+      args:
+        - id:
+            short: i
+            long: id
+            env: IDENTITY
+            help: agent ID
+            takes_value: true
+            required: true
+        - company:
+            long: company
+            env: KENTIK_COMPANY
+            help: company ID
+            takes_value: true
+        - proxy:
+            long: proxy
+            env: PROXY
+            help: HTTP proxy
+            takes_value: true
+        - region:
+            long: region
+            env: KENTIK_REGION
+            help: region
+            takes_value: true
+            default_value: "US"
+            required: true

@@ -15,6 +15,11 @@ args:
       help: agent ID
       takes_value: true
       required: true
+  - company:
+      long: company
+      env: KENTIK_COMPANY
+      help: company ID
+      takes_value: true
   - proxy:
       long: proxy
       env: PROXY
@@ -23,7 +28,7 @@ args:
   - region:
       long: region
       env: KENTIK_REGION
-      help: Kentik region
+      help: region
       takes_value: true
       default_value: "US"
       required: true

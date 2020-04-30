@@ -1,6 +1,7 @@
 use std::fs::{self, File};
 use std::io::Read;
 use std::process;
+use std::str::FromStr;
 use anyhow::Result;
 use clap::{App, load_yaml, value_t};
 use ed25519_dalek::Keypair;
@@ -18,9 +19,12 @@ fn main() -> Result<()> {
     let ver  = env!("CARGO_PKG_VERSION");
     let args = App::from_yaml(&yaml).version(ver).get_matches();
 
-    let id     = value_t!(args, "id", String)?;
-    let region = value_t!(args, "region", String)?;
-    let proxy  = args.value_of("proxy");
+    let id      = value_t!(args, "id", String)?;
+    let company = args.value_of("company");
+    let region  = value_t!(args, "region", String)?;
+    let proxy   = args.value_of("proxy");
+
+    let company = company.map(u64::from_str).transpose()?;
 
     let (module, level) = match args.occurrences_of("verbose") {
         0 => (Some(module_path!()), Info),
@@ -37,7 +41,7 @@ fn main() -> Result<()> {
         Err(_) => init(&id)?,
     };
 
-    let client  = Client::new(region.as_ref(), proxy)?;
+    let client  = Client::new(region.as_ref(), company, proxy)?;
     let runtime = Runtime::new()?;
     let agent   = Agent::new(client, keys);
 

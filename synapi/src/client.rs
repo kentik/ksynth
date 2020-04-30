@@ -12,10 +12,11 @@ use crate::tasks::Tasks;
 
 #[derive(Clone)]
 pub struct Client {
-    client: HttpClient,
-    auth:   String,
-    tasks:  String,
-    submit: String,
+    client:  HttpClient,
+    company: Option<u64>,
+    auth:    String,
+    tasks:   String,
+    submit:  String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,7 +33,7 @@ struct Failure {
 }
 
 impl Client {
-    pub fn new(region: &str, proxy: Option<&str>) -> Result<Self, Error> {
+    pub fn new(region: &str, company: Option<u64>, proxy: Option<&str>) -> Result<Self, Error> {
         let domain = match region.to_ascii_uppercase().as_ref() {
             "US" => "kentik.com".to_owned(),
             "EU" => "kentik.eu".to_owned(),
@@ -47,31 +48,36 @@ impl Client {
         }
 
         Ok(Self {
-            client: client.build()?,
-            auth:   format!("https://portal.{}:8888/v1/syn/auth",  domain),
-            tasks:  format!("https://portal.{}:8888/v1/syn/tasks", domain),
-            submit: format!("https://flow.{}/chf",                 domain),
+            client:  client.build()?,
+            company: company,
+            auth:    format!("https://portal.{}:8888/v1/syn/auth",  domain),
+            tasks:   format!("https://portal.{}:8888/v1/syn/tasks", domain),
+            submit:  format!("https://flow.{}/chf",                 domain),
         })
     }
 
     pub async fn auth<'a>(&self, keys: &Keypair, version: &'a str) -> Result<Auth, Error> {
         #[derive(Debug, Serialize)]
         struct Request<'a> {
-            agent:     String,
-            version:   &'a str,
-            timestamp: String,
-            signature: String,
+            agent:      String,
+            company_id: Option<String>,
+            version:    &'a str,
+            timestamp:  String,
+            signature:  String,
         }
+
+        let company = self.company.as_ref().map(u64::to_string);
 
         let key = &keys.public;
         let now = get_time().sec.to_string();
         let sig = keys.sign(now.as_bytes());
 
         Ok(self.send(&self.auth, &Request {
-            agent:     hex::encode(&key.to_bytes()[..]),
-            version:   version,
-            timestamp: now,
-            signature: hex::encode(&sig.to_bytes()[..]),
+            agent:      hex::encode(&key.to_bytes()[..]),
+            company_id: company,
+            version:    version,
+            timestamp:  now,
+            signature:  hex::encode(&sig.to_bytes()[..]),
         }).await?)
     }
 

@@ -14,6 +14,9 @@ jobs:
           - target: x86_64-apple-darwin
             builder: macos-latest
             cross: false
+          - target: aarch64-unknown-linux-musl
+            builder: ubuntu-latest
+            cross: true
     steps:
       - uses: actions-rs/toolchain@v1
         with:

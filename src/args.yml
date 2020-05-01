@@ -1,5 +1,4 @@
-name: agent
-usage: agent
+name: synag
 
 global_settings:
   - DeriveDisplayOrder
@@ -22,7 +21,7 @@ args:
 
 subcommands:
   - agent:
-      about: run agent
+      about: execute agent
       help_message: print help
       args:
         - id:
@@ -48,4 +47,33 @@ subcommands:
             help: region
             takes_value: true
             default_value: "US"
+  - ping:
+      about: execute ping
+      help_message: print help
+      args:
+        - count:
+            short: c
+            help: count
+            value_name: count
+            default_value: "4"
+        - delay:
+            short: d
+            help: delay (ms)
+            default_value: "100"
+        - expiry:
+            short: e
+            help: expiry (ms)
+            default_value: "250"
+        - ip4:
+            short: "4"
+            help: use IPv4 only
+            conflicts_with: ip6
+        - ip6:
+            short: "6"
+            help: use IPv6 only
+            conflicts_with: ip4
+        - host:
+            index: 1
+            help: host
+            multiple: true
             required: true

@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod cmd;
 
 mod exec;
 mod export;

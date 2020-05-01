@@ -3,7 +3,7 @@ use anyhow::Error;
 use clap::{App, load_yaml};
 use env_logger::Builder;
 use log::LevelFilter::{Info, Debug, Trace};
-use synag::agent;
+use synag::{agent, cmd};
 
 fn main() {
     let ver  = env!("CARGO_PKG_VERSION");
@@ -19,7 +19,8 @@ fn main() {
     Builder::from_default_env().filter(module, level).init();
 
     match args.subcommand() {
-        ("agent", Some(args)) => agent::agent(&args),
+        ("agent", Some(args)) => agent::agent(args),
+        ("ping",  Some(args)) => cmd::ping(args),
         _                     => unreachable!(),
     }.unwrap_or_else(abort);
 }

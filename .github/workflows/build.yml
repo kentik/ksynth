@@ -17,6 +17,9 @@ jobs:
           - target: aarch64-unknown-linux-musl
             builder: ubuntu-latest
             cross: true
+          - target: armv7-unknown-linux-musleabihf
+            builder: ubuntu-latest
+            cross: true
     steps:
       - uses: actions-rs/toolchain@v1
         with:

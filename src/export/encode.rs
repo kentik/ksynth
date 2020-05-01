@@ -39,6 +39,7 @@ pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
 }
 
 struct Columns {
+    agent:  u32,
     kind:   u32,
     id:     u32,
     cause:  u32,
@@ -65,14 +66,15 @@ impl Columns {
         };
 
         Ok(Self {
-            kind:   lookup("APP_PROTOCOL")?,
+            agent:  lookup("APP_PROTOCOL")?,
+            kind:   lookup("INT00")?,
             id:     lookup("INT64_00")?,
             cause:  lookup("STR00")?,
-            status: lookup("INT00")?,
+            status: lookup("INT01")?,
             rtt:    lookup("INT64_01")?,
             size:   lookup("INT64_02")?,
-            sent:   lookup("INT00")?,
-            lost:   lookup("INT01")?,
+            sent:   lookup("INT01")?,
+            lost:   lookup("INT02")?,
             min:    lookup("INT64_01")?,
             max:    lookup("INT64_02")?,
             avg:    lookup("INT64_03")?,
@@ -92,8 +94,9 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new(msg.init_custom(5));
-        customs.next(self.kind,   |v| v.set_uint32_val(0));
+        let mut customs = Customs::new("fetch", msg, 6);
+        customs.next(self.agent,  |v| v.set_uint32_val(AGENT));
+        customs.next(self.kind,   |v| v.set_uint32_val(FETCH));
         customs.next(self.id,     |v| v.set_uint64_val(id));
         customs.next(self.status, |v| v.set_uint16_val(status));
         customs.next(self.rtt,    |v| v.set_uint64_val(rtt));
@@ -112,14 +115,15 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new(msg.init_custom(7));
-        customs.next(self.kind, |v| v.set_uint32_val(0));
-        customs.next(self.id,   |v| v.set_uint64_val(id));
-        customs.next(self.sent, |v| v.set_uint32_val(sent));
-        customs.next(self.lost, |v| v.set_uint32_val(lost));
-        customs.next(self.min,  |v| v.set_uint64_val(min));
-        customs.next(self.max,  |v| v.set_uint64_val(max));
-        customs.next(self.avg,  |v| v.set_uint64_val(avg));
+        let mut customs = Customs::new("ping", msg, 8);
+        customs.next(self.agent, |v| v.set_uint32_val(AGENT));
+        customs.next(self.kind,  |v| v.set_uint32_val(PING));
+        customs.next(self.id,    |v| v.set_uint64_val(id));
+        customs.next(self.sent,  |v| v.set_uint32_val(sent));
+        customs.next(self.lost,  |v| v.set_uint32_val(lost));
+        customs.next(self.min,   |v| v.set_uint64_val(min));
+        customs.next(self.max,   |v| v.set_uint64_val(max));
+        customs.next(self.avg,   |v| v.set_uint64_val(avg));
     }
 
     fn trace(&self, mut msg: Builder, data: &Trace) {
@@ -133,23 +137,34 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new(msg.init_custom(4));
-        customs.next(self.kind,  |v| v.set_uint32_val(0));
+        let mut customs = Customs::new("trace", msg, 5);
+        customs.next(self.agent, |v| v.set_uint32_val(AGENT));
+        customs.next(self.kind,  |v| v.set_uint32_val(TRACE));
         customs.next(self.id,    |v| v.set_uint64_val(id));
         customs.next(self.route, |v| v.set_str_val(route));
         customs.next(self.time,  |v| v.set_uint64_val(time));
     }
 
     fn error(&self, msg: Builder, data: &Error) {
-        let mut customs = Customs::new(msg.init_custom(3));
-        customs.next(self.kind,  |v| v.set_uint32_val(0));
+        let mut customs = Customs::new("error", msg, 4);
+        customs.next(self.agent, |v| v.set_uint32_val(AGENT));
+        customs.next(self.kind,  |v| v.set_uint32_val(ERROR));
         customs.next(self.id,    |v| v.set_uint64_val(data.id));
         customs.next(self.cause, |v| v.set_str_val(&data.cause));
     }
 
     fn timeout(&self, msg: Builder, data: &Timeout) {
-        let mut customs = Customs::new(msg.init_custom(2));
-        customs.next(self.kind, |v| v.set_uint32_val(0));
-        customs.next(self.id,   |v| v.set_uint64_val(data.id));
+        let mut customs = Customs::new("timeout", msg, 3);
+        customs.next(self.agent, |v| v.set_uint32_val(AGENT));
+        customs.next(self.kind,  |v| v.set_uint32_val(TIMEOUT));
+        customs.next(self.id,    |v| v.set_uint64_val(data.id));
     }
 }
+
+const AGENT:   u32 = 10;
+
+const ERROR:   u32 = 0;
+const TIMEOUT: u32 = 1;
+const PING:    u32 = 2;
+const FETCH:   u32 = 3;
+const TRACE:   u32 = 4;

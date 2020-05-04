@@ -77,3 +77,29 @@ subcommands:
             help: host
             multiple: true
             required: true
+  - trace:
+      about: execute trace
+      help_message: print help
+      args:
+        - delay:
+            short: d
+            help: delay (ms)
+            default_value: "50"
+        - expiry:
+            short: e
+            help: expiry (ms)
+            default_value: "250"
+        - limit:
+            short: l
+            help: hop limit
+            default_value: "32"
+        - probes:
+            short: p
+            help: probe count
+            value_name: probes
+            default_value: "3"
+        - host:
+            index: 1
+            help: host
+            multiple: true
+            required: true

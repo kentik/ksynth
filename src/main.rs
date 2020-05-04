@@ -21,6 +21,7 @@ fn main() {
     match args.subcommand() {
         ("agent", Some(args)) => agent::agent(args),
         ("ping",  Some(args)) => cmd::ping(args),
+        ("trace", Some(args)) => cmd::trace(args),
         _                     => unreachable!(),
     }.unwrap_or_else(abort);
 }

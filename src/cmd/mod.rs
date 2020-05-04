@@ -10,6 +10,10 @@ pub fn ping(args: &ArgMatches<'_>) -> Result<()> {
     Runtime::new()?.block_on(ping::ping(args))
 }
 
+pub fn trace(args: &ArgMatches<'_>) -> Result<()> {
+    Runtime::new()?.block_on(trace::trace(args))
+}
+
 pub async fn resolve(hosts: Vec<String>, ip4: bool, ip6: bool) -> Vec<(String, IpAddr)> {
     stream::iter(hosts).filter_map(|host| async move {
         match lookup(&host, ip4, ip6).await {
@@ -38,3 +42,4 @@ pub async fn lookup(host: &str, ip4: bool, ip6: bool) -> Result<Option<IpAddr>> 
 }
 
 mod ping;
+mod trace;

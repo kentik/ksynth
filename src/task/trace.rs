@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -7,7 +8,7 @@ use log::{debug, warn};
 use tokio::time::{delay_for, timeout};
 use netdiag::{self, Node, Tracer};
 use synapi::tasks::TraceConfig;
-use crate::export::{record, Envoy};
+use crate::export::{record, Hop, Envoy};
 use super::resolve;
 
 pub struct Trace {
@@ -38,7 +39,7 @@ impl Trace {
             let result = self.trace();
 
             match timeout(self.expiry, result).await {
-                Ok(Ok(stats)) => self.success(stats).await,
+                Ok(Ok(stats)) => self.success(stats).await?,
                 Ok(Err(e))    => self.failure(e).await,
                 Err(_)        => self.timeout().await,
             }
@@ -65,14 +66,33 @@ impl Trace {
         })
     }
 
-    async fn success(&self, stats: Stats) {
+    async fn success(&self, stats: Stats) -> Result<()> {
         debug!("{}: {}", self.id, stats);
+
+        let route = stats.route.into_iter().enumerate().map(|(hop, nodes)| {
+            let mut map = HashMap::<IpAddr, Vec<u64>>::new();
+
+            for node in nodes {
+                if let Node::Node(_, addr, rtt) = node {
+                    let addr = IpAddr::from(addr);
+                    let rtt  = rtt.as_micros() as u64;
+                    map.entry(addr).or_default().push(rtt);
+                }
+            }
+
+            Hop { hop: hop + 1, nodes: map }
+        }).collect::<Vec<_>>();
+
+        let route = serde_json::to_string(&route)?;
+
         self.envoy.export(record::Trace {
             id:    self.id,
             addr:  stats.addr,
-            route: stats.route,
+            route: route,
             time:  stats.time,
         }).await;
+
+        Ok(())
     }
 
     async fn failure(&self, err: Error) {

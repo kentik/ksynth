@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::net::IpAddr;
 use std::time::Duration;
-use netdiag::Node;
+use serde::Serialize;
 use synapi::tasks::Device;
 
 #[derive(Debug)]
@@ -44,8 +45,14 @@ pub struct Ping {
 pub struct Trace {
     pub id:    u64,
     pub addr:  IpAddr,
-    pub route: Vec<Vec<Node>>,
+    pub route: String,
     pub time:  Duration,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Hop {
+    pub hop:   usize,
+    pub nodes: HashMap<IpAddr, Vec<u64>>,
 }
 
 #[derive(Debug)]

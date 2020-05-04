@@ -129,8 +129,8 @@ impl Columns {
     fn trace(&self, mut msg: Builder, data: &Trace) {
         let Trace { id, addr, time, .. } = *data;
 
+        let route = &data.route;
         let time  = time.as_micros() as u64;
-        let route = "[]";
 
         match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),

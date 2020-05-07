@@ -87,7 +87,7 @@ impl Fetcher {
     }
 
     pub async fn get(&self, url: &str) -> Result<Stats> {
-        let time = Instant::now();
+        let sent = Instant::now();
         let res = self.client.get(url).send().await?;
 
         let addr = match res.remote_addr() {
@@ -97,7 +97,8 @@ impl Fetcher {
 
         let status = res.status();
         let body   = res.bytes().await?;
-        let rtt    = time.elapsed();
+        let time   = Instant::now();
+        let rtt    = time.saturating_duration_since(sent);
 
         Ok(Stats { addr, status, rtt, body })
     }

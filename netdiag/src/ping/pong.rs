@@ -30,7 +30,7 @@ impl Future for Pong {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match ready!(Pin::new(&mut self.rtt).poll(cx)) {
-            Ok(time) => Poll::Ready(Ok(time.duration_since(self.sent))),
+            Ok(time) => Poll::Ready(Ok(time.saturating_duration_since(self.sent))),
             Err(e)   => Poll::Ready(Err(e.into())),
         }
     }

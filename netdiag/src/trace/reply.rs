@@ -52,7 +52,7 @@ impl Future for Reply {
         };
 
         let addr = echo.0;
-        let rtt  = echo.1.duration_since(sent);
+        let rtt  = echo.1.saturating_duration_since(sent);
 
         Poll::Ready(Ok(Node::Node(n, addr, rtt)))
     }

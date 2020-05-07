@@ -74,7 +74,7 @@ impl Trace {
 
             for node in nodes {
                 if let Node::Node(_, addr, rtt) = node {
-                    let rtt  = rtt.as_micros() as u64;
+                    let rtt = rtt.as_micros() as u64;
                     map.entry(addr).or_default().push(rtt);
                 }
             }

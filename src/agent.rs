@@ -27,7 +27,7 @@ impl Agent {
         Self { client, keys }
     }
 
-    pub async fn exec(self) -> Result<()> {
+    pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
         let client = self.client;
         let keys   = self.keys;
 
@@ -35,7 +35,7 @@ impl Agent {
 
         let (watcher, tasks) = Watcher::new(client.clone(), keys);
         let exporter = Arc::new(Exporter::new(client));
-        let executor = Executor::new(tasks, exporter.clone()).await?;
+        let executor = Executor::new(tasks, exporter.clone(), ip4, ip6).await?;
 
         spawn(watcher.exec(),  tx.clone());
         spawn(exporter.exec(), tx.clone());
@@ -65,6 +65,8 @@ pub fn agent(args: &ArgMatches) -> Result<()> {
     let company = args.value_of("company");
     let region  = value_t!(args, "region", String)?;
     let proxy   = args.value_of("proxy");
+    let ip4     = !args.is_present("ip6");
+    let ip6     = !args.is_present("ip4");
 
     let company = company.map(u64::from_str).transpose()?;
 
@@ -80,7 +82,7 @@ pub fn agent(args: &ArgMatches) -> Result<()> {
     let agent   = Agent::new(client, keys);
 
     runtime.spawn(async move {
-        if let Err(e) = agent.exec().await {
+        if let Err(e) = agent.exec(ip4, ip6).await {
             error!("agent failed: {:?}", e);
             process::exit(1);
         }

@@ -18,6 +18,16 @@ args:
       help: verbose output
       multiple: true
       global: true
+  - ip4:
+      short: "4"
+      help: use IPv4 only
+      conflicts_with: ip6
+      global: true
+  - ip6:
+      short: "6"
+      help: use IPv6 only
+      conflicts_with: ip4
+      global: true
 
 subcommands:
   - agent:
@@ -64,14 +74,6 @@ subcommands:
             short: e
             help: expiry (ms)
             default_value: "250"
-        - ip4:
-            short: "4"
-            help: use IPv4 only
-            conflicts_with: ip6
-        - ip6:
-            short: "6"
-            help: use IPv6 only
-            conflicts_with: ip4
         - host:
             index: 1
             help: host
@@ -98,14 +100,6 @@ subcommands:
             help: probe count
             value_name: probes
             default_value: "3"
-        - ip4:
-            short: "4"
-            help: use IPv4 only
-            conflicts_with: ip6
-        - ip6:
-            short: "6"
-            help: use IPv6 only
-            conflicts_with: ip4
         - host:
             index: 1
             help: host

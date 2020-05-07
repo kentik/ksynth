@@ -14,17 +14,21 @@ pub struct Executor {
     tasks:   HashMap<u64, Handle>,
     rx:      Receiver<Vec<Group>>,
     ex:      Arc<Exporter>,
+    ip4:     bool,
+    ip6:     bool,
     pinger:  Arc<Pinger>,
     tracer:  Arc<Tracer>,
     fetcher: Arc<Fetcher>,
 }
 
 impl Executor {
-    pub async fn new(rx: Receiver<Vec<Group>>, ex: Arc<Exporter>) -> Result<Self> {
+    pub async fn new(rx: Receiver<Vec<Group>>, ex: Arc<Exporter>, ip4: bool, ip6: bool) -> Result<Self> {
         Ok(Self {
             tasks:   HashMap::new(),
             rx:      rx,
             ex:      ex,
+            ip4:     ip4,
+            ip6:     ip6,
             pinger:  Arc::new(Pinger::new()?),
             tracer:  Arc::new(Tracer::new().await?),
             fetcher: Arc::new(Fetcher::new()?),
@@ -80,15 +84,17 @@ impl Executor {
     }
 
     async fn ping(&self, id: u64, cfg: PingConfig, envoy: Envoy) -> Result<Handle> {
+        let Self { ip4, ip6, .. } = *self;
         let pinger = self.pinger.clone();
         let ping = Ping::new(id, cfg, envoy, pinger);
-        Ok(spawn(id, ping.exec()))
+        Ok(spawn(id, ping.exec(ip4, ip6)))
     }
 
     async fn trace(&self, id: u64, cfg: TraceConfig, envoy: Envoy) -> Result<Handle> {
+        let Self { ip4, ip6, .. } = *self;
         let tracer = self.tracer.clone();
         let trace = Trace::new(id, cfg, envoy, tracer);
-        Ok(spawn(id, trace.exec()))
+        Ok(spawn(id, trace.exec(ip4, ip6)))
     }
 
     async fn fetch(&self, id: u64, cfg: FetchConfig, envoy: Envoy) -> Result<Handle> {

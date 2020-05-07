@@ -32,11 +32,11 @@ impl Trace {
         Self { id, target, period, limit, expiry, envoy, tracer }
     }
 
-    pub async fn exec(self) -> Result<()> {
+    pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
         loop {
             debug!("{}: target {}", self.id, self.target);
 
-            let result = self.trace();
+            let result = self.trace(ip4, ip6);
 
             match timeout(self.expiry, result).await {
                 Ok(Ok(stats)) => self.success(stats).await?,
@@ -48,19 +48,19 @@ impl Trace {
         }
     }
 
-    async fn trace(&self) -> Result<Stats> {
+    async fn trace(&self, ip4: bool, ip6: bool) -> Result<Stats> {
         let time = Instant::now();
-        let addr = resolve(&self.target).await?;
+        let addr = resolve(&self.target, ip4, ip6).await?;
 
         let route = self.tracer.route(netdiag::Trace {
-            addr:   IpAddr::V4(addr),
+            addr:   addr,
             probes: 3,
             limit:  self.limit,
             expiry: Duration::from_millis(250),
         }).await?;
 
         Ok(Stats {
-            addr:  IpAddr::V4(addr),
+            addr:  addr,
             route: route,
             time:  time.elapsed(),
         })

@@ -34,11 +34,11 @@ impl Ping {
         Self { id, target, period, count, expiry, envoy, pinger }
     }
 
-    pub async fn exec(self) -> Result<()> {
+    pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
         loop {
             debug!("{}: target {}", self.id, self.target);
 
-            let result = self.ping(self.count);
+            let result = self.ping(self.count, ip4, ip6);
 
             match timeout(self.expiry, result).await {
                 Ok(Ok(rtt)) => self.success(rtt).await,
@@ -50,10 +50,10 @@ impl Ping {
         }
     }
 
-    async fn ping(&self, count: usize) -> Result<Stats> {
+    async fn ping(&self, count: usize, ip4: bool, ip6: bool) -> Result<Stats> {
         let pinger = self.pinger.clone();
 
-        let addr = IpAddr::V4(resolve(&self.target).await?);
+        let addr = resolve(&self.target, ip4, ip6).await?;
 
         let rtt  = ping(pinger, addr).take(count).try_collect::<Vec<_>>().await?;
         let sent = rtt.len() as u32;

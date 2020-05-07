@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::net::{IpAddr, SocketAddr};
 use std::ops::Deref;
 use futures::executor;
 use rand::prelude::*;
@@ -16,15 +16,15 @@ const PORT_MAX: u16 = 65407;
 #[derive(Debug)]
 pub struct State {
     range:  Uniform<u16>,
-    source: Mutex<HashMap<SocketAddrV4, ()>>,
+    source: Mutex<HashMap<SocketAddr, ()>>,
     state:  Mutex<HashMap<Key, Sender<Echo>>>,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq)]
-struct Key(SocketAddrV4, SocketAddrV4);
+struct Key(SocketAddr, SocketAddr);
 
 #[derive(Debug)]
-pub struct Lease<'s>(&'s State, SocketAddrV4);
+pub struct Lease<'s>(&'s State, SocketAddr);
 
 impl State {
     pub fn new() -> Self {
@@ -35,11 +35,11 @@ impl State {
         }
     }
 
-    pub async fn reserve(&self, src: Ipv4Addr, dst: Ipv4Addr) -> (Lease<'_>, SocketAddrV4) {
+    pub async fn reserve(&self, src: IpAddr, dst: IpAddr) -> (Lease<'_>, SocketAddr) {
         loop {
             let port = thread_rng().sample(self.range);
-            let src  = SocketAddrV4::new(src, port);
-            let dst  = SocketAddrV4::new(dst, PORT_MIN);
+            let src  = SocketAddr::new(src, port);
+            let dst  = SocketAddr::new(dst, PORT_MIN);
 
             let mut set = self.source.lock().await;
 
@@ -51,23 +51,23 @@ impl State {
         }
     }
 
-    pub async fn release(&self, src: &SocketAddrV4) {
+    pub async fn release(&self, src: &SocketAddr) {
         self.source.lock().await.remove(src);
     }
 
     pub async fn insert(&self, probe: &Probe, tx: Sender<Echo>) {
-        let key = Key(probe.src, probe.dst);
+        let key = Key(probe.src(), probe.dst());
         self.state.lock().await.insert(key, tx);
     }
 
     pub async fn remove(&self, probe: &Probe) -> Option<Sender<Echo>> {
-        let key = Key(probe.src, probe.dst);
+        let key = Key(probe.src(), probe.dst());
         self.state.lock().await.remove(&key)
     }
 }
 
 impl Deref for Lease<'_> {
-    type Target = SocketAddrV4;
+    type Target = SocketAddr;
 
     fn deref(&self) -> &Self::Target {
         &self.1

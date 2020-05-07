@@ -1,62 +1,51 @@
-use std::convert::TryFrom;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::IpAddr;
 use std::sync::Arc;
-use std::time::{Instant, Duration};
-use anyhow::{anyhow, Result};
-use etherparse::{Ipv4Header, IpTrafficClass};
+use std::time::{Duration, Instant};
+use anyhow::Result;
 use futures::future;
 use futures::{StreamExt, TryStreamExt};
-use libc::IPPROTO_RAW;
-use tokio::net::UdpSocket;
-use tokio::sync::{Mutex, oneshot::channel};
+use tokio::sync::oneshot::channel;
 use tokio::time::timeout;
-use tokio_raw::{Domain, Type, Protocol, RawSocket};
-use crate::icmp::{IcmpV4Packet, Unreachable};
 use super::probe::Probe;
-use super::reply::{Echo, Node, Reply};
+use super::reply::{Node, Reply};
 use super::route::Route;
+use super::sock4::Sock4;
+use super::sock6::Sock6;
 use super::state::State;
 
 #[derive(Debug)]
 pub struct Trace {
-    pub addr:   Ipv4Addr,
+    pub addr:   IpAddr,
     pub probes: usize,
     pub limit:  usize,
     pub expiry: Duration,
 }
 
 pub struct Tracer {
-    sock:  Mutex<RawSocket>,
-    route: Mutex<UdpSocket>,
+    sock4: Sock4,
+    sock6: Sock6,
     state: Arc<State>,
 }
 
 impl Tracer {
     pub async fn new() -> Result<Self> {
-        let ipv4 = Domain::ipv4();
-        let icmp = Protocol::icmpv4();
-        let raw  = Protocol::from(IPPROTO_RAW);
-
-        let icmp  = RawSocket::new(ipv4, Type::raw(), Some(icmp))?;
-        let sock  = RawSocket::new(ipv4, Type::raw(), Some(raw))?;
-        let route = UdpSocket::bind("0.0.0.0:0").await?;
-
         let state = Arc::new(State::new());
 
-        tokio::spawn(recv(icmp, state.clone()));
+        let sock4 = Sock4::new(state.clone()).await?;
+        let sock6 = Sock6::new(state.clone()).await?;
 
         Ok(Self {
-            sock:  Mutex::new(sock),
-            route: Mutex::new(route),
+            sock4: sock4,
+            sock6: sock6,
             state: state,
         })
     }
 
     pub async fn route(&self, trace: Trace) -> Result<Vec<Vec<Node>>> {
         let Trace { addr, probes, limit, expiry } = trace;
+
         let src = self.source(addr).await?;
         let (src, dst) = self.state.reserve(src, addr).await;
-
         let route = Route::new(self, *src, dst, expiry);
 
         let mut done = false;
@@ -80,72 +69,22 @@ impl Tracer {
         let (tx, rx) = channel();
         state.insert(&probe, tx).await;
 
-        let sent = send(&self.sock, &probe).await?;
+        let sent = self.send(&probe).await?;
         let echo = timeout(expiry, rx);
         Reply::new(echo, sent, state, probe).await
     }
 
-    async fn source(&self, dst: Ipv4Addr) -> Result<Ipv4Addr> {
-        let route = self.route.lock().await;
-        route.connect(SocketAddr::new(IpAddr::V4(dst), 1234)).await?;
-        match route.local_addr()? {
-            SocketAddr::V4(sa) => Ok(*sa.ip()),
-            SocketAddr::V6(..) => Err(anyhow!("unsupported IPv6 addr")),
+    pub async fn send(&self, probe: &Probe) -> Result<Instant> {
+        match probe {
+            Probe::V4(v4) => self.sock4.send(v4).await,
+            Probe::V6(v6) => self.sock6.send(v6).await,
+        }
+    }
+
+    pub async fn source(&self, dst: IpAddr) -> Result<IpAddr> {
+        match dst {
+            IpAddr::V4(..) => self.sock4.source(dst).await,
+            IpAddr::V6(..) => self.sock6.source(dst).await,
         }
     }
 }
-
-async fn send(sock: &Mutex<RawSocket>, probe: &Probe) -> Result<Instant> {
-    let mut pkt = [0u8; 64];
-
-    let pkt = probe.encode(&mut pkt)?;
-    let dst = &probe.dst;
-
-    let mut sock = sock.lock().await;
-    sock.send_to(&pkt, &dst).await?;
-
-    Ok(Instant::now())
-}
-
-async fn recv(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
-    let mut pkt = [0u8; 64];
-    loop {
-        let (n, from) = sock.recv_from(&mut pkt).await?;
-
-        let from = match from {
-            SocketAddr::V4(sa) => *sa.ip(),
-            SocketAddr::V6(..) => continue,
-        };
-
-        let now = Instant::now();
-        let pkt = Ipv4Header::read_from_slice(&pkt[..n])?;
-
-        if let (Ipv4Header { protocol: ICMP, .. }, tail) = pkt {
-            let icmp = IcmpV4Packet::try_from(tail)?;
-
-            if let IcmpV4Packet::TimeExceeded(pkt) = icmp {
-                if let Some(probe) = Probe::decode(pkt)? {
-                    if let Some(tx) = state.remove(&probe).await {
-                        let _ = tx.send(Echo(from, now, false));
-                    }
-                }
-            } else if let IcmpV4Packet::Unreachable(what) = icmp {
-                let pkt = match what {
-                    Unreachable::Net(pkt)      => pkt,
-                    Unreachable::Host(pkt)     => pkt,
-                    Unreachable::Protocol(pkt) => pkt,
-                    Unreachable::Port(pkt)     => pkt,
-                    Unreachable::Other(_, pkt) => pkt,
-                };
-
-                if let Some(probe) = Probe::decode(pkt)? {
-                    if let Some(tx) = state.remove(&probe).await {
-                        let _ = tx.send(Echo(from, now, true));
-                    }
-                }
-            }
-        }
-    }
-}
-
-const ICMP: u8 = IpTrafficClass::Icmp as u8;

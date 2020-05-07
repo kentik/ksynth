@@ -76,7 +76,7 @@ impl Watcher {
 }
 
 fn retry(result: Result<()>) -> Result<Option<Error>> {
-   match result.map_err(|e| Error::downcast::<synapi::Error>(e))  {
+   match result.map_err(Error::downcast::<synapi::Error>)  {
        Ok(())                       => Ok(None),
        Err(Ok(e @ Application(..))) => Err(e)?,
        Err(Ok(e @ Unauthorized))    => Err(e)?,

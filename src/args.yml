@@ -98,6 +98,14 @@ subcommands:
             help: probe count
             value_name: probes
             default_value: "3"
+        - ip4:
+            short: "4"
+            help: use IPv4 only
+            conflicts_with: ip6
+        - ip6:
+            short: "6"
+            help: use IPv6 only
+            conflicts_with: ip4
         - host:
             index: 1
             help: host

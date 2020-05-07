@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::net::Ipv4Addr;
+use std::net::IpAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -13,7 +13,7 @@ use super::state::State;
 
 #[derive(Debug)]
 pub enum Node {
-    Node(u8, Ipv4Addr, Duration),
+    Node(u8, IpAddr, Duration),
     None(u8)
 }
 
@@ -25,7 +25,7 @@ pub struct Reply {
 }
 
 #[derive(Debug)]
-pub struct Echo(pub Ipv4Addr, pub Instant, pub bool);
+pub struct Echo(pub IpAddr, pub Instant, pub bool);
 
 impl Reply {
     pub fn new(echo: Timeout<Receiver<Echo>>, sent: Instant, state: Arc<State>, probe: Probe) -> Reply {
@@ -42,7 +42,7 @@ impl Future for Reply {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let sent = self.sent;
-        let n    = self.probe.ttl;
+        let n    = self.probe.ttl();
         let echo = Pin::new(&mut self.echo);
 
         let echo = match ready!(echo.poll(cx)) {

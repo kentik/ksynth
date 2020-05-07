@@ -53,7 +53,7 @@ impl Trace {
         let addr = resolve(&self.target).await?;
 
         let route = self.tracer.route(netdiag::Trace {
-            addr:   addr,
+            addr:   IpAddr::V4(addr),
             probes: 3,
             limit:  self.limit,
             expiry: Duration::from_millis(250),
@@ -74,7 +74,6 @@ impl Trace {
 
             for node in nodes {
                 if let Node::Node(_, addr, rtt) = node {
-                    let addr = IpAddr::from(addr);
                     let rtt  = rtt.as_micros() as u64;
                     map.entry(addr).or_default().push(rtt);
                 }

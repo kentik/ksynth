@@ -1,4 +1,4 @@
-use std::net::SocketAddrV4;
+use std::net::SocketAddr;
 use std::time::Duration;
 use anyhow::Result;
 use futures::{Stream, StreamExt, TryStreamExt};
@@ -9,13 +9,13 @@ use super::trace::Tracer;
 
 pub struct Route<'t> {
     tracer: &'t Tracer,
-    src:    SocketAddrV4,
-    dst:    SocketAddrV4,
+    src:    SocketAddr,
+    dst:    SocketAddr,
     expiry: Duration,
 }
 
 impl<'t> Route<'t> {
-    pub fn new(tracer: &'t Tracer, src: SocketAddrV4, dst: SocketAddrV4, expiry: Duration) -> Route<'t> {
+    pub fn new(tracer: &'t Tracer, src: SocketAddr, dst: SocketAddr, expiry: Duration) -> Route<'t> {
         Route { tracer, src, dst, expiry }
     }
 
@@ -27,10 +27,10 @@ impl<'t> Route<'t> {
         })
     }
 
-    pub fn probe(&'t self, dst: &'t mut SocketAddrV4, ttl: u8) -> impl Stream<Item = Result<Node>> + 't {
+    pub fn probe(&'t self, dst: &'t mut SocketAddr, ttl: u8) -> impl Stream<Item = Result<Node>> + 't {
         unfold((self, dst, ttl), |(route, dst, ttl)| async move {
             let Route { tracer, src, expiry, .. } = route;
-            let probe  = Probe::new(*src, *dst, ttl);
+            let probe  = Probe::new(*src, *dst, ttl).ok()?;
             let result = tracer.probe(probe, *expiry).await;
             dst.set_port(dst.port() + 1);
             Some((result, (route, dst, ttl)))

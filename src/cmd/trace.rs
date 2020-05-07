@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr, SocketAddrV4};
+use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
 use anyhow::Result;
 use clap::{value_t, values_t, ArgMatches};
@@ -13,40 +13,37 @@ pub async fn trace(args: &ArgMatches<'_>) -> Result<()> {
     let expiry = value_t!(args, "expiry", u64)?;
     let limit  = value_t!(args, "limit",  usize)?;
     let probes = value_t!(args, "probes", usize)?;
-    let ip4    = true;
-    let ip6    = false;
+    let ip4    = !args.is_present("ip6");
+    let ip6    = !args.is_present("ip4");
     let hosts  = values_t!(args, "host", String)?;
 
     let delay  = Duration::from_millis(delay);
     let expiry = Duration::from_millis(expiry);
 
     let tracer = Tracer::new().await?;
-    let source = UdpSocket::bind("0.0.0.0:0").await?;
+    let route4 = UdpSocket::bind("0.0.0.0:0").await?;
+    let route6 = UdpSocket::bind("[::]:0").await?;
 
     for (host, addr) in resolve(hosts, ip4, ip6).await {
         println!("trace {} ({})", host, addr);
 
-        let mut dst = match addr {
-            IpAddr::V4(ip) => SocketAddrV4::new(ip, 33434),
-            IpAddr::V6(..) => panic!("IPv6 not supported"),
+        let route = match addr {
+            IpAddr::V4(..) => &route4,
+            IpAddr::V6(..) => &route6,
         };
 
-        source.connect(SocketAddr::V4(dst)).await?;
-
-        let src = match source.local_addr()? {
-            SocketAddr::V4(sa) => sa,
-            SocketAddr::V6(..) => panic!("IPv6 not supported"),
-        };
+        let mut dst = SocketAddr::new(addr, 33434);
+        route.connect(dst).await?;
+        let src = route.local_addr()?;
 
         for ttl in 1..=limit {
             let mut nodes = HashMap::<IpAddr, Vec<String>>::new();
 
             for _ in 0..probes {
-                let probe = Probe::new(src, dst, ttl as u8);
+                let probe = Probe::new(src, dst, ttl as u8)?;
                 let node  = tracer.probe(probe, expiry).await?;
 
                 if let Node::Node(_, addr, rtt) = node {
-                    let addr = IpAddr::V4(addr);
                     let rtt  = format!("{:>0.2?}", rtt);
                     nodes.entry(addr).or_default().push(rtt);
                 }

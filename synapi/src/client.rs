@@ -56,7 +56,7 @@ impl Client {
         })
     }
 
-    pub async fn auth<'a>(&self, keys: &Keypair, version: &'a str) -> Result<Auth, Error> {
+    pub async fn auth(&self, keys: &Keypair, version: &str) -> Result<Auth, Error> {
         #[derive(Debug, Serialize)]
         struct Request<'a> {
             agent:      String,
@@ -81,7 +81,7 @@ impl Client {
         }).await?)
     }
 
-    pub async fn tasks<'a>(&self, session: &'a str, since: u64) -> Result<Tasks, Error> {
+    pub async fn tasks(&self, session: &str, since: u64) -> Result<Tasks, Error> {
         #[derive(Debug, Serialize)]
         struct Request<'a> {
             session: &'a str,

@@ -7,6 +7,7 @@ use synapi::tasks::Device;
 #[derive(Debug)]
 pub struct Target {
     pub company: u64,
+    pub agent:   u64,
     pub device:  Device,
     pub email:   String,
     pub token:   String,

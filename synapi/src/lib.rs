@@ -4,6 +4,7 @@ pub use error::Error;
 pub mod client;
 pub mod error;
 
+pub mod agent;
 pub mod auth;
 pub mod tasks;
 

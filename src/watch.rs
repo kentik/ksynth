@@ -5,6 +5,7 @@ use log::{debug, warn};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::time::delay_for;
 use synapi::{self, Client};
+use synapi::agent::Agent;
 use synapi::auth::Auth;
 use synapi::tasks::Group;
 use synapi::Error::{Application, Unauthorized};
@@ -12,11 +13,17 @@ use synapi::Error::{Application, Unauthorized};
 pub struct Watcher {
     client: Client,
     keys:   Keypair,
-    output: Sender<Vec<Group>>,
+    output: Sender<Update>,
+}
+
+#[derive(Debug)]
+pub struct Update {
+    pub agent: Agent,
+    pub tasks: Vec<Group>,
 }
 
 impl Watcher {
-    pub fn new(client: Client, keys: Keypair) -> (Self, Receiver<Vec<Group>>) {
+    pub fn new(client: Client, keys: Keypair) -> (Self, Receiver<Update>) {
         let (tx, rx) = channel(128);
         (Self {
             client: client,
@@ -44,11 +51,16 @@ impl Watcher {
         let ver  = env!("CARGO_PKG_VERSION");
         loop {
             match self.client.auth(&self.keys, ver).await? {
-                Auth::Ok(s) => self.tasks(&s).await?,
-                Auth::Wait  => self.wait(wait).await,
-                Auth::Deny  => Err(Unauthorized)?,
+                Auth::Ok(auth) => self.auth(auth).await?,
+                Auth::Wait     => self.wait(wait).await,
+                Auth::Deny     => Err(Unauthorized)?,
             }
         }
+    }
+
+    async fn auth(&mut self, (agent, session): (Agent, String)) -> Result<()> {
+        debug!("authenticated agent {}", agent.id);
+        self.tasks(agent, session).await
     }
 
     async fn wait(&mut self, delay: Duration) {
@@ -56,7 +68,7 @@ impl Watcher {
         delay_for(delay).await;
     }
 
-    async fn tasks(&mut self, session: &str) -> Result<()> {
+    async fn tasks(&mut self, agent: Agent, session: String) -> Result<()> {
         let delay  = Duration::from_secs(60);
 
         let client = &mut self.client;
@@ -66,8 +78,11 @@ impl Watcher {
         loop {
             debug!("requesting task updates");
 
-            let tasks = client.tasks(session, since).await?;
-            output.send(tasks.groups).await?;
+            let tasks = client.tasks(&session, since).await?;
+            output.send(Update {
+                agent: agent.clone(),
+                tasks: tasks.groups,
+            }).await?;
 
             since = tasks.timestamp;
             delay_for(delay).await;

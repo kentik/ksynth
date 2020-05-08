@@ -3,32 +3,45 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use log::{debug, error};
 use tokio::sync::mpsc::Receiver;
-use synapi::tasks::{Group, State, Config};
+use synapi::agent::Net;
+use synapi::tasks::{State, Config};
 use synapi::tasks::{PingConfig, TraceConfig, FetchConfig};
 use netdiag::{Pinger, Tracer};
 use crate::export::{Exporter, Envoy, Target};
 use crate::task::{spawn, Handle, Ping, Trace, Fetch};
 use crate::task::Fetcher;
+use crate::watch::Update;
 
 pub struct Executor {
     tasks:   HashMap<u64, Handle>,
-    rx:      Receiver<Vec<Group>>,
+    rx:      Receiver<Update>,
     ex:      Arc<Exporter>,
-    ip4:     bool,
-    ip6:     bool,
+    network: Network,
     pinger:  Arc<Pinger>,
     tracer:  Arc<Tracer>,
     fetcher: Arc<Fetcher>,
 }
 
+#[derive(Debug)]
+struct Network {
+    ip4: bool,
+    ip6: bool,
+    set: bool,
+}
+
 impl Executor {
-    pub async fn new(rx: Receiver<Vec<Group>>, ex: Arc<Exporter>, ip4: bool, ip6: bool) -> Result<Self> {
+    pub async fn new(rx: Receiver<Update>, ex: Arc<Exporter>, ip4: bool, ip6: bool) -> Result<Self> {
+        let network = Network {
+            ip4: ip4,
+            ip6: ip6,
+            set: !ip4 || !ip6,
+        };
+
         Ok(Self {
             tasks:   HashMap::new(),
             rx:      rx,
             ex:      ex,
-            ip4:     ip4,
-            ip6:     ip6,
+            network: network,
             pinger:  Arc::new(Pinger::new()?),
             tracer:  Arc::new(Tracer::new().await?),
             fetcher: Arc::new(Fetcher::new()?),
@@ -36,10 +49,22 @@ impl Executor {
     }
 
     pub async fn exec(mut self) -> Result<()> {
-        while let Some(update) = self.rx.recv().await {
-            for group in update {
+        while let Some(Update { agent, tasks }) = self.rx.recv().await {
+            if !self.network.set {
+                let (ip4, ip6) = match agent.net {
+                    Net::IPv4 => (true,  false),
+                    Net::IPv6 => (false, true ),
+                    Net::Dual => (true,  true ),
+                };
+
+                self.network.ip4 = ip4;
+                self.network.ip6 = ip6;
+            }
+
+            for group in tasks {
                 let target = Arc::new(Target {
                     company: group.company,
+                    agent:   agent.id,
                     device:  group.device,
                     email:   group.kentik.email,
                     token:   group.kentik.token,
@@ -84,14 +109,14 @@ impl Executor {
     }
 
     async fn ping(&self, id: u64, cfg: PingConfig, envoy: Envoy) -> Result<Handle> {
-        let Self { ip4, ip6, .. } = *self;
+        let Network { ip4, ip6, .. } = self.network;
         let pinger = self.pinger.clone();
         let ping = Ping::new(id, cfg, envoy, pinger);
         Ok(spawn(id, ping.exec(ip4, ip6)))
     }
 
     async fn trace(&self, id: u64, cfg: TraceConfig, envoy: Envoy) -> Result<Handle> {
-        let Self { ip4, ip6, .. } = *self;
+        let Network { ip4, ip6, .. } = self.network;
         let tracer = self.tracer.clone();
         let trace = Trace::new(id, cfg, envoy, tracer);
         Ok(spawn(id, trace.exec(ip4, ip6)))

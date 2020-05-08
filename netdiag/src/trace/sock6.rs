@@ -1,12 +1,13 @@
 use std::convert::TryFrom;
+use std::io::IoSlice;
 use std::net::{IpAddr, SocketAddr};
 use std::time::Instant;
 use std::sync::Arc;
 use anyhow::Result;
 use libc::c_int;
+use raw_socket::tokio::prelude::*;
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
-use tokio_raw::{Domain, Type, Protocol, Level, Name, RawSocket};
 use crate::icmp::{IcmpV6Packet, icmp6::Unreachable};
 use super::probe::ProbeV6;
 use super::reply::Echo;
@@ -40,13 +41,18 @@ impl Sock6 {
 
     pub async fn send(&self, probe: &ProbeV6) -> Result<Instant> {
         let mut dst = probe.dst;
+        let mut ctl = [0u8; 64];
         let mut pkt = [0u8; 64];
 
         let pkt = probe.encode(&mut pkt)?;
         dst.set_port(0);
 
+        let hops = CMsg::Ipv6HopLimit(probe.ttl as c_int);
+        let ctl  = CMsg::encode(&mut ctl, &[hops])?;
+        let data = &[IoSlice::new(pkt)];
+
         let mut sock = self.sock.lock().await;
-        sock.send_to(&pkt, &dst).await?;
+        sock.send_msg(&dst, data, Some(&ctl)).await?;
 
         Ok(Instant::now())
     }

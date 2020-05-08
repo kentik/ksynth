@@ -24,7 +24,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: beta
           target: ${{ matrix.target }}
       - uses: actions/checkout@v2
         with:

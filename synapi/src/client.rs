@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 use crate::{Error, error::Backend};
 use crate::auth::Auth;
 use crate::config::Config;
+use crate::okay::Okay;
 use crate::tasks::Tasks;
 
 #[derive(Debug)]
@@ -21,6 +22,7 @@ pub struct Client {
     session: RwLock<Session>,
     auth:    String,
     tasks:   String,
+    status:  String,
     submit:  String,
 }
 
@@ -64,9 +66,10 @@ impl Client {
             company: company,
             version: version,
             session: RwLock::new(Session::None),
-            auth:    format!("https://portal.{}:8888/v1/syn/auth",  domain),
-            tasks:   format!("https://portal.{}:8888/v1/syn/tasks", domain),
-            submit:  format!("https://flow.{}/chf",                 domain),
+            auth:    format!("https://portal.{}:8888/v1/syn/auth",   domain),
+            tasks:   format!("https://portal.{}:8888/v1/syn/tasks",  domain),
+            status:  format!("https://portal.{}:8888/v1/syn/status", domain),
+            submit:  format!("https://flow.{}/chf",                  domain),
         })
     }
 
@@ -96,15 +99,15 @@ impl Client {
 
         if let Auth::Ok((_, session)) = &auth {
             let session = Arc::new(session.to_owned());
-            let mut s = self.session.write().await;
-            *s = Session::Some(session);
+            let mut lock = self.session.write().await;
+            *lock = Session::Some(session);
         }
 
         Ok(auth)
     }
 
     pub async fn tasks(&self, since: u64) -> Result<Tasks, Error> {
-        #[derive(Debug, Serialize)]
+        #[derive(Serialize)]
         struct Request<'a> {
             session: &'a str,
             since:   u64,
@@ -115,6 +118,21 @@ impl Client {
         Ok(self.send(&self.tasks, &Request {
             session: &session,
             since:   since,
+        }).await?)
+    }
+
+    pub async fn status(&self) -> Result<Okay, Error> {
+        #[derive(Serialize)]
+        struct Request<'a> {
+            session: &'a str,
+            status:  &'a [&'a str],
+        };
+
+        let session = self.session().await?;
+
+        Ok(self.send(&self.status, &Request {
+            session: &session,
+            status:  &[],
         }).await?)
     }
 

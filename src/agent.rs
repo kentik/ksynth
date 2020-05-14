@@ -12,18 +12,18 @@ use rand::thread_rng;
 use signal_hook::{iterator::Signals, SIGINT, SIGTERM};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Sender};
-use synapi::Client;
+use synapi::{Client, Config};
 use crate::exec::Executor;
 use crate::export::Exporter;
 use crate::watch::Watcher;
 
 pub struct Agent {
-    client: Client,
+    client: Arc<Client>,
     keys:   Keypair,
 }
 
 impl Agent {
-    pub fn new(client: Client, keys: Keypair) -> Self {
+    pub fn new(client: Arc<Client>, keys: Keypair) -> Self {
         Self { client, keys }
     }
 
@@ -34,7 +34,7 @@ impl Agent {
         let (tx, mut rx) = channel(16);
 
         let (watcher, tasks) = Watcher::new(client.clone(), keys);
-        let exporter = Arc::new(Exporter::new(client));
+        let exporter = Arc::new(Exporter::new(client.clone()));
         let executor = Executor::new(tasks, exporter.clone(), ip4, ip6).await?;
 
         spawn(watcher.exec(),  tx.clone());
@@ -57,9 +57,8 @@ fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, mut tx: Sende
     });
 }
 
-pub fn agent(args: &ArgMatches) -> Result<()> {
+pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
     let name = env!("CARGO_PKG_NAME");
-    let ver  = env!("CARGO_PKG_VERSION");
 
     let id      = value_t!(args, "id", String)?;
     let company = args.value_of("company");
@@ -70,14 +69,21 @@ pub fn agent(args: &ArgMatches) -> Result<()> {
 
     let company = company.map(u64::from_str).transpose()?;
 
-    info!("initializing {} {}", name, ver);
+    info!("initializing {} {}", name, version);
 
     let keys = match fs::metadata(&id) {
         Ok(_)  => load(&id)?,
         Err(_) => init(&id)?,
     };
 
-    let client  = Client::new(region.as_ref(), company, proxy)?;
+    let config = Config {
+        region:  region,
+        version: version,
+        company: company,
+        proxy:   proxy.map(String::from),
+    };
+
+    let client  = Arc::new(Client::new(config)?);
     let runtime = Runtime::new()?;
     let agent   = Agent::new(client, keys);
 

@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Error, Result};
 use ed25519_dalek::Keypair;
@@ -11,7 +12,7 @@ use synapi::tasks::Group;
 use synapi::Error::{Application, Unauthorized};
 
 pub struct Watcher {
-    client: Client,
+    client: Arc<Client>,
     keys:   Keypair,
     output: Sender<Update>,
 }
@@ -23,7 +24,7 @@ pub struct Update {
 }
 
 impl Watcher {
-    pub fn new(client: Client, keys: Keypair) -> (Self, Receiver<Update>) {
+    pub fn new(client: Arc<Client>, keys: Keypair) -> (Self, Receiver<Update>) {
         let (tx, rx) = channel(128);
         (Self {
             client: client,
@@ -48,9 +49,8 @@ impl Watcher {
 
     async fn watch(&mut self) -> Result<()> {
         let wait = Duration::from_secs(30);
-        let ver  = env!("CARGO_PKG_VERSION");
         loop {
-            match self.client.auth(&self.keys, ver).await? {
+            match self.client.auth(&self.keys).await? {
                 Auth::Ok(auth) => self.auth(auth).await?,
                 Auth::Wait     => self.wait(wait).await,
                 Auth::Deny     => Err(Unauthorized)?,

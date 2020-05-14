@@ -11,7 +11,7 @@ use super::{encode, Record, Target};
 
 pub struct Exporter {
     export: Arc<Mutex<HashMap<Key, Output>>>,
-    client: Client,
+    client: Arc<Client>,
 }
 
 pub struct Envoy {
@@ -32,7 +32,7 @@ struct Output {
 }
 
 impl Exporter {
-    pub fn new(client: Client) -> Self {
+    pub fn new(client: Arc<Client>) -> Self {
         Self {
             export: Arc::new(Mutex::new(HashMap::new())),
             client: client,

@@ -8,12 +8,14 @@ use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use time::get_time;
 use crate::{Error, error::Backend};
 use crate::auth::Auth;
+use crate::config::Config;
 use crate::tasks::Tasks;
 
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct Client {
     client:  HttpClient,
     company: Option<u64>,
+    version: String,
     auth:    String,
     tasks:   String,
     submit:  String,
@@ -33,7 +35,8 @@ struct Failure {
 }
 
 impl Client {
-    pub fn new(region: &str, company: Option<u64>, proxy: Option<&str>) -> Result<Self, Error> {
+    pub fn new(config: Config) -> Result<Self, Error> {
+        let Config { region, version, company, proxy } = config;
         let domain = match region.to_ascii_uppercase().as_ref() {
             "US" => "kentik.com".to_owned(),
             "EU" => "kentik.eu".to_owned(),
@@ -43,20 +46,21 @@ impl Client {
         let mut client = HttpClient::builder();
         client = client.timeout(Duration::from_secs(30));
 
-        if let Some(proxy) = proxy.map(Proxy::all) {
+        if let Some(proxy) = proxy.as_ref().map(Proxy::all) {
             client = client.proxy(proxy?);
         }
 
         Ok(Self {
             client:  client.build()?,
             company: company,
+            version: version,
             auth:    format!("https://portal.{}:8888/v1/syn/auth",  domain),
             tasks:   format!("https://portal.{}:8888/v1/syn/tasks", domain),
             submit:  format!("https://flow.{}/chf",                 domain),
         })
     }
 
-    pub async fn auth(&self, keys: &Keypair, version: &str) -> Result<Auth, Error> {
+    pub async fn auth(&self, keys: &Keypair) -> Result<Auth, Error> {
         #[derive(Debug, Serialize)]
         struct Request<'a> {
             agent:      String,
@@ -75,7 +79,7 @@ impl Client {
         Ok(self.send(&self.auth, &Request {
             agent:      hex::encode(&key.to_bytes()[..]),
             company_id: company,
-            version:    version,
+            version:    &self.version,
             timestamp:  now,
             signature:  hex::encode(&sig.to_bytes()[..]),
         }).await?)

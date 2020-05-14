@@ -29,11 +29,15 @@ default-features = false
 version  = "1.0.106"
 features = ["derive"]
 
+[dependencies.tokio]
+version  = "0.2.21"
+features = ["sync"]
+
 [dev-dependencies]
 anyhow     = "1.0.28"
 log        = "0.4.8"
 env_logger = "0.7.1"
 
 [dev-dependencies.tokio]
-version  = "0.2.18"
+version  = "0.2.21"
 features = ["full"]

@@ -51,16 +51,16 @@ impl Watcher {
         let wait = Duration::from_secs(30);
         loop {
             match self.client.auth(&self.keys).await? {
-                Auth::Ok(auth) => self.auth(auth).await?,
+                Auth::Ok(auth) => self.auth(auth.0).await?,
                 Auth::Wait     => self.wait(wait).await,
                 Auth::Deny     => Err(Unauthorized)?,
             }
         }
     }
 
-    async fn auth(&mut self, (agent, session): (Agent, String)) -> Result<()> {
+    async fn auth(&mut self, agent: Agent) -> Result<()> {
         debug!("authenticated agent {}", agent.id);
-        self.tasks(agent, session).await
+        self.tasks(agent).await
     }
 
     async fn wait(&mut self, delay: Duration) {
@@ -68,7 +68,7 @@ impl Watcher {
         delay_for(delay).await;
     }
 
-    async fn tasks(&mut self, agent: Agent, session: String) -> Result<()> {
+    async fn tasks(&mut self, agent: Agent) -> Result<()> {
         let delay  = Duration::from_secs(60);
 
         let client = &mut self.client;
@@ -78,7 +78,7 @@ impl Watcher {
         loop {
             debug!("requesting task updates");
 
-            let tasks = client.tasks(&session, since).await?;
+            let tasks = client.tasks(since).await?;
             output.send(Update {
                 agent: agent.clone(),
                 tasks: tasks.groups,

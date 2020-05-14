@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 use async_compression::futures::write::GzipEncoder;
 use ed25519_dalek::Keypair;
@@ -6,6 +7,7 @@ use reqwest::{Client as HttpClient, Proxy};
 use reqwest::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use time::get_time;
+use tokio::sync::RwLock;
 use crate::{Error, error::Backend};
 use crate::auth::Auth;
 use crate::config::Config;
@@ -16,9 +18,16 @@ pub struct Client {
     client:  HttpClient,
     company: Option<u64>,
     version: String,
+    session: RwLock<Session>,
     auth:    String,
     tasks:   String,
     submit:  String,
+}
+
+#[derive(Debug)]
+enum Session {
+    Some(Arc<String>),
+    None,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,6 +63,7 @@ impl Client {
             client:  client.build()?,
             company: company,
             version: version,
+            session: RwLock::new(Session::None),
             auth:    format!("https://portal.{}:8888/v1/syn/auth",  domain),
             tasks:   format!("https://portal.{}:8888/v1/syn/tasks", domain),
             submit:  format!("https://flow.{}/chf",                 domain),
@@ -76,24 +86,34 @@ impl Client {
         let now = get_time().sec.to_string();
         let sig = keys.sign(now.as_bytes());
 
-        Ok(self.send(&self.auth, &Request {
+        let auth = self.send(&self.auth, &Request {
             agent:      hex::encode(&key.to_bytes()[..]),
             company_id: company,
             version:    &self.version,
             timestamp:  now,
             signature:  hex::encode(&sig.to_bytes()[..]),
-        }).await?)
+        }).await?;
+
+        if let Auth::Ok((_, session)) = &auth {
+            let session = Arc::new(session.to_owned());
+            let mut s = self.session.write().await;
+            *s = Session::Some(session);
+        }
+
+        Ok(auth)
     }
 
-    pub async fn tasks(&self, session: &str, since: u64) -> Result<Tasks, Error> {
+    pub async fn tasks(&self, since: u64) -> Result<Tasks, Error> {
         #[derive(Debug, Serialize)]
         struct Request<'a> {
             session: &'a str,
             since:   u64,
         };
 
+        let session = self.session().await?;
+
         Ok(self.send(&self.tasks, &Request {
-            session: session,
+            session: &session,
             since:   since,
         }).await?)
     }
@@ -117,6 +137,13 @@ impl Client {
         match self.client.execute(req).await?.status() {
             s if s.is_success() => Ok(()),
             s                   => Err(s.into()),
+        }
+    }
+
+    async fn session(&self) -> Result<Arc<String>, Error> {
+        match &*(self.session.read().await) {
+            Session::Some(session) => Ok(session.clone()),
+            Session::None          => Err(Error::Session),
         }
     }
 

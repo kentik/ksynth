@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub enum Error {
     Application(u32, String),
     Backend(Backend),
+    Session,
     Status(StatusCode),
     Transport(String),
     Unauthorized,

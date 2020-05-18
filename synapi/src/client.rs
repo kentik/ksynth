@@ -11,8 +11,7 @@ use tokio::sync::RwLock;
 use crate::{Error, error::Backend};
 use crate::auth::Auth;
 use crate::config::Config;
-use crate::okay::Okay;
-use crate::tasks::Tasks;
+use crate::{okay::Okay, status::Report, tasks::Tasks};
 
 #[derive(Debug)]
 pub struct Client {
@@ -32,15 +31,14 @@ enum Session {
     None,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum Response<T> {
+#[derive(Debug)]
+pub enum Response<T> {
     Success(T),
     Failure(Failure),
 }
 
 #[derive(Debug, Deserialize)]
-struct Failure {
+pub struct Failure {
     status: u32,
     msg:    String,
 }
@@ -121,18 +119,18 @@ impl Client {
         }).await?)
     }
 
-    pub async fn status(&self) -> Result<Okay, Error> {
+    pub async fn status(&self, report: &Report) -> Result<Okay, Error> {
         #[derive(Serialize)]
         struct Request<'a> {
             session: &'a str,
-            status:  &'a [&'a str],
+            report:  &'a Report,
         };
 
         let session = self.session().await?;
 
         Ok(self.send(&self.status, &Request {
             session: &session,
-            status:  &[],
+            report:  report,
         }).await?)
     }
 

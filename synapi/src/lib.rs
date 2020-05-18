@@ -7,6 +7,7 @@ pub mod error;
 
 pub mod agent;
 pub mod auth;
+pub mod status;
 pub mod tasks;
 
 mod config;

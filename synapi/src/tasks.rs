@@ -1,8 +1,9 @@
 use serde::{Deserialize, de::{Deserializer, Error, Unexpected}};
 use crate::serde::id;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Tasks {
+    #[serde(deserialize_with = "id")]
     pub timestamp: u64,
     pub groups:    Vec<Group>,
 }
@@ -93,33 +94,6 @@ pub enum Kind {
     Addr,
 }
 
-impl<'d> Deserialize<'d> for Tasks {
-    fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
-        #[derive(Debug, Deserialize)]
-        struct TasksContainer<'d> {
-            status:    u64,
-            msg:       &'d str,
-            timestamp: Option<String>,
-            groups:    Option<Vec<Group>>,
-        }
-
-        let mut c  = TasksContainer::deserialize(de)?;
-        let status = c.status;
-
-        let mut ok = || {
-            let timestamp = c.timestamp.take().ok_or(D::Error::missing_field("timestamp"))?;
-            let timestamp = timestamp.parse().map_err(D::Error::custom)?;
-            let groups    = c.groups.take().ok_or(D::Error::missing_field("groups"))?;
-            Ok(Tasks { timestamp, groups })
-        };
-
-        match status  {
-            0 => Ok(ok()?),
-            n => Err(Error::invalid_value(Unexpected::Unsigned(n), &"0")),
-        }
-    }
-}
-
 impl<'d> Deserialize<'d> for Task {
     fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
         #[derive(Debug, Deserialize)]
@@ -136,8 +110,8 @@ impl<'d> Deserialize<'d> for Task {
 
         let c = TaskContainer::deserialize(de)?;
 
-        let id     = c.id;
-        let state  = c.state;
+        let id    = c.id;
+        let state = c.state;
 
         let config = if let Some(cfg) = c.ping {
             Config::Ping(cfg)

@@ -12,9 +12,8 @@ pub enum Auth {
 impl<'d> Deserialize<'d> for Auth {
     fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
         #[derive(Debug, Deserialize)]
-        struct AuthContainer<'d> {
-            status:   u64,
-            msg:      &'d str,
+        struct AuthContainer {
+            auth:     u64,
             #[serde(deserialize_with = "id")]
             agent_id: u64,
             family:   Net,
@@ -22,7 +21,7 @@ impl<'d> Deserialize<'d> for Auth {
         }
 
         let mut c   = AuthContainer::deserialize(de)?;
-        let status  = c.status;
+        let auth    = c.auth;
         let session = c.session.take();
 
         let ok = || Ok((Agent {
@@ -30,11 +29,11 @@ impl<'d> Deserialize<'d> for Auth {
             net: c.family,
         }, session.ok_or(D::Error::missing_field("session"))?));
 
-        match status  {
+        match auth  {
             0 => Ok(Auth::Ok(ok()?)),
             1 => Ok(Auth::Wait),
-            3 => Ok(Auth::Deny),
-            n => Err(Error::invalid_value(Unexpected::Unsigned(n), &"0,1,3")),
+            2 => Ok(Auth::Deny),
+            n => Err(Error::invalid_value(Unexpected::Unsigned(n), &"0..2")),
         }
     }
 }

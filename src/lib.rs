@@ -4,6 +4,8 @@ pub mod cmd;
 
 mod exec;
 mod export;
+mod spawn;
+mod status;
 mod task;
 mod watch;
 

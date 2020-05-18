@@ -11,12 +11,12 @@ rand          = "0.7.3"
 time          = "0.1.42"
 
 [dependencies.async-compression]
-version  = "0.3.2"
+version  = "0.3.4"
 features = ["futures-write", "gzip"]
 default-features = false
 
 [dependencies.futures]
-version  = "0.3.4"
+version  = "0.3.5"
 features = ["std"]
 default-features = false
 
@@ -26,7 +26,7 @@ features = ["gzip", "json", "rustls-tls"]
 default-features = false
 
 [dependencies.serde]
-version  = "1.0.106"
+version  = "1.0.110"
 features = ["derive"]
 
 [dependencies.tokio]
@@ -34,7 +34,7 @@ version  = "0.2.21"
 features = ["sync"]
 
 [dev-dependencies]
-anyhow     = "1.0.28"
+anyhow     = "1.0.31"
 log        = "0.4.8"
 env_logger = "0.7.1"
 

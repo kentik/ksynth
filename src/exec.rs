@@ -8,8 +8,9 @@ use synapi::tasks::{State, Config};
 use synapi::tasks::{PingConfig, TraceConfig, FetchConfig};
 use netdiag::{Pinger, Tracer};
 use crate::export::{Exporter, Envoy, Target};
-use crate::task::{spawn, Handle, Ping, Trace, Fetch};
-use crate::task::Fetcher;
+use crate::spawn::{Spawner, Handle};
+use crate::status::Status;
+use crate::task::{Fetcher, Ping, Trace, Fetch};
 use crate::watch::Update;
 
 pub struct Executor {
@@ -17,6 +18,8 @@ pub struct Executor {
     rx:      Receiver<Update>,
     ex:      Arc<Exporter>,
     network: Network,
+    status:  Arc<Status>,
+    spawner: Arc<Spawner>,
     pinger:  Arc<Pinger>,
     tracer:  Arc<Tracer>,
     fetcher: Arc<Fetcher>,
@@ -37,15 +40,24 @@ impl Executor {
             set: !ip4 || !ip6,
         };
 
+        let status  = Arc::new(Status::default());
+        let spawner = Spawner::new(status.clone());
+
         Ok(Self {
             tasks:   HashMap::new(),
             rx:      rx,
             ex:      ex,
             network: network,
+            status:  status,
+            spawner: Arc::new(spawner),
             pinger:  Arc::new(Pinger::new()?),
             tracer:  Arc::new(Tracer::new().await?),
             fetcher: Arc::new(Fetcher::new()?),
         })
+    }
+
+    pub fn status(&self) -> Arc<Status> {
+        self.status.clone()
     }
 
     pub async fn exec(mut self) -> Result<()> {
@@ -80,7 +92,7 @@ impl Executor {
                     };
 
                     match result {
-                        Ok(_)  => debug!("started task {}", task.id),
+                        Ok(_)  => debug!("created task {}", task.id),
                         Err(e) => error!("invalid task {}: {}", task.id, e),
                     }
                 }
@@ -112,19 +124,19 @@ impl Executor {
         let Network { ip4, ip6, .. } = self.network;
         let pinger = self.pinger.clone();
         let ping = Ping::new(id, cfg, envoy, pinger);
-        Ok(spawn(id, ping.exec(ip4, ip6)))
+        Ok(self.spawner.spawn(id, ping.exec(ip4, ip6)))
     }
 
     async fn trace(&self, id: u64, cfg: TraceConfig, envoy: Envoy) -> Result<Handle> {
         let Network { ip4, ip6, .. } = self.network;
         let tracer = self.tracer.clone();
         let trace = Trace::new(id, cfg, envoy, tracer);
-        Ok(spawn(id, trace.exec(ip4, ip6)))
+        Ok(self.spawner.spawn(id, trace.exec(ip4, ip6)))
     }
 
     async fn fetch(&self, id: u64, cfg: FetchConfig, envoy: Envoy) -> Result<Handle> {
         let client = self.fetcher.clone();
         let fetch = Fetch::new(id, cfg, envoy, client);
-        Ok(spawn(id, fetch.exec()))
+        Ok(self.spawner.spawn(id, fetch.exec()))
     }
 }

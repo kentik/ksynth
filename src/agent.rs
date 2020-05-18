@@ -15,6 +15,7 @@ use tokio::sync::mpsc::{channel, Sender};
 use synapi::{Client, Config};
 use crate::exec::Executor;
 use crate::export::Exporter;
+use crate::status::Monitor;
 use crate::watch::Watcher;
 
 pub struct Agent {
@@ -36,7 +37,9 @@ impl Agent {
         let (watcher, tasks) = Watcher::new(client.clone(), keys);
         let exporter = Arc::new(Exporter::new(client.clone()));
         let executor = Executor::new(tasks, exporter.clone(), ip4, ip6).await?;
+        let monitor  = Monitor::new(client, executor.status());
 
+        spawn(monitor.exec(),  tx.clone());
         spawn(watcher.exec(),  tx.clone());
         spawn(exporter.exec(), tx.clone());
         spawn(executor.exec(), tx.clone());

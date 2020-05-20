@@ -11,6 +11,7 @@ use tokio::time::{delay_for, timeout};
 use netdiag::{self, Pinger};
 use synapi::tasks::PingConfig;
 use crate::export::{record, Envoy};
+use crate::stats::{summarize, Summary};
 use super::resolve;
 
 pub struct Ping {
@@ -50,7 +51,7 @@ impl Ping {
         }
     }
 
-    async fn ping(&self, count: usize, ip4: bool, ip6: bool) -> Result<Stats> {
+    async fn ping(&self, count: usize, ip4: bool, ip6: bool) -> Result<Output> {
         let pinger = self.pinger.clone();
 
         let addr = resolve(&self.target, ip4, ip6).await?;
@@ -60,33 +61,22 @@ impl Ping {
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();
         let lost = sent - rtt.len() as u32;
 
-        let zero = Duration::from_secs(0);
-        let min  = rtt.iter().min().unwrap_or(&zero);
-        let max  = rtt.iter().max().unwrap_or(&zero);
-        let sum  = rtt.iter().sum::<Duration>();
-
-        let avg = sum.checked_div(sent).unwrap_or(zero);
-
-        Ok(Stats {
+        Ok(Output {
             addr: addr,
             sent: sent,
             lost: lost,
-            min:  *min,
-            max:  *max,
-            avg:  avg,
+            rtt:  summarize(&rtt).unwrap_or_default(),
         })
     }
 
-    async fn success(&self, stats: Stats) {
-        debug!("{}: {}", self.id, stats);
+    async fn success(&self, out: Output) {
+        debug!("{}: {}", self.id, out);
         self.envoy.export(record::Ping {
             id:   self.id,
-            addr: stats.addr,
-            sent: stats.sent,
-            lost: stats.lost,
-            min:  stats.min,
-            max:  stats.max,
-            avg:  stats.avg,
+            addr: out.addr,
+            sent: out.sent,
+            lost: out.lost,
+            rtt:  out.rtt,
         }).await;
     }
 
@@ -123,18 +113,16 @@ fn ping(pinger: Arc<Pinger>, addr: IpAddr) -> impl Stream<Item = Result<Option<D
 }
 
 #[derive(Debug)]
-struct Stats {
+struct Output {
     addr: IpAddr,
     sent: u32,
     lost: u32,
-    min:  Duration,
-    max:  Duration,
-    avg:  Duration,
+    rtt:  Summary,
 }
 
-impl fmt::Display for Stats {
+impl fmt::Display for Output {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self { sent, lost, min, max, avg, .. } = self;
+        let Self  { sent, lost, rtt: Summary { min, max, avg, .. }, .. } = self;
         let good = sent - lost;
         write!(f, "{}/{} min rtt {:.2?}, max {:.2?}, avg {:.2?}", good, sent, min, max, avg)
     }

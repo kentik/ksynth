@@ -1,4 +1,6 @@
+use std::convert::TryFrom;
 use std::net::IpAddr;
+use std::time::Duration;
 use anyhow::{anyhow, Result};
 use capnp::{message, serialize_packed};
 use crate::chf_capnp::{c_h_f::Builder, packed_c_h_f};
@@ -47,15 +49,20 @@ struct Columns {
     task:   u32,
     cause:  u32,
     status: u32,
-    rtt:    u32,
+    ttlb:   u32,
     size:   u32,
     sent:   u32,
     lost:   u32,
-    min:    u32,
-    max:    u32,
-    avg:    u32,
+    rtt:    Stats,
     route:  u32,
     time:   u32,
+}
+
+struct Stats {
+    min: u32,
+    max: u32,
+    avg: u32,
+    std: u32,
 }
 
 impl Columns {
@@ -69,29 +76,29 @@ impl Columns {
         };
 
         Ok(Self {
-            app:    lookup("APP_PROTOCOL")?,
-            agent:  lookup("INT64_00")?,
-            kind:   lookup("INT00")?,
-            task:   lookup("INT64_01")?,
-            cause:  lookup("STR00")?,
-            status: lookup("INT01")?,
-            rtt:    lookup("INT64_02")?,
-            size:   lookup("INT64_03")?,
-            sent:   lookup("INT01")?,
-            lost:   lookup("INT02")?,
-            min:    lookup("INT64_02")?,
-            max:    lookup("INT64_03")?,
-            avg:    lookup("INT64_04")?,
-            route:  lookup("STR00")?,
-            time:   lookup("INT64_02")?,
+            app:     lookup("APP_PROTOCOL")?,
+            agent:   lookup("INT64_00")?,
+            kind:    lookup("INT00")?,
+            task:    lookup("INT64_01")?,
+            cause:   lookup("STR00")?,
+            status:  lookup("INT01")?,
+            ttlb:    lookup("INT64_02")?,
+            size:    lookup("INT64_03")?,
+            sent:    lookup("INT01")?,
+            lost:    lookup("INT02")?,
+            rtt: Stats {
+                min: lookup("INT64_02")?,
+                max: lookup("INT64_03")?,
+                avg: lookup("INT64_04")?,
+                std: lookup("INT64_05")?,
+            },
+            route:   lookup("STR00")?,
+            time:    lookup("INT64_02")?,
         })
     }
 
     fn fetch(&self, mut msg: Builder, agent: u64, data: &Fetch) {
         let Fetch { id, addr, status, rtt, size, .. } = *data;
-
-        let rtt  = rtt.as_micros() as u64;
-        let size = size            as u64;
 
         match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
@@ -104,32 +111,29 @@ impl Columns {
         customs.next(self.kind,   |v| v.set_uint32_val(FETCH));
         customs.next(self.task,   |v| v.set_uint64_val(id));
         customs.next(self.status, |v| v.set_uint16_val(status));
-        customs.next(self.rtt,    |v| v.set_uint64_val(rtt));
-        customs.next(self.size,   |v| v.set_uint64_val(size));
+        customs.next(self.ttlb,   |v| v.set_uint64_val(as_micros(rtt)));
+        customs.next(self.size,   |v| v.set_uint64_val(size as u64));
     }
 
     fn ping(&self, mut msg: Builder, agent: u64, data: &Ping) {
-        let Ping { id, addr, sent, lost, min, max, avg, .. } = *data;
-
-        let min = min.as_micros() as u64;
-        let max = max.as_micros() as u64;
-        let avg = avg.as_micros() as u64;
+        let Ping { id, addr, sent, lost, rtt, .. } = *data;
 
         match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new("ping", msg,  9);
-        customs.next(self.app,   |v| v.set_uint32_val(AGENT));
-        customs.next(self.agent, |v| v.set_uint64_val(agent));
-        customs.next(self.kind,  |v| v.set_uint32_val(PING));
-        customs.next(self.task,  |v| v.set_uint64_val(id));
-        customs.next(self.sent,  |v| v.set_uint32_val(sent));
-        customs.next(self.lost,  |v| v.set_uint32_val(lost));
-        customs.next(self.min,   |v| v.set_uint64_val(min));
-        customs.next(self.max,   |v| v.set_uint64_val(max));
-        customs.next(self.avg,   |v| v.set_uint64_val(avg));
+        let mut customs = Customs::new("ping", msg,  10);
+        customs.next(self.app,     |v| v.set_uint32_val(AGENT));
+        customs.next(self.agent,   |v| v.set_uint64_val(agent));
+        customs.next(self.kind,    |v| v.set_uint32_val(PING));
+        customs.next(self.task,    |v| v.set_uint64_val(id));
+        customs.next(self.sent,    |v| v.set_uint32_val(sent));
+        customs.next(self.lost,    |v| v.set_uint32_val(lost));
+        customs.next(self.rtt.min, |v| v.set_uint64_val(as_micros(rtt.min)));
+        customs.next(self.rtt.max, |v| v.set_uint64_val(as_micros(rtt.max)));
+        customs.next(self.rtt.avg, |v| v.set_uint64_val(as_micros(rtt.avg)));
+        customs.next(self.rtt.std, |v| v.set_uint64_val(as_micros(rtt.std)));
     }
 
     fn trace(&self, mut msg: Builder, agent: u64, data: &Trace) {
@@ -168,6 +172,10 @@ impl Columns {
         customs.next(self.kind,  |v| v.set_uint32_val(TIMEOUT));
         customs.next(self.task,  |v| v.set_uint64_val(data.id));
     }
+}
+
+fn as_micros(d: Duration) -> u64 {
+    u64::try_from(d.as_micros()).unwrap_or(0)
 }
 
 const AGENT:   u32 = 10;

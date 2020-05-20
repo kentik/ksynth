@@ -48,7 +48,7 @@ impl Trace {
         }
     }
 
-    async fn trace(&self, ip4: bool, ip6: bool) -> Result<Stats> {
+    async fn trace(&self, ip4: bool, ip6: bool) -> Result<Output> {
         let time = Instant::now();
         let addr = resolve(&self.target, ip4, ip6).await?;
 
@@ -59,17 +59,17 @@ impl Trace {
             expiry: Duration::from_millis(250),
         }).await?;
 
-        Ok(Stats {
+        Ok(Output {
             addr:  addr,
             route: route,
             time:  time.elapsed(),
         })
     }
 
-    async fn success(&self, stats: Stats) -> Result<()> {
-        debug!("{}: {}", self.id, stats);
+    async fn success(&self, out: Output) -> Result<()> {
+        debug!("{}: {}", self.id, out);
 
-        let route = stats.route.into_iter().enumerate().map(|(hop, nodes)| {
+        let route = out.route.into_iter().enumerate().map(|(hop, nodes)| {
             let mut map = HashMap::<IpAddr, Vec<u64>>::new();
 
             for node in nodes {
@@ -86,9 +86,9 @@ impl Trace {
 
         self.envoy.export(record::Trace {
             id:    self.id,
-            addr:  stats.addr,
+            addr:  out.addr,
             route: route,
-            time:  stats.time,
+            time:  out.time,
         }).await;
 
         Ok(())
@@ -111,13 +111,13 @@ impl Trace {
 }
 
 #[derive(Debug)]
-struct Stats {
+struct Output {
     addr:  IpAddr,
     route: Vec<Vec<Node>>,
     time:  Duration,
 }
 
-impl fmt::Display for Stats {
+impl fmt::Display for Output {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let Self { route, time, .. } = self;
         write!(f, "{} hops in {:0.2?}", route.len(), time)

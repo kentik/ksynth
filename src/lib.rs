@@ -6,6 +6,7 @@ mod exec;
 mod export;
 mod spawn;
 mod status;
+mod stats;
 mod task;
 mod watch;
 

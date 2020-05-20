@@ -45,14 +45,14 @@ impl Fetch {
         }
     }
 
-    async fn success(&self, stats: Stats) {
-        debug!("{}: {}", self.id, stats);
+    async fn success(&self, out: Output) {
+        debug!("{}: {}", self.id, out);
         self.envoy.export(record::Fetch {
             id:     self.id,
-            addr:   stats.addr,
-            status: stats.status.as_u16(),
-            rtt:    stats.rtt,
-            size:   stats.body.len(),
+            addr:   out.addr,
+            status: out.status.as_u16(),
+            rtt:    out.rtt,
+            size:   out.body.len(),
         }).await;
     }
 
@@ -86,7 +86,7 @@ impl Fetcher {
         Ok(Self { client })
     }
 
-    pub async fn get(&self, url: &str) -> Result<Stats> {
+    pub async fn get(&self, url: &str) -> Result<Output> {
         let sent = Instant::now();
         let res = self.client.get(url).send().await?;
 
@@ -100,19 +100,19 @@ impl Fetcher {
         let time   = Instant::now();
         let rtt    = time.saturating_duration_since(sent);
 
-        Ok(Stats { addr, status, rtt, body })
+        Ok(Output { addr, status, rtt, body })
     }
 }
 
 #[derive(Debug)]
-pub struct Stats {
+pub struct Output {
     addr:   IpAddr,
     status: StatusCode,
     rtt:    Duration,
     body:   Bytes,
 }
 
-impl fmt::Display for Stats {
+impl fmt::Display for Output {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let Self { rtt, status, body, .. } = self;
         let status = status.as_u16();

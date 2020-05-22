@@ -82,23 +82,25 @@ impl Columns {
             task:    lookup("INT64_01")?,
             cause:   lookup("STR00")?,
             status:  lookup("INT01")?,
-            ttlb:    lookup("INT64_02")?,
-            size:    lookup("INT64_03")?,
+            ttlb:    lookup("INT02")?,
+            size:    lookup("INT03")?,
             sent:    lookup("INT01")?,
             lost:    lookup("INT02")?,
             rtt: Stats {
-                min: lookup("INT64_02")?,
-                max: lookup("INT64_03")?,
-                avg: lookup("INT64_04")?,
-                std: lookup("INT64_05")?,
+                min: lookup("INT03")?,
+                max: lookup("INT04")?,
+                avg: lookup("INT05")?,
+                std: lookup("INT06")?,
             },
             route:   lookup("STR00")?,
-            time:    lookup("INT64_02")?,
+            time:    lookup("INT01")?,
         })
     }
 
     fn fetch(&self, mut msg: Builder, agent: u64, data: &Fetch) {
         let Fetch { id, addr, status, rtt, size, .. } = *data;
+
+        let size = u32::try_from(size).unwrap_or(0);
 
         match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
@@ -111,8 +113,8 @@ impl Columns {
         customs.next(self.kind,   |v| v.set_uint32_val(FETCH));
         customs.next(self.task,   |v| v.set_uint64_val(id));
         customs.next(self.status, |v| v.set_uint16_val(status));
-        customs.next(self.ttlb,   |v| v.set_uint64_val(as_micros(rtt)));
-        customs.next(self.size,   |v| v.set_uint64_val(size as u64));
+        customs.next(self.ttlb,   |v| v.set_uint32_val(as_micros(rtt)));
+        customs.next(self.size,   |v| v.set_uint32_val(size));
     }
 
     fn ping(&self, mut msg: Builder, agent: u64, data: &Ping) {
@@ -130,17 +132,16 @@ impl Columns {
         customs.next(self.task,    |v| v.set_uint64_val(id));
         customs.next(self.sent,    |v| v.set_uint32_val(sent));
         customs.next(self.lost,    |v| v.set_uint32_val(lost));
-        customs.next(self.rtt.min, |v| v.set_uint64_val(as_micros(rtt.min)));
-        customs.next(self.rtt.max, |v| v.set_uint64_val(as_micros(rtt.max)));
-        customs.next(self.rtt.avg, |v| v.set_uint64_val(as_micros(rtt.avg)));
-        customs.next(self.rtt.std, |v| v.set_uint64_val(as_micros(rtt.std)));
+        customs.next(self.rtt.min, |v| v.set_uint32_val(as_micros(rtt.min)));
+        customs.next(self.rtt.max, |v| v.set_uint32_val(as_micros(rtt.max)));
+        customs.next(self.rtt.avg, |v| v.set_uint32_val(as_micros(rtt.avg)));
+        customs.next(self.rtt.std, |v| v.set_uint32_val(as_micros(rtt.std)));
     }
 
     fn trace(&self, mut msg: Builder, agent: u64, data: &Trace) {
         let Trace { id, addr, time, .. } = *data;
 
         let route = &data.route;
-        let time  = time.as_micros() as u64;
 
         match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
@@ -153,7 +154,7 @@ impl Columns {
         customs.next(self.kind,  |v| v.set_uint32_val(TRACE));
         customs.next(self.task,  |v| v.set_uint64_val(id));
         customs.next(self.route, |v| v.set_str_val(route));
-        customs.next(self.time,  |v| v.set_uint64_val(time));
+        customs.next(self.time,  |v| v.set_uint32_val(as_micros(time)));
     }
 
     fn error(&self, msg: Builder, agent: u64, data: &Error) {
@@ -174,8 +175,8 @@ impl Columns {
     }
 }
 
-fn as_micros(d: Duration) -> u64 {
-    u64::try_from(d.as_micros()).unwrap_or(0)
+fn as_micros(d: Duration) -> u32 {
+    u32::try_from(d.as_micros()).unwrap_or(0)
 }
 
 const AGENT:   u32 = 10;

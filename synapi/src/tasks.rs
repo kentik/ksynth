@@ -22,6 +22,7 @@ pub struct Task {
     pub id:     u64,
     pub config: Config,
     pub state:  State,
+    pub test_id: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -106,12 +107,14 @@ impl<'d> Deserialize<'d> for Task {
             #[serde(rename = "http")]
             pub fetch: Option<FetchConfig>,
             pub state: State,
+            pub test_id: u64,
         }
 
         let c = TaskContainer::deserialize(de)?;
 
         let id    = c.id;
         let state = c.state;
+        let test_id = c.test_id;
 
         let config = if let Some(cfg) = c.ping {
             Config::Ping(cfg)
@@ -123,7 +126,7 @@ impl<'d> Deserialize<'d> for Task {
             Config::Unknown
         };
 
-        Ok(Task { id, config, state })
+        Ok(Task { id, config, state, test_id })
     }
 }
 

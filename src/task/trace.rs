@@ -12,24 +12,25 @@ use crate::export::{record, Hop, Envoy};
 use super::resolve;
 
 pub struct Trace {
-    id:     u64,
-    target: String,
-    period: Duration,
-    limit:  usize,
-    expiry: Duration,
-    envoy:  Envoy,
-    tracer: Arc<Tracer>,
+    id:      u64,
+    test_id: u64,
+    target:  String,
+    period:  Duration,
+    limit:   usize,
+    expiry:  Duration,
+    envoy:   Envoy,
+    tracer:  Arc<Tracer>,
 }
 
 impl Trace {
-    pub fn new(id: u64, cfg: TraceConfig, envoy: Envoy, tracer: Arc<Tracer>) -> Self {
+    pub fn new(id: u64, test_id: u64, cfg: TraceConfig, envoy: Envoy, tracer: Arc<Tracer>) -> Self {
         let TraceConfig { target, period, limit, expiry } = cfg;
 
         let period = Duration::from_secs(period);
         let limit  = limit as usize;
         let expiry = Duration::from_millis(expiry);
 
-        Self { id, target, period, limit, expiry, envoy, tracer }
+        Self { id, test_id, target, period, limit, expiry, envoy, tracer }
     }
 
     pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
@@ -85,10 +86,11 @@ impl Trace {
         let route = serde_json::to_string(&route)?;
 
         self.envoy.export(record::Trace {
-            id:    self.id,
-            addr:  out.addr,
-            route: route,
-            time:  out.time,
+            id:      self.id,
+            test_id: self.test_id,
+            addr:    out.addr,
+            route:   route,
+            time:    out.time,
         }).await;
 
         Ok(())
@@ -97,15 +99,17 @@ impl Trace {
     async fn failure(&self, err: Error) {
         warn!("{}: {}", self.id, err);
         self.envoy.export(record::Error {
-            id:    self.id,
-            cause: err.to_string(),
+            id:      self.id,
+            test_id: self.test_id,
+            cause:   err.to_string(),
         }).await;
     }
 
     async fn timeout(&self) {
         warn!("{}: timeout", self.id);
         self.envoy.export(record::Timeout {
-            id: self.id,
+            id:      self.id,
+            test_id: self.test_id,  
         }).await;
     }
 }

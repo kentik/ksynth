@@ -86,9 +86,9 @@ impl Executor {
                     let envoy = self.ex.envoy(target.clone());
 
                     let result = match task.state {
-                        State::Created => self.insert(task.id, task.config, envoy).await,
+                        State::Created => self.insert(task.id, task.test_id, task.config, envoy).await,
                         State::Deleted => self.delete(task.id),
-                        State::Updated => self.insert(task.id, task.config, envoy).await,
+                        State::Updated => self.insert(task.id, task.test_id, task.config, envoy).await,
                     };
 
                     match result {
@@ -101,11 +101,11 @@ impl Executor {
         Ok(())
     }
 
-    async fn insert(&mut self, id: u64, cfg: Config, envoy: Envoy) -> Result<()> {
+    async fn insert(&mut self, id: u64, test_id: u64, cfg: Config, envoy: Envoy) -> Result<()> {
         let handle = match cfg {
-            Config::Ping(cfg)  => self.ping(id, cfg, envoy).await?,
-            Config::Trace(cfg) => self.trace(id, cfg, envoy).await?,
-            Config::Fetch(cfg) => self.fetch(id, cfg, envoy).await?,
+            Config::Ping(cfg)  => self.ping(id, test_id, cfg, envoy).await?,
+            Config::Trace(cfg) => self.trace(id, test_id, cfg, envoy).await?,
+            Config::Fetch(cfg) => self.fetch(id, test_id, cfg, envoy).await?,
             _                  => Err(anyhow!("unsupported type"))?,
         };
 
@@ -120,23 +120,23 @@ impl Executor {
         Ok(())
     }
 
-    async fn ping(&self, id: u64, cfg: PingConfig, envoy: Envoy) -> Result<Handle> {
+    async fn ping(&self, id: u64, test_id: u64, cfg: PingConfig, envoy: Envoy) -> Result<Handle> {
         let Network { ip4, ip6, .. } = self.network;
         let pinger = self.pinger.clone();
-        let ping = Ping::new(id, cfg, envoy, pinger);
+        let ping = Ping::new(id, test_id, cfg, envoy, pinger);
         Ok(self.spawner.spawn(id, ping.exec(ip4, ip6)))
     }
 
-    async fn trace(&self, id: u64, cfg: TraceConfig, envoy: Envoy) -> Result<Handle> {
+    async fn trace(&self, id: u64, test_id: u64, cfg: TraceConfig, envoy: Envoy) -> Result<Handle> {
         let Network { ip4, ip6, .. } = self.network;
         let tracer = self.tracer.clone();
-        let trace = Trace::new(id, cfg, envoy, tracer);
+        let trace = Trace::new(id, test_id, cfg, envoy, tracer);
         Ok(self.spawner.spawn(id, trace.exec(ip4, ip6)))
     }
 
-    async fn fetch(&self, id: u64, cfg: FetchConfig, envoy: Envoy) -> Result<Handle> {
+    async fn fetch(&self, id: u64, test_id: u64, cfg: FetchConfig, envoy: Envoy) -> Result<Handle> {
         let client = self.fetcher.clone();
-        let fetch = Fetch::new(id, cfg, envoy, client);
+        let fetch = Fetch::new(id, test_id, cfg, envoy, client);
         Ok(self.spawner.spawn(id, fetch.exec()))
     }
 }

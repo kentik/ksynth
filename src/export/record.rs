@@ -25,28 +25,31 @@ pub enum Record {
 
 #[derive(Debug)]
 pub struct Fetch {
-    pub id:     u64,
-    pub addr:   IpAddr,
-    pub status: u16,
-    pub rtt:    Duration,
-    pub size:   usize,
+    pub id:      u64,
+    pub test_id: u64,
+    pub addr:    IpAddr,
+    pub status:  u16,
+    pub rtt:     Duration,
+    pub size:    usize,
 }
 
 #[derive(Debug)]
 pub struct Ping {
-    pub id:   u64,
-    pub addr: IpAddr,
-    pub sent: u32,
-    pub lost: u32,
-    pub rtt:  Summary,
+    pub id:      u64,
+    pub test_id: u64,    
+    pub addr:    IpAddr,
+    pub sent:    u32,
+    pub lost:    u32,
+    pub rtt:     Summary,
 }
 
 #[derive(Debug)]
 pub struct Trace {
-    pub id:    u64,
-    pub addr:  IpAddr,
-    pub route: String,
-    pub time:  Duration,
+    pub id:      u64,
+    pub test_id: u64,
+    pub addr:    IpAddr,
+    pub route:   String,
+    pub time:    Duration,
 }
 
 #[derive(Debug, Serialize)]
@@ -57,13 +60,15 @@ pub struct Hop {
 
 #[derive(Debug)]
 pub struct Error {
-    pub id:    u64,
-    pub cause: String,
+    pub id:      u64,
+    pub test_id: u64,    
+    pub cause:  String,
 }
 
 #[derive(Debug)]
 pub struct Timeout {
-    pub id: u64,
+    pub id:      u64,
+    pub test_id: u64,   
 }
 
 impl From<Fetch> for Record  {

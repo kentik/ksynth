@@ -64,9 +64,9 @@ impl Client {
             company: company,
             version: version,
             session: RwLock::new(Session::None),
-            auth:    format!("https://portal.{}:8888/v1/syn/auth",   domain),
-            tasks:   format!("https://portal.{}:8888/v1/syn/tasks",  domain),
-            status:  format!("https://portal.{}:8888/v1/syn/status", domain),
+            auth:    format!("https://api.{}/api/agent/v1/syn/auth",   domain),
+            tasks:   format!("https://api.{}/api/agent/v1/syn/tasks",  domain),
+            status:  format!("https://api.{}/api/agent/v1/syn/status", domain),
             submit:  format!("https://flow.{}/chf",                  domain),
         })
     }

@@ -107,6 +107,7 @@ impl<'d> Deserialize<'d> for Task {
             #[serde(rename = "http")]
             pub fetch: Option<FetchConfig>,
             pub state: State,
+            #[serde(deserialize_with = "id", rename = "test_id")]
             pub test_id: u64,
         }
 

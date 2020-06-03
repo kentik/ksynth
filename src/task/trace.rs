@@ -35,7 +35,7 @@ impl Trace {
 
     pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
         loop {
-            debug!("{}: target {}", self.id, self.target);
+            debug!("{}: test {}, target {}", self.id, self.test_id, self.target);
 
             let result = self.trace(ip4, ip6);
 

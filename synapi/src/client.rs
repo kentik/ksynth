@@ -45,7 +45,7 @@ pub struct Failure {
 
 impl Client {
     pub fn new(config: Config) -> Result<Self, Error> {
-        let Config { region, version, company, proxy } = config;
+        let Config { region, version, company, proxy, port } = config;
         let domain = match region.to_ascii_uppercase().as_ref() {
             "US" => "kentik.com".to_owned(),
             "EU" => "kentik.eu".to_owned(),
@@ -64,10 +64,10 @@ impl Client {
             company: company,
             version: version,
             session: RwLock::new(Session::None),
-            auth:    format!("https://api.{}/api/agent/v1/syn/auth",   domain),
-            tasks:   format!("https://api.{}/api/agent/v1/syn/tasks",  domain),
-            status:  format!("https://api.{}/api/agent/v1/syn/status", domain),
-            submit:  format!("https://flow.{}/chf",                  domain),
+            auth:    format!("https://portal.{}:{}/api/agent/v1/syn/auth",   domain, port),
+            tasks:   format!("https://portal.{}:{}/api/agent/v1/syn/tasks",  domain, port),
+            status:  format!("https://portal.{}:{}/api/agent/v1/syn/status", domain, port),
+            submit:  format!("https://flow.{}/chf",                          domain),
         })
     }
 

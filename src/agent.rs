@@ -69,8 +69,10 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
     let proxy   = args.value_of("proxy");
     let ip4     = !args.is_present("ip6");
     let ip6     = !args.is_present("ip4");
+    let port    = value_t!(args, "port", String)?;
 
     let company = company.map(u64::from_str).transpose()?;
+    let port = port.parse::<u32>()?;
 
     info!("initializing {} {}", name, version);
 
@@ -84,6 +86,7 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
         version: version,
         company: company,
         proxy:   proxy.map(String::from),
+        port: port,
     };
 
     let client  = Arc::new(Client::new(config)?);

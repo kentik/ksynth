@@ -4,4 +4,5 @@ pub struct Config {
     pub version: String,
     pub company: Option<u64>,
     pub proxy:   Option<String>,
+    pub port:    u32,
 }

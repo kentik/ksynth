@@ -109,7 +109,7 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new("fetch", msg, 7);
+        let mut customs = Customs::new("fetch", msg, 8);
         customs.next(self.app,    |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,  |v| v.set_uint64_val(agent));
         customs.next(self.kind,   |v| v.set_uint32_val(FETCH));
@@ -128,7 +128,7 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new("ping", msg,  10);
+        let mut customs = Customs::new("ping", msg,  11);
         customs.next(self.app,     |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,   |v| v.set_uint64_val(agent));
         customs.next(self.kind,    |v| v.set_uint32_val(PING));
@@ -152,7 +152,7 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new("trace", msg, 6);
+        let mut customs = Customs::new("trace", msg, 7);
         customs.next(self.app,   |v| v.set_uint32_val(AGENT));
         customs.next(self.agent, |v| v.set_uint64_val(agent));
         customs.next(self.kind,  |v| v.set_uint32_val(TRACE));
@@ -163,7 +163,7 @@ impl Columns {
     }
 
     fn error(&self, msg: Builder, agent: u64, data: &Error) {
-        let mut customs = Customs::new("error", msg, 5);
+        let mut customs = Customs::new("error", msg, 6);
         customs.next(self.app,   |v| v.set_uint32_val(AGENT));
         customs.next(self.agent, |v| v.set_uint64_val(agent));
         customs.next(self.kind,  |v| v.set_uint32_val(ERROR));
@@ -173,7 +173,7 @@ impl Columns {
     }
 
     fn timeout(&self, msg: Builder, agent: u64, data: &Timeout) {
-        let mut customs = Customs::new("timeout", msg, 4);
+        let mut customs = Customs::new("timeout", msg, 5);
         customs.next(self.app,   |v| v.set_uint32_val(AGENT));
         customs.next(self.agent, |v| v.set_uint64_val(agent));
         customs.next(self.kind,  |v| v.set_uint32_val(TIMEOUT));

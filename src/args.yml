@@ -57,6 +57,12 @@ subcommands:
             help: region
             takes_value: true
             default_value: "US"
+        - port:
+            long: port
+            env: KENTIK_PORT
+            help: Remote Port.
+            takes_value: true
+            default_value: "443"
   - ping:
       about: execute ping
       help_message: print help

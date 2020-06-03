@@ -32,7 +32,7 @@ impl Fetch {
 
     pub async fn exec(self) -> Result<()> {
         loop {
-            debug!("{}: target {}", self.id, self.target);
+            debug!("{}: test {}, target {}", self.id, self.test_id, self.target);
 
             let result = self.client.get(&self.target);
 

@@ -21,8 +21,8 @@ pub struct Fetch {
 }
 
 impl Fetch {
-    pub fn new(id: u64, test_id: u64, cfg: FetchConfig, envoy: Envoy, client: Arc<Fetcher>) -> Self {
-        let FetchConfig { target, period, expiry } = cfg;
+    pub fn new(id: u64, cfg: FetchConfig, envoy: Envoy, client: Arc<Fetcher>) -> Self {
+        let FetchConfig { test_id, target, period, expiry } = cfg;
 
         let period = Duration::from_secs(period);
         let expiry = Duration::from_millis(expiry);
@@ -50,7 +50,7 @@ impl Fetch {
         debug!("{}: {}", self.id, out);
         self.envoy.export(record::Fetch {
             id:      self.id,
-            test_id: self.test_id, 
+            test_id: self.test_id,
             addr:    out.addr,
             status:  out.status.as_u16(),
             rtt:     out.rtt,
@@ -62,7 +62,7 @@ impl Fetch {
         warn!("{}: error: {}", self.id, err);
         self.envoy.export(record::Error {
             id:    self.id,
-            test_id: self.test_id,   
+            test_id: self.test_id,
             cause: err.to_string(),
         }).await;
     }
@@ -71,7 +71,7 @@ impl Fetch {
         warn!("{}: timeout", self.id);
         self.envoy.export(record::Timeout {
             id: self.id,
-            test_id: self.test_id,    
+            test_id: self.test_id,
         }).await;
     }
 }

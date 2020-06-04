@@ -16,7 +16,7 @@ use super::resolve;
 
 pub struct Ping {
     id:      u64,
-    test_id: u64,   
+    test_id: u64,
     target:  String,
     period:  Duration,
     count:   usize,
@@ -26,8 +26,8 @@ pub struct Ping {
 }
 
 impl Ping {
-    pub fn new(id: u64, test_id: u64, cfg: PingConfig, envoy: Envoy, pinger: Arc<Pinger>) -> Self {
-        let PingConfig { target, period, count, expiry } = cfg;
+    pub fn new(id: u64, cfg: PingConfig, envoy: Envoy, pinger: Arc<Pinger>) -> Self {
+        let PingConfig { test_id, target, period, count, expiry } = cfg;
 
         let period = Duration::from_secs(period);
         let count  = count as usize;
@@ -74,7 +74,7 @@ impl Ping {
         debug!("{}: {}", self.id, out);
         self.envoy.export(record::Ping {
             id:   self.id,
-            test_id: self.test_id,  
+            test_id: self.test_id,
             addr: out.addr,
             sent: out.sent,
             lost: out.lost,
@@ -86,7 +86,7 @@ impl Ping {
         warn!("{}: error: {}", self.id, err);
         self.envoy.export(record::Error {
             id:    self.id,
-            test_id: self.test_id,      
+            test_id: self.test_id,
             cause: err.to_string(),
         }).await;
     }
@@ -95,7 +95,7 @@ impl Ping {
         warn!("{}: timeout", self.id);
         self.envoy.export(record::Timeout {
             id: self.id,
-            test_id: self.test_id,    
+            test_id: self.test_id,
         }).await;
     }
 }

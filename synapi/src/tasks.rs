@@ -36,25 +36,31 @@ pub enum Config {
 
 #[derive(Debug, Deserialize)]
 pub struct PingConfig {
-    pub target: String,
-    pub period: u64,
-    pub count:  u64,
-    pub expiry: u64,
+    #[serde(skip)]
+    pub test_id: u64,
+    pub target:  String,
+    pub period:  u64,
+    pub count:   u64,
+    pub expiry:  u64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TraceConfig {
-    pub target: String,
-    pub period: u64,
-    pub limit:  u64,
-    pub expiry: u64,
+    #[serde(skip)]
+    pub test_id: u64,
+    pub target:  String,
+    pub period:  u64,
+    pub limit:   u64,
+    pub expiry:  u64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct FetchConfig {
-    pub target: String,
-    pub period: u64,
-    pub expiry: u64,
+    #[serde(skip)]
+    pub test_id: u64,
+    pub target:  String,
+    pub period:  u64,
+    pub expiry:  u64,
 }
 
 #[derive(Debug)]
@@ -107,7 +113,7 @@ impl<'d> Deserialize<'d> for Task {
             #[serde(rename = "http")]
             pub fetch: Option<FetchConfig>,
             pub state: State,
-            #[serde(deserialize_with = "id", rename = "test_id")]
+            #[serde(deserialize_with = "id")]
             pub test_id: u64,
         }
 
@@ -117,11 +123,14 @@ impl<'d> Deserialize<'d> for Task {
         let state = c.state;
         let test_id = c.test_id;
 
-        let config = if let Some(cfg) = c.ping {
+        let config = if let Some(mut cfg) = c.ping {
+            cfg.test_id = c.test_id;
             Config::Ping(cfg)
-        } else if let Some(cfg) = c.trace {
+        } else if let Some(mut cfg) = c.trace {
+            cfg.test_id = c.test_id;
             Config::Trace(cfg)
-        } else if let Some(cfg) = c.fetch {
+        } else if let Some(mut cfg) = c.fetch {
+            cfg.test_id = c.test_id;
             Config::Fetch(cfg)
         } else {
             Config::Unknown

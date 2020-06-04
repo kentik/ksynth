@@ -47,7 +47,7 @@ struct Columns {
     agent:  u32,
     kind:   u32,
     task:   u32,
-    test:   u32,   
+    test:   u32,
     cause:  u32,
     status: u32,
     ttlb:   u32,
@@ -168,7 +168,7 @@ impl Columns {
         customs.next(self.agent, |v| v.set_uint64_val(agent));
         customs.next(self.kind,  |v| v.set_uint32_val(ERROR));
         customs.next(self.task,  |v| v.set_uint64_val(data.id));
-        customs.next(self.test,  |v| v.set_uint64_val(data.test_id));   
+        customs.next(self.test,  |v| v.set_uint64_val(data.test_id));
         customs.next(self.cause, |v| v.set_str_val(&data.cause));
     }
 
@@ -178,7 +178,7 @@ impl Columns {
         customs.next(self.agent, |v| v.set_uint64_val(agent));
         customs.next(self.kind,  |v| v.set_uint32_val(TIMEOUT));
         customs.next(self.task,  |v| v.set_uint64_val(data.id));
-        customs.next(self.test,  |v| v.set_uint64_val(data.test_id));  
+        customs.next(self.test,  |v| v.set_uint64_val(data.test_id));
     }
 }
 

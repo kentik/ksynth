@@ -23,8 +23,8 @@ pub struct Trace {
 }
 
 impl Trace {
-    pub fn new(id: u64, test_id: u64, cfg: TraceConfig, envoy: Envoy, tracer: Arc<Tracer>) -> Self {
-        let TraceConfig { target, period, limit, expiry } = cfg;
+    pub fn new(id: u64, cfg: TraceConfig, envoy: Envoy, tracer: Arc<Tracer>) -> Self {
+        let TraceConfig { test_id, target, period, limit, expiry } = cfg;
 
         let period = Duration::from_secs(period);
         let limit  = limit as usize;
@@ -109,7 +109,7 @@ impl Trace {
         warn!("{}: timeout", self.id);
         self.envoy.export(record::Timeout {
             id:      self.id,
-            test_id: self.test_id,  
+            test_id: self.test_id,
         }).await;
     }
 }

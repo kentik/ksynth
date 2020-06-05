@@ -1,0 +1,26 @@
+meta:
+  description: Kentik Synthetic Agent
+  vendor: Kentik
+  maintainer: Kentik
+files:
+  "/usr/bin/synag":
+    file: synag
+    mode: "0755"
+  "/etc/default/synag":
+    file: pkg/etc/default/synag
+    mode: "0644"
+    keep: true
+dirs:
+  - /var/lib/synag
+units:
+  - pkg/etc/systemd/system/synag.service
+conditional:
+  - when: format == "deb"
+    units:
+      - pkg/etc/systemd/system/synag-update-deb.service
+      - pkg/etc/systemd/system/synag-update-deb.timer
+  - when: format == "rpm"
+    units:
+      - pkg/etc/systemd/system/synag-update-rpm.service
+      - pkg/etc/systemd/system/synag-update-rpm.timer
+user: synag

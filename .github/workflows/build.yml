@@ -94,3 +94,94 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     needs: release
+
+  package:
+    runs-on: ubuntu-latest
+    outputs:
+      package-deb: ${{ steps.package-deb.outputs.package }}
+      package-rpm: ${{ steps.package-rpm.outputs.package }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            arch: x86_64
+          - target: armv7-unknown-linux-musleabihf
+            arch: armv7
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v2
+        with:
+          name: synag-x86_64-unknown-linux-musl
+          path: temp
+      - uses: actions/download-artifact@v2
+        with:
+          name: synag-${{ matrix.target }}
+      - name: setup
+        id: setup
+        run: |
+          chmod u+x temp/synag
+          VERSION=$(temp/synag -V | cut -d ' ' -f 2)
+          echo ::set-output name=version::$VERSION
+      - id: package-deb
+        uses: kentik/pkg@master
+        with:
+          name: synag
+          version: ${{ steps.setup.outputs.version }}
+          arch: ${{ matrix.arch }}
+          format: deb
+          package: package.yml
+      - id: package-rpm
+        uses: kentik/pkg@master
+        with:
+          name: synag
+          version: ${{ steps.setup.outputs.version }}
+          arch: ${{ matrix.arch }}
+          format: rpm
+          package: package.yml
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.package-deb.outputs.package }}
+          path: ${{ steps.package-deb.outputs.package }}
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.package-rpm.outputs.package }}
+          path: ${{ steps.package-rpm.outputs.package }}
+    needs: build
+
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ needs.package.outputs.package-deb }}
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ needs.package.outputs.package-rpm }}
+      - uses: actions/setup-ruby@v1
+        with:
+          ruby-version: 2.6
+      - run: |
+          gem install package_cloud
+      - name: publish
+        run: |
+          case $GITHUB_REF in
+              refs/tags/*) REPO="synag"     ;;
+                        *) REPO="synag-dev" ;;
+          esac
+
+          package_cloud push kentik/$REPO/debian/jessie  $DEB
+          package_cloud push kentik/$REPO/debian/stretch $DEB
+          package_cloud push kentik/$REPO/debian/buster  $DEB
+
+          package_cloud push kentik/$REPO/ubuntu/focal   $DEB
+          package_cloud push kentik/$REPO/ubuntu/bionic  $DEB
+
+          package_cloud push kentik/$REPO/el/7 $RPM
+          package_cloud push kentik/$REPO/el/8 $RPM
+        env:
+          DEB: ${{ needs.package.outputs.package-deb }}
+          RPM: ${{ needs.package.outputs.package-rpm }}
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+    needs: package

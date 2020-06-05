@@ -1,0 +1,16 @@
+[Unit]
+Description=Kentik Synthetic Agent
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/default/synag
+Type=simple
+User=synag
+WorkingDirectory=/var/lib/synag
+AmbientCapabilities=CAP_NET_RAW
+ExecStart=/usr/bin/synag agent -v
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

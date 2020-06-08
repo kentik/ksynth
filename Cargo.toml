@@ -43,3 +43,8 @@ path = "synapi"
 [build-dependencies]
 capnpc = "0.12.3"
 anyhow = "1.0.31"
+
+[build-dependencies.git2]
+version  = "0.13.6"
+features = []
+default-features = false

@@ -54,6 +54,25 @@ jobs:
           name: synag-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/synag
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v2
+        with:
+          name: synag-x86_64-unknown-linux-musl
+      - uses: docker/build-push-action@v1
+        with:
+          repository: ${{ github.repository }}
+          tag_with_ref: true
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        env:
+          DOCKER_BUILDKIT: 1
+    needs: build
+
   release:
     runs-on: ubuntu-latest
     outputs:

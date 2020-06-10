@@ -6,11 +6,9 @@ use futures::future;
 use futures::{StreamExt, TryStreamExt};
 use tokio::sync::oneshot::channel;
 use tokio::time::timeout;
-use super::probe::Probe;
-use super::reply::{Node, Reply};
-use super::route::Route;
-use super::sock4::Sock4;
-use super::sock6::Sock6;
+use crate::Bind;
+use super::{probe::Probe, reply::{Node, Reply}, route::Route};
+use super::{sock4::Sock4, sock6::Sock6};
 use super::state::State;
 
 #[derive(Debug)]
@@ -28,11 +26,11 @@ pub struct Tracer {
 }
 
 impl Tracer {
-    pub async fn new() -> Result<Self> {
+    pub async fn new(bind: &Bind) -> Result<Self> {
         let state = Arc::new(State::new());
 
-        let sock4 = Sock4::new(state.clone()).await?;
-        let sock6 = Sock6::new(state.clone()).await?;
+        let sock4 = Sock4::new(bind, state.clone()).await?;
+        let sock6 = Sock6::new(bind, state.clone()).await?;
 
         Ok(Self {
             sock4: sock4,

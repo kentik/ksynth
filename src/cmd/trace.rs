@@ -5,7 +5,7 @@ use anyhow::Result;
 use clap::{value_t, values_t, ArgMatches};
 use tokio::net::UdpSocket;
 use tokio::time::delay_for;
-use netdiag::{Node, Probe, Tracer};
+use netdiag::{Bind, Node, Probe, Tracer};
 use super::resolve;
 
 pub async fn trace(args: &ArgMatches<'_>) -> Result<()> {
@@ -17,12 +17,19 @@ pub async fn trace(args: &ArgMatches<'_>) -> Result<()> {
     let ip6    = !args.is_present("ip4");
     let hosts  = values_t!(args, "host", String)?;
 
+    let mut bind = Bind::default();
+    if let Some(addrs) = args.values_of("bind") {
+        for addr in addrs {
+            bind.set(addr.parse()?);
+        }
+    }
+
     let delay  = Duration::from_millis(delay);
     let expiry = Duration::from_millis(expiry);
 
-    let tracer = Tracer::new().await?;
-    let route4 = UdpSocket::bind("0.0.0.0:0").await?;
-    let route6 = UdpSocket::bind("[::]:0").await?;
+    let tracer = Tracer::new(&bind).await?;
+    let route4 = UdpSocket::bind(bind.sa4()).await?;
+    let route6 = UdpSocket::bind(bind.sa6()).await?;
 
     for (host, addr) in resolve(hosts, ip4, ip6).await {
         println!("trace {} ({})", host, addr);

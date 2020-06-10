@@ -7,6 +7,7 @@ use tokio::sync::{Mutex, oneshot::channel};
 use rand::prelude::*;
 use raw_socket::{Domain, Type, Protocol};
 use raw_socket::tokio::{RawSocket, RawSend, RawRecv};
+use crate::Bind;
 use crate::icmp::{ping4, ping6, IcmpV4Packet, IcmpV6Packet};
 use super::pong::Pong;
 use super::state::State;
@@ -36,7 +37,7 @@ pub struct Pinger {
 pub struct Token([u8; 16]);
 
 impl Pinger {
-    pub fn new() -> Result<Self> {
+    pub async fn new(bind: &Bind) -> Result<Self> {
         let state = State::default();
 
         let raw   = Type::raw();
@@ -45,6 +46,9 @@ impl Pinger {
 
         let sock4 = RawSocket::new(Domain::ipv4(), raw, Some(icmp4))?;
         let sock6 = RawSocket::new(Domain::ipv6(), raw, Some(icmp6))?;
+
+        sock4.bind(bind.sa4()).await?;
+        sock6.bind(bind.sa6()).await?;
 
         let (rx, tx) = sock4.split();
         let sock4 = Mutex::new(tx);

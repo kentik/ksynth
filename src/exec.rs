@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Receiver;
 use synapi::agent::Net;
 use synapi::tasks::{State, Config};
 use synapi::tasks::{PingConfig, TraceConfig, FetchConfig};
-use netdiag::{Pinger, Tracer};
+use netdiag::{Bind, Pinger, Tracer};
 use crate::export::{Exporter, Envoy, Target};
 use crate::spawn::{Spawner, Handle};
 use crate::status::Status;
@@ -17,6 +17,7 @@ pub struct Executor {
     tasks:   HashMap<u64, Handle>,
     rx:      Receiver<Update>,
     ex:      Arc<Exporter>,
+    bind:    Bind,
     network: Network,
     status:  Arc<Status>,
     spawner: Arc<Spawner>,
@@ -26,33 +27,32 @@ pub struct Executor {
 }
 
 #[derive(Debug)]
-struct Network {
-    ip4: bool,
-    ip6: bool,
-    set: bool,
+pub struct Network {
+    pub ip4: bool,
+    pub ip6: bool,
+    pub set: bool,
 }
 
 impl Executor {
-    pub async fn new(rx: Receiver<Update>, ex: Arc<Exporter>, ip4: bool, ip6: bool) -> Result<Self> {
-        let network = Network {
-            ip4: ip4,
-            ip6: ip6,
-            set: !ip4 || !ip6,
-        };
-
+    pub async fn new(rx: Receiver<Update>, ex: Arc<Exporter>, bind: Bind, net: Network) -> Result<Self> {
         let status  = Arc::new(Status::default());
         let spawner = Spawner::new(status.clone());
+
+        let pinger  = Pinger::new(&bind).await?;
+        let tracer  = Tracer::new(&bind).await?;
+        let fetcher = Fetcher::new(&bind)?;
 
         Ok(Self {
             tasks:   HashMap::new(),
             rx:      rx,
             ex:      ex,
-            network: network,
+            bind:    bind,
+            network: net,
             status:  status,
             spawner: Arc::new(spawner),
-            pinger:  Arc::new(Pinger::new()?),
-            tracer:  Arc::new(Tracer::new().await?),
-            fetcher: Arc::new(Fetcher::new()?),
+            pinger:  Arc::new(pinger),
+            tracer:  Arc::new(tracer),
+            fetcher: Arc::new(fetcher),
         })
     }
 
@@ -61,6 +61,9 @@ impl Executor {
     }
 
     pub async fn exec(mut self) -> Result<()> {
+        debug!("IPv4 bind address {}", self.bind.sa4());
+        debug!("IPv6 bind address {}", self.bind.sa6());
+
         while let Some(Update { agent, tasks }) = self.rx.recv().await {
             if !self.network.set {
                 let (ip4, ip6) = match agent.net {

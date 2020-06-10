@@ -8,6 +8,7 @@ use libc::{IPPROTO_RAW, c_int};
 use raw_socket::tokio::prelude::*;
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
+use crate::Bind;
 use crate::icmp::{IcmpV4Packet, icmp4::Unreachable};
 use super::probe::ProbeV4;
 use super::reply::Echo;
@@ -19,14 +20,16 @@ pub struct Sock4 {
 }
 
 impl Sock4 {
-    pub async fn new(state: Arc<State>) -> Result<Self> {
+    pub async fn new(bind: &Bind, state: Arc<State>) -> Result<Self> {
         let ipv4 = Domain::ipv4();
         let icmp = Protocol::icmpv4();
         let raw  = Protocol::from(IPPROTO_RAW);
 
         let icmp  = RawSocket::new(ipv4, Type::raw(), Some(icmp))?;
         let sock  = RawSocket::new(ipv4, Type::raw(), Some(raw))?;
-        let route = UdpSocket::bind("0.0.0.0:0").await?;
+        let route = UdpSocket::bind(bind.sa4()).await?;
+
+        sock.bind(bind.sa4()).await?;
 
         let enable: c_int = 6;
         sock.set_sockopt(Level::IPV4, Name::IPV4_HDRINCL, &enable)?;

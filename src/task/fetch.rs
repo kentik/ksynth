@@ -7,6 +7,7 @@ use bytes::Bytes;
 use reqwest::{Client, StatusCode};
 use log::{debug, warn};
 use tokio::time::{delay_for, timeout};
+use netdiag::Bind;
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
 
@@ -82,9 +83,10 @@ pub struct Fetcher {
 }
 
 impl Fetcher {
-    pub fn new() -> Result<Self> {
+    pub fn new(bind: &Bind) -> Result<Self> {
         let mut client = Client::builder();
         client = client.timeout(Duration::from_secs(10));
+        client = client.local_address(bind.sa4().ip());
         let client = client.build()?;
 
         Ok(Self { client })

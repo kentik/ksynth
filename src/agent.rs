@@ -13,7 +13,8 @@ use signal_hook::{iterator::Signals, SIGINT, SIGTERM};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Sender};
 use synapi::{Client, Config};
-use crate::exec::Executor;
+use netdiag::Bind;
+use crate::exec::{Executor, Network};
 use crate::export::Exporter;
 use crate::status::Monitor;
 use crate::watch::Watcher;
@@ -28,7 +29,7 @@ impl Agent {
         Self { client, keys }
     }
 
-    pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
+    pub async fn exec(self, bind: Bind, net: Network) -> Result<()> {
         let client = self.client;
         let keys   = self.keys;
 
@@ -36,7 +37,7 @@ impl Agent {
 
         let (watcher, tasks) = Watcher::new(client.clone(), keys);
         let exporter = Arc::new(Exporter::new(client.clone()));
-        let executor = Executor::new(tasks, exporter.clone(), ip4, ip6).await?;
+        let executor = Executor::new(tasks, exporter.clone(), bind, net).await?;
         let monitor  = Monitor::new(client, executor.status());
 
         spawn(monitor.exec(),  tx.clone());
@@ -71,6 +72,19 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
     let ip6     = !args.is_present("ip4");
     let port    = value_t!(args, "port", u32)?;
 
+    let mut bind = Bind::default();
+    if let Some(addrs) = args.values_of("bind") {
+        for addr in addrs {
+            bind.set(addr.parse()?);
+        }
+    }
+
+    let net = Network {
+        ip4: ip4,
+        ip6: ip6,
+        set: !ip4 || !ip6,
+    };
+
     let company = company.map(u64::from_str).transpose()?;
 
     info!("initializing {} {}", name, version);
@@ -93,7 +107,7 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
     let agent   = Agent::new(client, keys);
 
     runtime.spawn(async move {
-        if let Err(e) = agent.exec(ip4, ip6).await {
+        if let Err(e) = agent.exec(bind, net).await {
             error!("agent failed: {:?}", e);
             process::exit(1);
         }

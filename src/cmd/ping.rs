@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{value_t, values_t, ArgMatches};
 use rand::prelude::*;
 use tokio::time::{delay_for, timeout};
-use netdiag::{Pinger, Ping};
+use netdiag::{Bind, Pinger, Ping};
 use super::resolve;
 
 pub async fn ping(args: &ArgMatches<'_>) -> Result<()> {
@@ -15,7 +15,14 @@ pub async fn ping(args: &ArgMatches<'_>) -> Result<()> {
     let ip6    = !args.is_present("ip4");
     let hosts  = values_t!(args, "host", String)?;
 
-    let pinger = Arc::new(Pinger::new()?);
+    let mut bind = Bind::default();
+    if let Some(addrs) = args.values_of("bind") {
+        for addr in addrs {
+            bind.set(addr.parse()?);
+        }
+    }
+
+    let pinger = Arc::new(Pinger::new(&bind).await?);
 
     let delay  = Duration::from_millis(delay);
     let expiry = Duration::from_millis(expiry);

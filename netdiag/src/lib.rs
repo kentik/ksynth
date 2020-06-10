@@ -1,3 +1,5 @@
+pub use bind::Bind;
+
 pub use ping::Ping;
 pub use ping::Pinger;
 
@@ -8,5 +10,6 @@ pub use trace::Tracer;
 
 pub mod icmp;
 
+mod bind;
 mod ping;
 mod trace;

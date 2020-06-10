@@ -8,6 +8,7 @@ use libc::c_int;
 use raw_socket::tokio::prelude::*;
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
+use crate::Bind;
 use crate::icmp::{IcmpV6Packet, icmp6::Unreachable};
 use super::probe::ProbeV6;
 use super::reply::Echo;
@@ -19,17 +20,18 @@ pub struct Sock6 {
 }
 
 impl Sock6 {
-    pub async fn new(state: Arc<State>) -> Result<Self> {
+    pub async fn new(bind: &Bind, state: Arc<State>) -> Result<Self> {
         let ipv6 = Domain::ipv6();
         let icmp = Protocol::icmpv6();
         let udp  = Protocol::udp();
 
         let icmp  = RawSocket::new(ipv6, Type::raw(), Some(icmp))?;
         let sock  = RawSocket::new(ipv6, Type::raw(), Some(udp))?;
-        let route = UdpSocket::bind("[::]:0").await?;
+        let route = UdpSocket::bind(bind.sa6()).await?;
 
         let offset: c_int = 6;
         sock.set_sockopt(Level::IPV6, Name::IPV6_CHECKSUM, &offset)?;
+        sock.bind(bind.sa6()).await?;
 
         tokio::spawn(recv(icmp, state));
 

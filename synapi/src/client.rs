@@ -71,7 +71,7 @@ impl Client {
         })
     }
 
-    pub async fn auth(&self, keys: &Keypair) -> Result<Auth, Error> {
+    pub async fn auth(&self, name: &str, keys: &Keypair) -> Result<Auth, Error> {
         #[derive(Debug, Serialize)]
         struct Request<'a> {
             agent:      String,
@@ -79,6 +79,7 @@ impl Client {
             version:    &'a str,
             timestamp:  String,
             signature:  String,
+            name:       &'a str,
         }
 
         let company = self.company.as_ref().map(u64::to_string);
@@ -93,6 +94,7 @@ impl Client {
             version:    &self.version,
             timestamp:  now,
             signature:  hex::encode(&sig.to_bytes()[..]),
+            name:       name,
         }).await?;
 
         if let Auth::Ok((_, session)) = &auth {

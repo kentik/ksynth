@@ -48,6 +48,12 @@ subcommands:
             help: agent ID
             takes_value: true
             required: true
+        - name:
+            short: n
+            long: name
+            env: AGENT_NAME
+            help: agent name
+            takes_value: true
         - company:
             long: company
             env: KENTIK_COMPANY

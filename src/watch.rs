@@ -13,6 +13,7 @@ use synapi::Error::{Application, Unauthorized};
 
 pub struct Watcher {
     client: Arc<Client>,
+    name:   String,
     keys:   Keypair,
     output: Sender<Update>,
 }
@@ -24,10 +25,11 @@ pub struct Update {
 }
 
 impl Watcher {
-    pub fn new(client: Arc<Client>, keys: Keypair) -> (Self, Receiver<Update>) {
+    pub fn new(client: Arc<Client>, name: String, keys: Keypair) -> (Self, Receiver<Update>) {
         let (tx, rx) = channel(128);
         (Self {
             client: client,
+            name:   name,
             keys:   keys,
             output: tx,
         }, rx)
@@ -50,7 +52,7 @@ impl Watcher {
     async fn watch(&mut self) -> Result<()> {
         let wait = Duration::from_secs(30);
         loop {
-            match self.client.auth(&self.keys).await? {
+            match self.client.auth(&self.name, &self.keys).await? {
                 Auth::Ok(auth) => self.auth(auth.0).await?,
                 Auth::Wait     => self.wait(wait).await,
                 Auth::Deny     => Err(Unauthorized)?,

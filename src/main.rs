@@ -2,7 +2,7 @@ use std::process;
 use anyhow::Error;
 use clap::{load_yaml, App};
 use env_logger::Builder;
-use log::LevelFilter::{Info, Debug, Trace};
+use log::LevelFilter;
 use synag::{agent, cmd};
 
 fn main() {
@@ -16,13 +16,21 @@ fn main() {
     let app  = app.version(&*version).long_version(&*detail);
     let args = app.get_matches();
 
-    let (module, level) = match args.occurrences_of("verbose") {
-        0 => (Some(module_path!()), Info),
-        1 => (Some(module_path!()), Debug),
-        2 => (Some(module_path!()), Trace),
-        _ => (None,                 Trace),
+    let mut builder = Builder::from_default_env();
+    let mut filter  = |agent, other| {
+        builder.filter(Some(module_path!()), agent);
+        builder.filter(None,                 other);
     };
-    Builder::from_default_env().filter(module, level).init();
+
+    match args.occurrences_of("verbose") {
+        0 => filter(LevelFilter::Info,  LevelFilter::Warn),
+        1 => filter(LevelFilter::Debug, LevelFilter::Info),
+        2 => filter(LevelFilter::Trace, LevelFilter::Info),
+        3 => filter(LevelFilter::Trace, LevelFilter::Debug),
+        _ => filter(LevelFilter::Trace, LevelFilter::Trace),
+    };
+
+    builder.init();
 
     match args.subcommand() {
         ("agent", Some(args)) => agent::agent(args, version),

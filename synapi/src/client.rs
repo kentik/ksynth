@@ -1,8 +1,10 @@
+use std::str;
 use std::sync::Arc;
 use std::time::Duration;
 use async_compression::futures::write::GzipEncoder;
 use ed25519_dalek::Keypair;
 use futures::io::AsyncWriteExt;
+use log::error;
 use reqwest::{Client as HttpClient, Proxy};
 use reqwest::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
@@ -168,15 +170,26 @@ impl Client {
     async fn send<T: Serialize, U: DeserializeOwned>(&self, url: &str, body: &T) -> Result<U, Error> {
         let r = self.client.post(url).json(body).send().await?;
 
-        if !r.status().is_success() {
-            return Err(r.json::<Backend>().await?.into());
+        let status = r.status();
+        let body   = r.bytes().await?;
+
+        if !status.is_success() {
+            return Err(json::<Backend>(&body)?.into());
         }
 
-        match r.json().await? {
+        match json(&body)? {
             Response::Success(v) => Ok(v),
             Response::Failure(f) => Err(f.into()),
         }
     }
+}
+
+fn json<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> Result<T, Error> {
+    serde_json::from_slice(bytes).map_err(|e| {
+        let json = str::from_utf8(bytes).unwrap_or("<invalid>");
+        error!("{:?}: {}", e, json);
+        Error::Transport(e.to_string())
+    })
 }
 
 impl From<Failure> for Error {

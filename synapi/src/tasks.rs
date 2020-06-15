@@ -1,4 +1,4 @@
-use serde::{Deserialize, de::{Deserializer, Error, Unexpected}};
+use serde::{Deserialize, de::Deserializer};
 use crate::serde::id;
 
 #[derive(Debug, Deserialize)]
@@ -63,7 +63,8 @@ pub struct FetchConfig {
     pub expiry:  u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum State {
     Created,
     Updated,
@@ -93,10 +94,11 @@ pub struct Column {
     pub kind: Kind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Kind {
-    U32,
-    U64,
+    UInt32,
+    UInt64,
     String,
     Addr,
 }
@@ -137,28 +139,5 @@ impl<'d> Deserialize<'d> for Task {
         };
 
         Ok(Task { id, config, state, test_id })
-    }
-}
-
-impl<'d> Deserialize<'d> for State {
-    fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
-        match u64::deserialize(de)? {
-            0 => Ok(State::Created),
-            1 => Ok(State::Updated),
-            2 => Ok(State::Deleted),
-            n => Err(Error::invalid_value(Unexpected::Unsigned(n), &"0..2")),
-        }
-    }
-}
-
-impl<'d> Deserialize<'d> for Kind {
-    fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
-        match u64::deserialize(de)? {
-            0 => Ok(Kind::U32),
-            1 => Ok(Kind::U64),
-            2 => Ok(Kind::String),
-            3 => Ok(Kind::Addr),
-            n => Err(Error::invalid_value(Unexpected::Unsigned(n), &"0..3")),
-        }
     }
 }

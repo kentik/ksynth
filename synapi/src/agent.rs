@@ -1,4 +1,4 @@
-use serde::{Deserialize, de::{Deserializer, Error, Unexpected}};
+use serde::Deserialize;
 
 #[derive(Clone, Debug)]
 pub struct Agent {
@@ -6,20 +6,12 @@ pub struct Agent {
     pub net: Net,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub enum Net {
+    #[serde(rename = "V4")]
     IPv4,
+    #[serde(rename = "V6")]
     IPv6,
+    #[serde(rename = "DUAL")]
     Dual,
-}
-
-impl<'d> Deserialize<'d> for Net {
-    fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
-        match u64::deserialize(de)?  {
-            0 => Ok(Net::IPv4),
-            1 => Ok(Net::IPv6),
-            2 => Ok(Net::Dual),
-            n => Err(Error::invalid_value(Unexpected::Unsigned(n), &"0..2")),
-        }
-    }
 }

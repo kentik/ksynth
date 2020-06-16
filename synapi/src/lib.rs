@@ -1,6 +1,7 @@
 pub use client::Client;
 pub use config::Config;
 pub use error::Error;
+pub use error::Retry;
 
 pub mod client;
 pub mod error;

@@ -1,10 +1,11 @@
 use std::fmt;
+use std::time::Duration;
 use reqwest::StatusCode;
 use serde::Deserialize;
 
 #[derive(Debug)]
 pub enum Error {
-    Application(u32, String),
+    Application(Application),
     Backend(Backend),
     Session,
     Status(StatusCode),
@@ -13,9 +14,45 @@ pub enum Error {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct Application {
+    pub code:    u32,
+    pub message: String,
+    pub retry:   Option<Duration>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Backend {
-    code:    i32,
-    message: String,
+    pub code:    i32,
+    pub message: String,
+}
+
+#[derive(Debug)]
+pub enum Retry {
+    Delay(Duration),
+    Default,
+    None,
+}
+
+impl Error {
+    pub fn retry(&self) -> Retry {
+        match self {
+            Error::Application(a) => a.retry(),
+            Error::Backend(..)    => Retry::Default,
+            Error::Session        => Retry::Default,
+            Error::Status(..)     => Retry::Default,
+            Error::Transport(..)  => Retry::Default,
+            Error::Unauthorized   => Retry::None,
+        }
+    }
+}
+
+impl Application {
+    pub fn retry(&self) -> Retry {
+        match self.retry {
+            Some(delay) => Retry::Delay(delay),
+            None        => Retry::None,
+        }
+    }
 }
 
 impl std::error::Error for Error {}

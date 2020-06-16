@@ -1,15 +1,15 @@
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::{Error, Result};
+use anyhow::Result;
 use ed25519_dalek::Keypair;
 use log::{debug, warn};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::time::delay_for;
-use synapi::{self, Client};
+use synapi::{self, Client, Error, Retry};
 use synapi::agent::Agent;
 use synapi::auth::Auth;
 use synapi::tasks::Group;
-use synapi::Error::{Application, Unauthorized};
+use synapi::Error::Unauthorized;
 
 pub struct Watcher {
     client: Arc<Client>,
@@ -38,14 +38,19 @@ impl Watcher {
     pub async fn exec(mut self) -> Result<()> {
         let delay = Duration::from_secs(30);
         loop {
-            let result = self.watch().await;
+            if let Err(e) = self.watch().await {
+                let err = e.downcast::<Error>()?;
 
-            match retry(result)? {
-                Some(e) => warn!("{:?}", e),
-                None    => continue,
-            };
+                let delay = match err.retry() {
+                    Retry::Delay(delay) => delay,
+                    Retry::Default      => delay,
+                    Retry::None         => return Err(err.into()),
+                };
 
-            delay_for(delay).await;
+                warn!("{:?}", err);
+
+                delay_for(delay).await;
+            }
         }
     }
 
@@ -89,15 +94,5 @@ impl Watcher {
             since = tasks.timestamp;
             delay_for(delay).await;
         }
-    }
-}
-
-fn retry(result: Result<()>) -> Result<Option<Error>> {
-   match result.map_err(Error::downcast::<synapi::Error>)  {
-       Ok(())                       => Ok(None),
-       Err(Ok(e @ Application(..))) => Err(e)?,
-       Err(Ok(e @ Unauthorized))    => Err(e)?,
-       Err(Ok(e))                   => Ok(Some(e.into())),
-       Err(Err(e))                  => Err(e)?,
     }
 }

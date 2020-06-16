@@ -10,7 +10,7 @@ use reqwest::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use time::get_time;
 use tokio::sync::RwLock;
-use crate::{Error, error::Backend};
+use crate::{Error, error::{Application, Backend}};
 use crate::auth::Auth;
 use crate::config::Config;
 use crate::{okay::Okay, status::Report, tasks::Tasks};
@@ -43,6 +43,7 @@ pub enum Response<T> {
 pub struct Failure {
     status: u32,
     msg:    String,
+    retry:  u64,
 }
 
 impl Client {
@@ -193,8 +194,15 @@ fn json<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> Result<T, Error> {
 }
 
 impl From<Failure> for Error {
-    fn from(Failure { status, msg }: Failure) -> Self {
-        Error::Application(status, msg)
+    fn from(Failure { status, msg, retry }: Failure) -> Self {
+        Error::Application(Application {
+            code:    status,
+            message: msg,
+            retry:   match retry {
+                0 => None,
+                n => Some(Duration::from_millis(n)),
+            }
+        })
     }
 }
 

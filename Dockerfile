@@ -10,7 +10,7 @@ RUN chown synag:synag /var/lib/synag
 COPY synag /
 
 RUN setcap cap_net_raw=ep /synag
-RUN chmod a+x /synag
+RUN chmod  a+x            /synag
 
 FROM scratch
 
@@ -26,8 +26,6 @@ COPY --from=0 /etc/group     /etc/
 COPY --from=0 /etc/passwd    /etc/
 COPY --from=0 /var/lib/synag /var/lib/
 COPY --from=0 /synag         /
-
-USER synag
 
 WORKDIR /var/lib/synag
 

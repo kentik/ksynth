@@ -18,6 +18,7 @@ use synapi::{Client, Config};
 use netdiag::Bind;
 use crate::exec::{Executor, Network};
 use crate::export::Exporter;
+use crate::secure;
 use crate::status::Monitor;
 use crate::watch::Watcher;
 
@@ -76,6 +77,7 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
     let ip4     = !args.is_present("ip6");
     let ip6     = !args.is_present("ip4");
     let port    = value_t!(args, "port", u32)?;
+    let user    = args.value_of("user");
 
     let mut bind = Bind::default();
     if let Some(addrs) = args.values_of("bind") {
@@ -106,6 +108,10 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
 
     let id = hex::encode(&keys.public.as_bytes()[..6]);
     debug!("name '{}' identity: {}", name, id);
+
+    if let Err(e) = secure::apply(user) {
+        error!("agent security failure: {}", e);
+    }
 
     let client = Client::new(Config {
         region:  region,

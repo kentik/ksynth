@@ -73,9 +73,13 @@ subcommands:
         - port:
             long: port
             env: KENTIK_PORT
-            help: Remote Port.
+            help: remote port
             takes_value: true
             default_value: "443"
+        - user:
+            long: user
+            help: run as user
+            takes_value: true
   - ping:
       about: execute ping
       help_message: print help

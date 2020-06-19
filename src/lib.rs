@@ -4,6 +4,7 @@ pub mod cmd;
 mod exec;
 mod export;
 mod spawn;
+mod secure;
 mod status;
 mod stats;
 mod task;

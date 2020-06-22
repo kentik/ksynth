@@ -44,7 +44,7 @@ subcommands:
         - id:
             short: i
             long: id
-            env: IDENTITY
+            env: AGENT_IDENTITY
             help: agent ID
             takes_value: true
             required: true
@@ -54,6 +54,11 @@ subcommands:
             env: AGENT_NAME
             help: agent name
             takes_value: true
+        - global:
+            long: global
+            env: AGENT_GLOBAL
+            help: global agent
+            takes_value: false
         - company:
             long: company
             env: KENTIK_COMPANY

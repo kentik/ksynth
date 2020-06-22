@@ -18,6 +18,8 @@ use crate::{okay::Okay, status::Report, tasks::Tasks};
 #[derive(Debug)]
 pub struct Client {
     client:  HttpClient,
+    name:    String,
+    global:  bool,
     company: Option<u64>,
     version: String,
     session: RwLock<Session>,
@@ -48,7 +50,8 @@ pub struct Failure {
 
 impl Client {
     pub fn new(config: Config) -> Result<Self, Error> {
-        let Config { region, version, company, proxy, port } = config;
+        let Config { name, global, region, version, company, proxy, port } = config;
+
         let domain = match region.to_ascii_uppercase().as_ref() {
             "US" => "kentik.com".to_owned(),
             "EU" => "kentik.eu".to_owned(),
@@ -64,6 +67,8 @@ impl Client {
 
         Ok(Self {
             client:  client.build()?,
+            name:    name,
+            global:  global,
             company: company,
             version: version,
             session: RwLock::new(Session::None),
@@ -74,7 +79,7 @@ impl Client {
         })
     }
 
-    pub async fn auth(&self, name: &str, keys: &Keypair) -> Result<Auth, Error> {
+    pub async fn auth(&self, keys: &Keypair) -> Result<Auth, Error> {
         #[derive(Debug, Serialize)]
         struct Request<'a> {
             agent:      String,
@@ -83,6 +88,7 @@ impl Client {
             timestamp:  String,
             signature:  String,
             name:       &'a str,
+            global:     bool,
         }
 
         let company = self.company.as_ref().map(u64::to_string);
@@ -97,7 +103,8 @@ impl Client {
             version:    &self.version,
             timestamp:  now,
             signature:  hex::encode(&sig.to_bytes()[..]),
-            name:       name,
+            name:       &self.name,
+            global:     self.global,
         }).await?;
 
         if let Auth::Ok((_, session)) = &auth {

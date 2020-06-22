@@ -24,23 +24,21 @@ use crate::watch::Watcher;
 
 pub struct Agent {
     client: Client,
-    name:   String,
     keys:   Keypair,
 }
 
 impl Agent {
-    pub fn new(client: Client, name: String, keys: Keypair) -> Self {
-        Self { client, name, keys }
+    pub fn new(client: Client, keys: Keypair) -> Self {
+        Self { client, keys }
     }
 
     pub async fn exec(self, bind: Bind, net: Network) -> Result<()> {
         let client = Arc::new(self.client);
-        let name   = self.name;
         let keys   = self.keys;
 
         let (tx, mut rx) = channel(16);
 
-        let (watcher, tasks) = Watcher::new(client.clone(), name, keys);
+        let (watcher, tasks) = Watcher::new(client.clone(), keys);
         let exporter = Arc::new(Exporter::new(client.clone()));
         let executor = Executor::new(tasks, exporter.clone(), bind, net).await?;
         let monitor  = Monitor::new(client, executor.status());
@@ -71,6 +69,7 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
 
     let id      = value_t!(args, "id", String)?;
     let name    = args.value_of("name");
+    let global  = args.is_present("global");
     let company = args.value_of("company");
     let region  = value_t!(args, "region", String)?;
     let proxy   = args.value_of("proxy");
@@ -114,6 +113,8 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
     }
 
     let client = Client::new(Config {
+        name:    name,
+        global:  global,
         region:  region,
         version: version,
         company: company,
@@ -122,7 +123,7 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
     })?;
 
     let runtime = Runtime::new()?;
-    let agent   = Agent::new(client, name, keys);
+    let agent   = Agent::new(client, keys);
 
     runtime.spawn(async move {
         if let Err(e) = agent.exec(bind, net).await {

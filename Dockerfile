@@ -14,9 +14,9 @@ RUN chmod  a+x            /synag
 
 FROM scratch
 
+ENV AGENT_IDENTITY=agent.id
 ENV KENTIK_COMPANY=0
 ENV KENTIK_REGION=US
-ENV IDENTITY=agent.id
 ENV RUST_BACKTRACE=full
 
 VOLUME /var/lib/synag

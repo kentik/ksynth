@@ -11,11 +11,11 @@ use crate::export::{Exporter, Envoy, Target};
 use crate::spawn::{Spawner, Handle};
 use crate::status::Status;
 use crate::task::{Fetcher, Ping, Trace, Fetch};
-use crate::watch::Update;
+use crate::watch::{Event, Tasks};
 
 pub struct Executor {
     tasks:   HashMap<u64, Handle>,
-    rx:      Receiver<Update>,
+    rx:      Receiver<Event>,
     ex:      Arc<Exporter>,
     bind:    Bind,
     network: Network,
@@ -34,7 +34,7 @@ pub struct Network {
 }
 
 impl Executor {
-    pub async fn new(rx: Receiver<Update>, ex: Arc<Exporter>, bind: Bind, net: Network) -> Result<Self> {
+    pub async fn new(rx: Receiver<Event>, ex: Arc<Exporter>, bind: Bind, net: Network) -> Result<Self> {
         let status  = Arc::new(Status::default());
         let spawner = Spawner::new(status.clone());
 
@@ -64,40 +64,54 @@ impl Executor {
         debug!("IPv4 bind address {}", self.bind.sa4());
         debug!("IPv6 bind address {}", self.bind.sa6());
 
-        while let Some(Update { agent, tasks }) = self.rx.recv().await {
-            if !self.network.set {
-                let (ip4, ip6) = match agent.net {
-                    Net::IPv4 => (true,  false),
-                    Net::IPv6 => (false, true ),
-                    Net::Dual => (true,  true ),
+        while let Some(event) = self.rx.recv().await {
+            match event {
+                Event::Tasks(tasks) => self.tasks(tasks).await?,
+                Event::Reset        => self.reset().await?
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn reset(&mut self) -> Result<()> {
+        debug!("resetting task state");
+        Ok(self.tasks.clear())
+    }
+
+    async fn tasks(&mut self, Tasks { agent, tasks }: Tasks) -> Result<()> {
+        if !self.network.set {
+            let (ip4, ip6) = match agent.net {
+                Net::IPv4 => (true,  false),
+                Net::IPv6 => (false, true ),
+                Net::Dual => (true,  true ),
+            };
+
+            self.network.ip4 = ip4;
+            self.network.ip6 = ip6;
+        }
+
+        for group in tasks {
+            let target = Arc::new(Target {
+                company: group.company,
+                agent:   agent.id,
+                device:  group.device,
+                email:   group.kentik.email,
+                token:   group.kentik.token,
+            });
+
+            for task in group.tasks {
+                let envoy = self.ex.envoy(target.clone());
+
+                let result = match task.state {
+                    State::Created => self.insert(task.id, task.config, envoy).await,
+                    State::Deleted => self.delete(task.id),
+                    State::Updated => self.insert(task.id, task.config, envoy).await,
                 };
 
-                self.network.ip4 = ip4;
-                self.network.ip6 = ip6;
-            }
-
-            for group in tasks {
-                let target = Arc::new(Target {
-                    company: group.company,
-                    agent:   agent.id,
-                    device:  group.device,
-                    email:   group.kentik.email,
-                    token:   group.kentik.token,
-                });
-
-                for task in group.tasks {
-                    let envoy = self.ex.envoy(target.clone());
-
-                    let result = match task.state {
-                        State::Created => self.insert(task.id, task.config, envoy).await,
-                        State::Deleted => self.delete(task.id),
-                        State::Updated => self.insert(task.id, task.config, envoy).await,
-                    };
-
-                    match result {
-                        Ok(_)  => debug!("created task {}", task.id),
-                        Err(e) => error!("invalid task {}: {}", task.id, e),
-                    }
+                match result {
+                    Ok(_)  => debug!("created task {}", task.id),
+                    Err(e) => error!("invalid task {}: {}", task.id, e),
                 }
             }
         }

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use anyhow::Result;
 use ed25519_dalek::Keypair;
 use log::{debug, warn};
@@ -15,17 +15,23 @@ pub struct Watcher {
     client: Arc<Client>,
     name:   String,
     keys:   Keypair,
-    output: Sender<Update>,
+    output: Sender<Event>,
 }
 
 #[derive(Debug)]
-pub struct Update {
+pub enum Event {
+    Tasks(Tasks),
+    Reset,
+}
+
+#[derive(Debug)]
+pub struct Tasks {
     pub agent: Agent,
     pub tasks: Vec<Group>,
 }
 
 impl Watcher {
-    pub fn new(client: Arc<Client>, name: String, keys: Keypair) -> (Self, Receiver<Update>) {
+    pub fn new(client: Arc<Client>, name: String, keys: Keypair) -> (Self, Receiver<Event>) {
         let (tx, rx) = channel(128);
         (Self {
             client: client,
@@ -76,23 +82,27 @@ impl Watcher {
     }
 
     async fn tasks(&mut self, agent: Agent) -> Result<()> {
-        let delay  = Duration::from_secs(60);
+        let delay = Duration::from_secs(60);
+        let reset = Duration::from_secs(60 * 60 * 24);
+        let start = Instant::now();
 
         let client = &mut self.client;
         let output = &mut self.output;
 
         let mut since = 0;
-        loop {
+        while start.elapsed() < reset {
             debug!("requesting task updates");
 
             let tasks = client.tasks(since).await?;
-            output.send(Update {
+            output.send(Event::Tasks(Tasks {
                 agent: agent.clone(),
                 tasks: tasks.groups,
-            }).await?;
+            })).await?;
 
             since = tasks.timestamp;
             delay_for(delay).await;
         }
+
+        Ok(output.send(Event::Reset).await?)
     }
 }

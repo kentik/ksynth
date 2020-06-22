@@ -167,17 +167,6 @@ jobs:
         with:
           name: ${{ steps.package-rpm.outputs.package }}
           path: ${{ steps.package-rpm.outputs.package }}
-    needs: build
-
-  publish:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: ${{ needs.package.outputs.package-deb }}
-      - uses: actions/download-artifact@v2
-        with:
-          name: ${{ needs.package.outputs.package-rpm }}
       - uses: actions/setup-ruby@v1
         with:
           ruby-version: 2.6
@@ -200,8 +189,8 @@ jobs:
           package_cloud push kentik/$REPO/el/7 $RPM
           package_cloud push kentik/$REPO/el/8 $RPM
         env:
-          DEB: ${{ needs.package.outputs.package-deb }}
-          RPM: ${{ needs.package.outputs.package-rpm }}
+          DEB: ${{ steps.package-deb.outputs.package }}
+          RPM: ${{ steps.package-rpm.outputs.package }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
-    needs: package
-    if: startsWith(github.ref, 'refs/tags') || github.ref == 'refs/heads/master'
+        if: startsWith(github.ref, 'refs/tags') || github.ref == 'refs/heads/master'
+    needs: build

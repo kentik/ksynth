@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::Result;
 use ed25519_dalek::Keypair;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::time::delay_for;
 use synapi::{self, Client, Error, Retry};
@@ -63,7 +63,7 @@ impl Watcher {
         loop {
             match self.client.auth(&self.keys).await? {
                 Auth::Ok(auth) => self.auth(auth.0).await?,
-                Auth::Wait     => self.wait(wait).await,
+                Auth::Wait(c)  => self.wait(c, wait).await,
                 Auth::Deny     => Err(Unauthorized)?,
             }
         }
@@ -74,7 +74,8 @@ impl Watcher {
         self.tasks(agent).await
     }
 
-    async fn wait(&mut self, delay: Duration) {
+    async fn wait(&mut self, challenge: String, delay: Duration) {
+        info!("auth challenge: {}", challenge);
         debug!("waiting for authorization");
         delay_for(delay).await;
     }

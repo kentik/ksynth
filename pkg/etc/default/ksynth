@@ -1,4 +1,4 @@
 KENTIK_COMPANY=0
 KENTIK_REGION=US
 #PROXY=proxy.example.com
-AGENT_IDENTITY=synag.id
+AGENT_IDENTITY=ksynth.id

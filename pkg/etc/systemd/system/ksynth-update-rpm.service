@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/apt-get install synag
-ExecStartPost=/bin/systemctl restart synag.service
+ExecStart=/usr/bin/yum install ksynth
+ExecStartPost=/bin/systemctl restart ksynth.service
 
 [Install]
 WantedBy=multi-user.target

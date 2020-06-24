@@ -51,8 +51,8 @@ jobs:
           args: --release --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v2
         with:
-          name: synag-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/synag
+          name: ksynth-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/ksynth
 
   docker:
     runs-on: ubuntu-latest
@@ -62,7 +62,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v2
         with:
-          name: synag-x86_64-unknown-linux-musl
+          name: ksynth-x86_64-unknown-linux-musl
       - uses: docker/build-push-action@v1
         with:
           repository: ${{ github.repository }}
@@ -102,13 +102,13 @@ jobs:
     steps:
       - uses: actions/download-artifact@v2
         with:
-          name: synag-${{ matrix.target }}
+          name: ksynth-${{ matrix.target }}
       - run: "file *"
       - uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: synag
-          asset_name: synag-${{ matrix.target }}
+          asset_path: ksynth
+          asset_name: ksynth-${{ matrix.target }}
           asset_content_type: application/binary
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -132,21 +132,21 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v2
         with:
-          name: synag-x86_64-unknown-linux-musl
+          name: ksynth-x86_64-unknown-linux-musl
           path: temp
       - uses: actions/download-artifact@v2
         with:
-          name: synag-${{ matrix.target }}
+          name: ksynth-${{ matrix.target }}
       - name: setup
         id: setup
         run: |
-          chmod u+x temp/synag
-          VERSION=$(temp/synag -V | cut -d ' ' -f 2)
+          chmod u+x temp/ksynth
+          VERSION=$(temp/ksynth -V | cut -d ' ' -f 2)
           echo ::set-output name=version::$VERSION
       - id: package-deb
         uses: kentik/pkg@master
         with:
-          name: synag
+          name: ksynth
           version: ${{ steps.setup.outputs.version }}
           arch: ${{ matrix.arch }}
           format: deb
@@ -154,7 +154,7 @@ jobs:
       - id: package-rpm
         uses: kentik/pkg@master
         with:
-          name: synag
+          name: ksynth
           version: ${{ steps.setup.outputs.version }}
           arch: ${{ matrix.arch }}
           format: rpm
@@ -175,8 +175,8 @@ jobs:
       - name: publish
         run: |
           case $GITHUB_REF in
-              refs/tags/*) REPO="synag"     ;;
-                        *) REPO="synag-dev" ;;
+              refs/tags/*) REPO="ksynth"     ;;
+                        *) REPO="ksynth-dev" ;;
           esac
 
           package_cloud push kentik/$REPO/debian/jessie  $DEB

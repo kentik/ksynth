@@ -3,26 +3,26 @@ meta:
   vendor: Kentik
   maintainer: Kentik
 files:
-  "/usr/bin/synag":
-    file: synag
+  "/usr/bin/ksynth":
+    file: ksynth
     mode: "0755"
-  "/etc/default/synag":
-    file: pkg/etc/default/synag
+  "/etc/default/ksynth":
+    file: pkg/etc/default/ksynth
     mode: "0644"
     keep: true
 dirs:
-  - /var/lib/synag
+  - /var/lib/ksynth
 units:
-  - pkg/etc/systemd/system/synag.service
+  - pkg/etc/systemd/system/ksynth.service
 scripts:
   "post-install": pkg/scripts/post-install
 conditional:
   - when: format == "deb"
     units:
-      - pkg/etc/systemd/system/synag-update-deb.service
-      - pkg/etc/systemd/system/synag-update-deb.timer
+      - pkg/etc/systemd/system/ksynth-update-deb.service
+      - pkg/etc/systemd/system/ksynth-update-deb.timer
   - when: format == "rpm"
     units:
-      - pkg/etc/systemd/system/synag-update-rpm.service
-      - pkg/etc/systemd/system/synag-update-rpm.timer
-user: synag
+      - pkg/etc/systemd/system/ksynth-update-rpm.service
+      - pkg/etc/systemd/system/ksynth-update-rpm.timer
+user: ksynth

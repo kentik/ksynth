@@ -3,12 +3,12 @@ Description=Kentik Synthetic Agent
 After=network.target
 
 [Service]
-EnvironmentFile=-/etc/default/synag
+EnvironmentFile=-/etc/default/ksynth
 Type=simple
-User=synag
-WorkingDirectory=/var/lib/synag
+User=ksynth
+WorkingDirectory=/var/lib/ksynth
 AmbientCapabilities=CAP_NET_RAW
-ExecStart=/usr/bin/synag agent -v
+ExecStart=/usr/bin/ksynth agent -v
 Restart=on-failure
 RestartSec=3
 

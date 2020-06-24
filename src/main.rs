@@ -3,7 +3,7 @@ use anyhow::Error;
 use clap::{load_yaml, App};
 use env_logger::Builder;
 use log::LevelFilter;
-use synag::{agent, cmd};
+use ksynth::{agent, cmd};
 
 fn main() {
     let version = option_env!("CARGO_PKG_VERSION").unwrap_or("0.0.0");

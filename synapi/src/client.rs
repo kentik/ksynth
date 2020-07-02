@@ -50,10 +50,6 @@ pub struct Failure {
     retry:  u64,
 }
 
-fn to_cstr(buf: &[libc::c_char]) -> &CStr {
-  unsafe { CStr::from_ptr(buf.as_ptr()) }
-}
-
 impl Client {
     pub fn new(config: Config) -> Result<Self, Error> {
         let Config { name, global, region, version, company, proxy, port } = config;
@@ -103,14 +99,16 @@ impl Client {
         let key = &keys.public;
         let now = get_time().sec.to_string();
         let sig = keys.sign(now.as_bytes());
-        let mut uts : libc::utsname = unsafe { std::mem::zeroed() };
         let mut os_data = vec![String::from("")];
-        if unsafe { libc::uname(&mut uts) } == 0 {
-            os_data = vec![to_cstr(&uts.sysname[..]).to_string_lossy().into_owned(),
-                           to_cstr(&uts.nodename[..]).to_string_lossy().into_owned(),
-                           to_cstr(&uts.release[..]).to_string_lossy().into_owned(),
-                           to_cstr(&uts.version[..]).to_string_lossy().into_owned(),
-                           to_cstr(&uts.machine[..]).to_string_lossy().into_owned()];
+        unsafe {
+            let mut uts : libc::utsname = std::mem::zeroed();
+            if libc::uname(&mut uts)  == 0 {
+                os_data = vec![CStr::from_ptr(uts.sysname[..].as_ptr()).to_string_lossy().into_owned(),
+                               CStr::from_ptr(uts.nodename[..].as_ptr()).to_string_lossy().into_owned(),
+                               CStr::from_ptr(uts.release[..].as_ptr()).to_string_lossy().into_owned(),
+                               CStr::from_ptr(uts.version[..].as_ptr()).to_string_lossy().into_owned(),
+                               CStr::from_ptr(uts.machine[..].as_ptr()).to_string_lossy().into_owned()];
+            }
         }
 
         let auth = self.send(&self.auth, &Request {

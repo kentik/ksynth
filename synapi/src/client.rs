@@ -1,4 +1,5 @@
 use std::str;
+use std::ffi::CStr;
 use std::sync::Arc;
 use std::time::Duration;
 use async_compression::futures::write::GzipEncoder;
@@ -14,6 +15,7 @@ use crate::{Error, error::{Application, Backend}};
 use crate::auth::Auth;
 use crate::config::Config;
 use crate::{okay::Okay, status::Report, tasks::Tasks};
+extern crate libc;
 
 #[derive(Debug)]
 pub struct Client {
@@ -46,6 +48,10 @@ pub struct Failure {
     status: u32,
     msg:    String,
     retry:  u64,
+}
+
+fn to_cstr(buf: &[libc::c_char]) -> &CStr {
+  unsafe { CStr::from_ptr(buf.as_ptr()) }
 }
 
 impl Client {
@@ -97,6 +103,15 @@ impl Client {
         let key = &keys.public;
         let now = get_time().sec.to_string();
         let sig = keys.sign(now.as_bytes());
+        let mut uts : libc::utsname = unsafe { std::mem::zeroed() };
+        let mut os_data = vec![String::from("")];
+        if unsafe { libc::uname(&mut uts) } == 0 {
+            os_data = vec![to_cstr(&uts.sysname[..]).to_string_lossy().into_owned(),
+                           to_cstr(&uts.nodename[..]).to_string_lossy().into_owned(),
+                           to_cstr(&uts.release[..]).to_string_lossy().into_owned(),
+                           to_cstr(&uts.version[..]).to_string_lossy().into_owned(),
+                           to_cstr(&uts.machine[..]).to_string_lossy().into_owned()];
+        }
 
         let auth = self.send(&self.auth, &Request {
             agent:      hex::encode(&key.to_bytes()[..]),
@@ -106,7 +121,7 @@ impl Client {
             signature:  hex::encode(&sig.to_bytes()[..]),
             name:       &self.name,
             global:     self.global,
-            os:         sys_info::os_release().unwrap_or_default(),
+            os:         os_data.join(" "),
         }).await?;
 
         if let Auth::Ok((_, session)) = &auth {

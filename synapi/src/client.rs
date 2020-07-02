@@ -89,6 +89,7 @@ impl Client {
             signature:  String,
             name:       &'a str,
             global:     bool,
+            os:         String,
         }
 
         let company = self.company.as_ref().map(u64::to_string);
@@ -105,6 +106,7 @@ impl Client {
             signature:  hex::encode(&sig.to_bytes()[..]),
             name:       &self.name,
             global:     self.global,
+            os:         sys_info::os_release().unwrap_or_default(),
         }).await?;
 
         if let Auth::Ok((_, session)) = &auth {

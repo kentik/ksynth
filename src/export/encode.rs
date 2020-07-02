@@ -64,6 +64,7 @@ struct Stats {
     max: u32,
     avg: u32,
     std: u32,
+    jit: u32,
 }
 
 impl Columns {
@@ -93,6 +94,7 @@ impl Columns {
                 max: lookup("INT04")?,
                 avg: lookup("INT05")?,
                 std: lookup("INT06")?,
+                jit: lookup("INT07")?,
             },
             route:   lookup("STR00")?,
             time:    lookup("INT01")?,
@@ -128,7 +130,7 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new("ping", msg,  11);
+        let mut customs = Customs::new("ping", msg,  12);
         customs.next(self.app,     |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,   |v| v.set_uint64_val(agent));
         customs.next(self.kind,    |v| v.set_uint32_val(PING));
@@ -140,6 +142,7 @@ impl Columns {
         customs.next(self.rtt.max, |v| v.set_uint32_val(as_micros(rtt.max)));
         customs.next(self.rtt.avg, |v| v.set_uint32_val(as_micros(rtt.avg)));
         customs.next(self.rtt.std, |v| v.set_uint32_val(as_micros(rtt.std)));
+        customs.next(self.rtt.jit, |v| v.set_uint32_val(as_micros(rtt.jit)));
     }
 
     fn trace(&self, mut msg: Builder, agent: u64, data: &Trace) {

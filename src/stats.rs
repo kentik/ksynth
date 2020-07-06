@@ -8,6 +8,7 @@ pub struct Summary {
     pub max: Duration,
     pub avg: Duration,
     pub std: Duration,
+    pub jit: Duration,
 }
 
 pub fn summarize(ds: &[Duration]) -> Option<Summary> {
@@ -20,22 +21,31 @@ pub fn summarize(ds: &[Duration]) -> Option<Summary> {
     let mut min = first;
     let mut max = first;
     let mut sum = (first - mean).pow(2);
+    let mut dif = 0.0;
+    let mut last = first;
 
     for us in iter {
         min = us.min(min);
         max = us.max(max);
         sum += (us - mean).pow(2);
+        dif += f64::from(us - last).abs();
+        last = us;
     }
 
     let count = i32::try_from(count).ok()?;
     let stdev = f64::from(sum.checked_div(count)?).sqrt();
     let stdev = stdev.round() as i32;
+    let mut jit = 0;
+    if count > 1 {
+        jit = f64::from(dif/f64::from(count-1)).round() as i32;
+    }
 
     Some(Summary {
         min: Duration::from_micros(u64::try_from(min).ok()?),
         max: Duration::from_micros(u64::try_from(max).ok()?),
         avg: Duration::from_micros(u64::try_from(mean).ok()?),
         std: Duration::from_micros(u64::try_from(stdev).ok()?),
+        jit: Duration::from_micros(u64::try_from(jit).ok()?),
     })
 }
 
@@ -77,6 +87,7 @@ mod test {
             max: one,
             avg: one,
             std: zero,
+            jit: zero,
         }), super::summarize(&[one]));
     }
 
@@ -94,6 +105,7 @@ mod test {
             max: Duration::from_micros(300),
             avg: Duration::from_micros(225),
             std: Duration::from_micros(83),
+            jit: Duration::from_micros(67),
         }), result);
     }
 }

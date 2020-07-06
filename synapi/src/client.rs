@@ -1,4 +1,5 @@
 use std::str;
+use std::ffi::CStr;
 use std::sync::Arc;
 use std::time::Duration;
 use async_compression::futures::write::GzipEncoder;
@@ -14,6 +15,7 @@ use crate::{Error, error::{Application, Backend}};
 use crate::auth::Auth;
 use crate::config::Config;
 use crate::{okay::Okay, status::Report, tasks::Tasks};
+extern crate libc;
 
 #[derive(Debug)]
 pub struct Client {
@@ -89,6 +91,7 @@ impl Client {
             signature:  String,
             name:       &'a str,
             global:     bool,
+            os:         String,
         }
 
         let company = self.company.as_ref().map(u64::to_string);
@@ -96,6 +99,17 @@ impl Client {
         let key = &keys.public;
         let now = get_time().sec.to_string();
         let sig = keys.sign(now.as_bytes());
+        let mut os_data = vec![String::from("")];
+        unsafe {
+            let mut uts : libc::utsname = std::mem::zeroed();
+            if libc::uname(&mut uts)  == 0 {
+                os_data = vec![CStr::from_ptr(uts.sysname[..].as_ptr()).to_string_lossy().into_owned(),
+                               CStr::from_ptr(uts.nodename[..].as_ptr()).to_string_lossy().into_owned(),
+                               CStr::from_ptr(uts.release[..].as_ptr()).to_string_lossy().into_owned(),
+                               CStr::from_ptr(uts.version[..].as_ptr()).to_string_lossy().into_owned(),
+                               CStr::from_ptr(uts.machine[..].as_ptr()).to_string_lossy().into_owned()];
+            }
+        }
 
         let auth = self.send(&self.auth, &Request {
             agent:      hex::encode(&key.to_bytes()[..]),
@@ -105,6 +119,7 @@ impl Client {
             signature:  hex::encode(&sig.to_bytes()[..]),
             name:       &self.name,
             global:     self.global,
+            os:         os_data.join(" "),
         }).await?;
 
         if let Auth::Ok((_, session)) = &auth {

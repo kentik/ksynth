@@ -126,8 +126,8 @@ struct Output {
 
 impl fmt::Display for Output {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self  { sent, lost, rtt: Summary { min, max, avg, .. }, .. } = self;
+        let Self  { sent, lost, rtt: Summary { min, max, avg, jit, .. }, .. } = self;
         let good = sent - lost;
-        write!(f, "{}/{} min rtt {:.2?}, max {:.2?}, avg {:.2?}", good, sent, min, max, avg)
+        write!(f, "{}/{} min rtt {:.2?}, max {:.2?}, avg {:.2?}, jitter {:.2?}", good, sent, min, max, avg, jit)
     }
 }

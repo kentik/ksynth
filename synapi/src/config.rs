@@ -7,4 +7,5 @@ pub struct Config {
     pub company: Option<u64>,
     pub proxy:   Option<String>,
     pub port:    u32,
+    pub bind:    Option<String>,
 }

@@ -120,6 +120,7 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
         company: company,
         proxy:   proxy.map(String::from),
         port:    port,
+        bind:    args.value_of("bind").map(String::from), // Only used for passing back to api to get local ip.
     })?;
 
     let runtime = Runtime::new()?;

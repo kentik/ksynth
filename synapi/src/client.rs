@@ -29,6 +29,7 @@ pub struct Client {
     tasks:   String,
     status:  String,
     submit:  String,
+    bind:    Option<String>,
 }
 
 #[derive(Debug)]
@@ -52,7 +53,7 @@ pub struct Failure {
 
 impl Client {
     pub fn new(config: Config) -> Result<Self, Error> {
-        let Config { name, global, region, version, company, proxy, port } = config;
+        let Config { name, global, region, version, company, proxy, port, bind } = config;
 
         let domain = match region.to_ascii_uppercase().as_ref() {
             "US" => "kentik.com".to_owned(),
@@ -73,6 +74,7 @@ impl Client {
             global:  global,
             company: company,
             version: version,
+            bind:    bind,
             session: RwLock::new(Session::None),
             auth:    format!("https://api.{}:{}/api/agent/v1/syn/auth",   domain, port),
             tasks:   format!("https://api.{}:{}/api/agent/v1/syn/tasks",  domain, port),
@@ -92,9 +94,11 @@ impl Client {
             name:       &'a str,
             global:     bool,
             os:         String,
+            bind:       Option<String>,
         }
 
         let company = self.company.as_ref().map(u64::to_string);
+        let bind = self.bind.as_ref().map(String::to_string);
 
         let key = &keys.public;
         let now = get_time().sec.to_string();
@@ -120,6 +124,7 @@ impl Client {
             name:       &self.name,
             global:     self.global,
             os:         os_data.join(" "),
+            bind:       bind,
         }).await?;
 
         if let Auth::Ok((_, session)) = &auth {

@@ -20,14 +20,14 @@ pub fn summarize(ds: &[Duration]) -> Option<Summary> {
 
     let mut min = first;
     let mut max = first;
-    let mut sum = (first - mean).pow(2);
+    let mut sum = (first - mean).saturating_pow(2);
     let mut dif = 0.0;
     let mut last = first;
 
     for us in iter {
         min = us.min(min);
         max = us.max(max);
-        sum += (us - mean).pow(2);
+        sum = sum.saturating_add((us - mean).saturating_pow(2));
         dif += f64::from(us - last).abs();
         last = us;
     }
@@ -50,11 +50,11 @@ pub fn summarize(ds: &[Duration]) -> Option<Summary> {
 }
 
 fn convert(ds: &[Duration]) -> Option<(Vec<i32>, i32)> {
-    let mut sum = 0;
+    let mut sum = 0i32;
 
     let micros = ds.iter().map(|d| {
         let us = micros(d)?;
-        sum += us;
+        sum = sum.saturating_add(us);
         Ok(us)
     }).collect::<Result<Vec<_>, TryFromIntError>>().ok()?;
 
@@ -107,5 +107,15 @@ mod test {
             std: Duration::from_micros(83),
             jit: Duration::from_micros(67),
         }), result);
+    }
+
+    #[test]
+    fn overflow() {
+        assert!(super::summarize(&[
+            Duration::from_micros(i32::MAX as u64),
+            Duration::from_micros(i32::MAX as u64),
+            Duration::from_micros(i32::MAX as u64),
+            Duration::from_micros(i32::MAX as u64),
+        ]).is_some());
     }
 }

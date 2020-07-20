@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::Result;
-use ed25519_dalek::Keypair;
+use ed25519_compact::KeyPair;
 use log::{debug, info, warn};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::time::delay_for;
@@ -13,7 +13,7 @@ use synapi::Error::Unauthorized;
 
 pub struct Watcher {
     client: Arc<Client>,
-    keys:   Keypair,
+    keys:   KeyPair,
     output: Sender<Event>,
 }
 
@@ -30,7 +30,7 @@ pub struct Tasks {
 }
 
 impl Watcher {
-    pub fn new(client: Arc<Client>, keys: Keypair) -> (Self, Receiver<Event>) {
+    pub fn new(client: Arc<Client>, keys: KeyPair) -> (Self, Receiver<Event>) {
         let (tx, rx) = channel(128);
         (Self {
             client: client,

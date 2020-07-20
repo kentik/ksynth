@@ -3,7 +3,7 @@ use std::ffi::CStr;
 use std::sync::Arc;
 use std::time::Duration;
 use async_compression::futures::write::GzipEncoder;
-use ed25519_dalek::Keypair;
+use ed25519_compact::KeyPair;
 use futures::io::AsyncWriteExt;
 use log::error;
 use reqwest::{Client as HttpClient, Proxy};
@@ -83,7 +83,7 @@ impl Client {
         })
     }
 
-    pub async fn auth(&self, keys: &Keypair) -> Result<Auth, Error> {
+    pub async fn auth(&self, keys: &KeyPair) -> Result<Auth, Error> {
         #[derive(Debug, Serialize)]
         struct Request<'a> {
             agent:      String,
@@ -100,9 +100,9 @@ impl Client {
         let company = self.company.as_ref().map(u64::to_string);
         let bind = self.bind.as_ref().map(String::to_string);
 
-        let key = &keys.public;
+        let key = &keys.pk;
         let now = get_time().sec.to_string();
-        let sig = keys.sign(now.as_bytes());
+        let sig = keys.sk.sign(now.as_bytes(), None);
         let mut os_data = vec![String::from("")];
         unsafe {
             let mut uts : libc::utsname = std::mem::zeroed();
@@ -116,11 +116,11 @@ impl Client {
         }
 
         let auth = self.send(&self.auth, &Request {
-            agent:      hex::encode(&key.to_bytes()[..]),
+            agent:      hex::encode(&key[..]),
             company_id: company,
             version:    &self.version,
             timestamp:  now,
-            signature:  hex::encode(&sig.to_bytes()[..]),
+            signature:  hex::encode(&sig[..]),
             name:       &self.name,
             global:     self.global,
             os:         os_data.join(" "),

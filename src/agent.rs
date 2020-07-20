@@ -7,10 +7,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use anyhow::{Error, Result};
 use clap::{value_t, ArgMatches};
-use ed25519_dalek::Keypair;
+use ed25519_compact::{KeyPair, Seed};
 use libc::gethostname;
 use log::{debug, error, info};
-use rand::thread_rng;
 use signal_hook::{iterator::Signals, SIGINT, SIGTERM};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Sender};
@@ -24,11 +23,11 @@ use crate::watch::Watcher;
 
 pub struct Agent {
     client: Client,
-    keys:   Keypair,
+    keys:   KeyPair,
 }
 
 impl Agent {
-    pub fn new(client: Client, keys: Keypair) -> Self {
+    pub fn new(client: Client, keys: KeyPair) -> Self {
         Self { client, keys }
     }
 
@@ -105,7 +104,7 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
         Err(_) => init(&id)?,
     };
 
-    let id = hex::encode(&keys.public.as_bytes()[..6]);
+    let id = hex::encode(&keys.pk[..6]);
     debug!("name '{}' identity: {}", name, id);
 
     if let Err(e) = secure::apply(user) {
@@ -146,19 +145,18 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
     Ok(())
 }
 
-fn load(path: &str) -> Result<Keypair> {
+fn load(path: &str) -> Result<KeyPair> {
     let mut file  = File::open(path)?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
-    Ok(Keypair::from_bytes(&bytes)?)
+    Ok(KeyPair::from_slice(&bytes)?)
 }
 
-fn init(path: &str) -> Result<Keypair> {
+fn init(path: &str) -> Result<KeyPair> {
     info!("generating new identity");
-    let mut rng = thread_rng();
-    let keys  = Keypair::generate(&mut rng);
-    let bytes = keys.to_bytes();
-    fs::write(path, &bytes[..])?;
+    let seed = Seed::generate();
+    let keys  = KeyPair::from_seed(seed);
+    fs::write(path, &keys[..])?;
     Ok(keys)
 }
 

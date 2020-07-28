@@ -18,6 +18,9 @@ signal-hook   = "0.1.15"
 serde_json    = "1.0.55"
 yaml-rust     = "0.3.5"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+capo          = "0.0.1"
+
 [dependencies.clap]
 version  = "2.33.1"
 features = ["yaml"]

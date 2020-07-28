@@ -3,17 +3,13 @@ use anyhow::Error;
 use clap::{load_yaml, App};
 use env_logger::Builder;
 use log::LevelFilter;
-use ksynth::{agent, cmd};
+use ksynth::{agent, cmd, version::Version};
 
 fn main() {
-    let version = option_env!("CARGO_PKG_VERSION").unwrap_or("0.0.0");
-    let version = option_env!("GIT_VERSION").unwrap_or(version).to_string();
-    let commit  = option_env!("GIT_COMMIT").unwrap_or("<unknown>");
-    let detail  = format!("{} ({})", version, commit);
-
+    let version = Version::new();
     let yaml = load_yaml!("args.yml");
     let app  = App::from_yaml(yaml);
-    let app  = app.version(&*version).long_version(&*detail);
+    let app  = app.version(&*version.version).long_version(&*version.detail);
     let args = app.get_matches();
 
     let mut builder = Builder::from_default_env();

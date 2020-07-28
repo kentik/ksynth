@@ -19,6 +19,7 @@ use crate::exec::{Executor, Network};
 use crate::export::Exporter;
 use crate::secure;
 use crate::status::Monitor;
+use crate::version::Version;
 use crate::watch::Watcher;
 
 pub struct Agent {
@@ -63,9 +64,7 @@ fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, mut tx: Sende
     });
 }
 
-pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
-    let app = env!("CARGO_PKG_NAME");
-
+pub fn agent(args: &ArgMatches, version: Version) -> Result<()> {
     let id      = value_t!(args, "id", String)?;
     let name    = args.value_of("name");
     let global  = args.is_present("global");
@@ -97,7 +96,7 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
         set: !ip4 || !ip6,
     };
 
-    info!("initializing {} {}", app, version);
+    info!("initializing {} {}", version.name, version.version);
 
     let keys = match fs::metadata(&id) {
         Ok(_)  => load(&id)?,
@@ -115,7 +114,7 @@ pub fn agent(args: &ArgMatches, version: String) -> Result<()> {
         name:    name,
         global:  global,
         region:  region,
-        version: version,
+        version: version.version,
         company: company,
         proxy:   proxy.map(String::from),
         port:    port,

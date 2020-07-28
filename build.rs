@@ -1,3 +1,4 @@
+use std::env;
 use anyhow::Result;
 use capnpc::CompilerCommand;
 use git2::{DescribeOptions, Repository};
@@ -22,8 +23,13 @@ fn main() -> Result<()> {
     let desc    = repo.describe(&opts)?;
     let version = desc.format(None)?;
 
-    println!("cargo:rustc-env=GIT_COMMIT={}", hash);
-    println!("cargo:rustc-env=GIT_VERSION={}", version);
+    let arch    = env::var("CARGO_CFG_TARGET_ARCH")?;
+    let system  = env::var("CARGO_CFG_TARGET_OS")?;
+
+    println!("cargo:rustc-env=BUILD_VERSION={}", version);
+    println!("cargo:rustc-env=BUILD_COMMIT={}", hash);
+    println!("cargo:rustc-env=BUILD_ARCH={}", arch);
+    println!("cargo:rustc-env=BUILD_SYSTEM={}", system);
 
     CompilerCommand::new()
         .src_prefix("schema")

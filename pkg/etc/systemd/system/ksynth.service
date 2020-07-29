@@ -8,7 +8,7 @@ Type=simple
 User=ksynth
 WorkingDirectory=/var/lib/ksynth
 AmbientCapabilities=CAP_NET_RAW
-ExecStart=/usr/bin/ksynth agent -v
+ExecStart=/opt/kentik/ksynth/ksynth agent -v
 Restart=on-failure
 RestartSec=3
 

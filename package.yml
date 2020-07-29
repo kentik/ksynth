@@ -3,7 +3,7 @@ meta:
   vendor: Kentik
   maintainer: Kentik
 files:
-  "/usr/bin/ksynth":
+  "/opt/kentik/ksynth/ksynth":
     file: ksynth
     mode: "0755"
   "/etc/default/ksynth":
@@ -11,6 +11,7 @@ files:
     mode: "0644"
     keep: true
 dirs:
+  - /opt/kentik/ksynth
   - /var/lib/ksynth
 units:
   - pkg/etc/systemd/system/ksynth.service

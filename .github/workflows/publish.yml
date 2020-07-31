@@ -1,0 +1,123 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - id: version
+        run: |
+          aws s3 cp $BUCKET/ksynth-x86_64-unknown-linux-musl ksynth
+          chmod u+x ksynth
+          VERSION=$(./ksynth -V | cut -d ' ' -f 2)
+          echo ::set-output name=version::$VERSION
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - run: |
+          aws s3 cp $BUCKET/ksynth-x86_64-unknown-linux-musl ksynth
+      - uses: docker/build-push-action@v1
+        with:
+          repository: ${{ github.repository }}
+          tags: ${{ needs.version.outputs.version }} #, latest
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+        env:
+          DOCKER_BUILDKIT: 1
+    needs: version
+
+  package:
+    runs-on: ubuntu-latest
+    outputs:
+      package-deb: ${{ steps.package-deb.outputs.package }}
+      package-rpm: ${{ steps.package-rpm.outputs.package }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            arch: x86_64
+          - target: armv7-unknown-linux-musleabihf
+            arch: armv7
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - run: |
+          aws s3 cp $BUCKET/ksynth-${{ matrix.target }} ksynth
+      - id: package-deb
+        uses: kentik/pkg@master
+        with:
+          name: ksynth
+          version: ${{ needs.version.outputs.version }}
+          arch: ${{ matrix.arch }}
+          format: deb
+          package: package.yml
+      - id: package-rpm
+        uses: kentik/pkg@master
+        with:
+          name: ksynth
+          version: ${{ needs.version.outputs.version }}
+          arch: ${{ matrix.arch }}
+          format: rpm
+          package: package.yml
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.package-deb.outputs.package }}
+          path: ${{ steps.package-deb.outputs.package }}
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.package-rpm.outputs.package }}
+          path: ${{ steps.package-rpm.outputs.package }}
+      - uses: actions/setup-ruby@v1
+        with:
+          ruby-version: 2.6
+      - run: |
+          gem install package_cloud
+      - name: publish
+        run: |
+          case "${{ github.event.release.prerelease }}" in
+                  true) REPO="ksynth-dev" ;;
+                 false) REPO="ksynth"     ;;
+          esac
+
+          package_cloud push kentik/$REPO/debian/jessie  $DEB
+          package_cloud push kentik/$REPO/debian/stretch $DEB
+          package_cloud push kentik/$REPO/debian/buster  $DEB
+
+          package_cloud push kentik/$REPO/ubuntu/focal   $DEB
+          package_cloud push kentik/$REPO/ubuntu/bionic  $DEB
+
+          package_cloud push kentik/$REPO/el/7 $RPM
+          package_cloud push kentik/$REPO/el/8 $RPM
+        env:
+          DEB: ${{ steps.package-deb.outputs.package }}
+          RPM: ${{ steps.package-rpm.outputs.package }}
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+    needs: version
+
+env:
+  BUCKET: s3://kentik-github-actions/${{ github.repository }}/${{ github.sha }}

@@ -85,6 +85,11 @@ subcommands:
             long: user
             help: run as user
             takes_value: true
+        - update:
+            long: update
+            env: AGENT_UPDATE
+            help: enable updates
+            takes_value: false
   - ping:
       about: execute ping
       help_message: print help

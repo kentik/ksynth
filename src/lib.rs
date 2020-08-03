@@ -9,6 +9,7 @@ mod secure;
 mod status;
 mod stats;
 mod task;
+mod update;
 mod watch;
 
 pub mod chf_capnp {

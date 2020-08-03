@@ -19,6 +19,7 @@ use crate::exec::{Executor, Network};
 use crate::export::Exporter;
 use crate::secure;
 use crate::status::Monitor;
+use crate::update::Updater;
 use crate::version::Version;
 use crate::watch::Watcher;
 
@@ -75,6 +76,7 @@ pub fn agent(args: &ArgMatches, version: Version) -> Result<()> {
     let ip6     = !args.is_present("ip4");
     let port    = value_t!(args, "port", u32)?;
     let user    = args.value_of("user");
+    let update  = args.is_present("update");
 
     let mut bind = Bind::default();
     if let Some(addrs) = args.values_of("bind") {
@@ -114,7 +116,7 @@ pub fn agent(args: &ArgMatches, version: Version) -> Result<()> {
         name:    name,
         global:  global,
         region:  region,
-        version: version.version,
+        version: version.version.clone(),
         company: company,
         proxy:   proxy.map(String::from),
         port:    port,
@@ -131,6 +133,9 @@ pub fn agent(args: &ArgMatches, version: Version) -> Result<()> {
         }
     });
 
+    let updater = Updater::new(version, false, runtime)?;
+    let (abort, guard) = updater.exec(update);
+
     let signals = Signals::new(&[SIGINT, SIGTERM])?;
     for signal in signals.forever() {
         match signal {
@@ -139,7 +144,8 @@ pub fn agent(args: &ArgMatches, version: Version) -> Result<()> {
         }
     }
 
-    drop(runtime);
+    abort.abort();
+    guard.join().unwrap();
 
     Ok(())
 }

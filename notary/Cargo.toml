@@ -1,0 +1,31 @@
+[package]
+name    = "notary"
+version = "0.0.1"
+authors = ["Will <will@kentik.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow          = "1.0.31"
+ed25519-compact = "0.1.6"
+hmac-sha512     = "0.1.6"
+log             = "0.4.8"
+nix             = "0.17.0"
+serde_json      = "1.0.56"
+tokio           = "0.2.22"
+zstd            = "0.5.3"
+
+[dependencies.bytes]
+version  = "0.5.6"
+features = ["serde"]
+
+[dependencies.reqwest]
+version  = "0.10.6"
+features = ["json", "rustls-tls", "stream"]
+default-features = false
+
+[dependencies.serde]
+version  = "1.0.114"
+features = ["derive"]
+
+[profile.release]
+debug = true

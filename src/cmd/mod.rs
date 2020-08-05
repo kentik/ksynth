@@ -1,15 +1,14 @@
 use std::net::IpAddr;
 use anyhow::Result;
-use clap::ArgMatches;
 use futures::stream::{self, StreamExt};
 use tokio::runtime::Runtime;
-use crate::task;
+use crate::{args::Args, task};
 
-pub fn ping(args: &ArgMatches<'_>) -> Result<()> {
+pub fn ping(args: Args<'_, '_>) -> Result<()> {
     Runtime::new()?.block_on(ping::ping(args))
 }
 
-pub fn trace(args: &ArgMatches<'_>) -> Result<()> {
+pub fn trace(args: Args<'_, '_>) -> Result<()> {
     Runtime::new()?.block_on(trace::trace(args))
 }
 

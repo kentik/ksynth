@@ -6,7 +6,7 @@ use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
 use anyhow::{Error, Result};
-use clap::{value_t, ArgMatches};
+use clap::value_t;
 use ed25519_compact::{KeyPair, Seed};
 use libc::gethostname;
 use log::{debug, error, info};
@@ -15,6 +15,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Sender};
 use synapi::{Client, Config};
 use netdiag::Bind;
+use crate::args::Args;
 use crate::exec::{Executor, Network};
 use crate::export::Exporter;
 use crate::secure;
@@ -65,7 +66,7 @@ fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, mut tx: Sende
     });
 }
 
-pub fn agent(args: &ArgMatches, version: Version) -> Result<()> {
+pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     let id      = value_t!(args, "id", String)?;
     let name    = args.value_of("name");
     let global  = args.is_present("global");

@@ -3,7 +3,7 @@ use anyhow::Error;
 use clap::{load_yaml, App};
 use env_logger::Builder;
 use log::LevelFilter;
-use ksynth::{agent, cmd, version::Version};
+use ksynth::{agent, cmd, args::Args, version::Version};
 
 fn main() {
     let version = Version::new();
@@ -11,6 +11,7 @@ fn main() {
     let app  = App::from_yaml(yaml);
     let app  = app.version(&*version.version).long_version(&*version.detail);
     let args = app.get_matches();
+    let args = Args::new(&args, yaml);
 
     let mut builder = Builder::from_default_env();
     let mut filter  = |agent, other| {
@@ -29,9 +30,9 @@ fn main() {
     builder.init();
 
     match args.subcommand() {
-        ("agent", Some(args)) => agent::agent(args, version),
-        ("ping",  Some(args)) => cmd::ping(args),
-        ("trace", Some(args)) => cmd::trace(args),
+        Some(("agent", args)) => agent::agent(args, version),
+        Some(("ping",  args)) => cmd::ping(args),
+        Some(("trace", args)) => cmd::trace(args),
         _                     => unreachable!(),
     }.unwrap_or_else(abort);
 }

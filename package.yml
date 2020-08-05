@@ -6,6 +6,7 @@ files:
   "/opt/kentik/ksynth/ksynth":
     file: ksynth
     mode: "0755"
+    user: ksynth
   "/etc/default/ksynth":
     file: pkg/etc/default/ksynth
     mode: "0644"

@@ -1,13 +1,14 @@
 use std::sync::Arc;
 use std::time::Duration;
 use anyhow::Result;
-use clap::{value_t, values_t, ArgMatches};
+use clap::{value_t, values_t};
 use rand::prelude::*;
 use tokio::time::{delay_for, timeout};
 use netdiag::{Bind, Pinger, Ping};
+use crate::args::Args;
 use super::resolve;
 
-pub async fn ping(args: &ArgMatches<'_>) -> Result<()> {
+pub async fn ping(args: Args<'_, '_>) -> Result<()> {
     let count  = value_t!(args, "count",  u16)?;
     let delay  = value_t!(args, "delay",  u64)?;
     let expiry = value_t!(args, "expiry", u64)?;

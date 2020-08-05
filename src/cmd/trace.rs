@@ -2,13 +2,14 @@ use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
 use anyhow::Result;
-use clap::{value_t, values_t, ArgMatches};
+use clap::{value_t, values_t};
 use tokio::net::UdpSocket;
 use tokio::time::delay_for;
 use netdiag::{Bind, Node, Probe, Tracer};
+use crate::args::Args;
 use super::resolve;
 
-pub async fn trace(args: &ArgMatches<'_>) -> Result<()> {
+pub async fn trace(args: Args<'_, '_>) -> Result<()> {
     let delay  = value_t!(args, "delay",  u64)?;
     let expiry = value_t!(args, "expiry", u64)?;
     let limit  = value_t!(args, "limit",  usize)?;

@@ -58,3 +58,9 @@ anyhow = "1.0.31"
 version  = "0.13.6"
 features = []
 default-features = false
+
+[profile.release]
+debug = true
+
+[profile.release.package."*"]
+debug = false

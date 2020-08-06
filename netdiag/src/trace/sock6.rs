@@ -76,7 +76,7 @@ async fn recv(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
 
         if let IcmpV6Packet::HopLimitExceeded(pkt) = pkt {
             if let Some(probe) = ProbeV6::decode(pkt)? {
-                if let Some(tx) = state.remove(&probe).await {
+                if let Some(tx) = state.remove(&probe) {
                     let _ = tx.send(Echo(from.ip(), now, false));
                 }
             }
@@ -88,7 +88,7 @@ async fn recv(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
             };
 
             if let Some(probe) = ProbeV6::decode(pkt)? {
-                if let Some(tx) = state.remove(&probe).await {
+                if let Some(tx) = state.remove(&probe) {
                     let _ = tx.send(Echo(from.ip(), now, true));
                 }
             }

@@ -2,11 +2,11 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::net::{IpAddr, SocketAddr};
 use std::ops::Deref;
-use futures::executor;
 use rand::prelude::*;
 use rand::distributions::Uniform;
-use tokio::sync::Mutex;
+use parking_lot::Mutex;
 use tokio::sync::oneshot::Sender;
+use tokio::task;
 use super::probe::Probe;
 use super::reply::Echo;
 
@@ -41,28 +41,28 @@ impl State {
             let src  = SocketAddr::new(src, port);
             let dst  = SocketAddr::new(dst, PORT_MIN);
 
-            let mut set = self.source.lock().await;
-
-            if let Entry::Vacant(e) = set.entry(src) {
+            if let Entry::Vacant(e) = self.source.lock().entry(src) {
                 let src = Lease(self, src);
                 e.insert(());
                 return (src, dst);
             }
+
+            task::yield_now().await;
         }
     }
 
-    pub async fn release(&self, src: &SocketAddr) {
-        self.source.lock().await.remove(src);
+    pub fn release(&self, src: &SocketAddr) {
+        self.source.lock().remove(src);
     }
 
-    pub async fn insert(&self, probe: &Probe, tx: Sender<Echo>) {
+    pub fn insert(&self, probe: &Probe, tx: Sender<Echo>) {
         let key = Key(probe.src(), probe.dst());
-        self.state.lock().await.insert(key, tx);
+        self.state.lock().insert(key, tx);
     }
 
-    pub async fn remove(&self, probe: &Probe) -> Option<Sender<Echo>> {
+    pub fn remove(&self, probe: &Probe) -> Option<Sender<Echo>> {
         let key = Key(probe.src(), probe.dst());
-        self.state.lock().await.remove(&key)
+        self.state.lock().remove(&key)
     }
 }
 
@@ -76,6 +76,6 @@ impl Deref for Lease<'_> {
 
 impl Drop for Lease<'_> {
     fn drop(&mut self) {
-        executor::block_on(self.0.release(&self.1));
+        self.0.release(&self.1);
     }
 }

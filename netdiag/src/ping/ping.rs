@@ -66,7 +66,7 @@ impl Pinger {
         let token = ping.token;
 
         let (tx, rx) = channel();
-        state.insert(token, tx).await;
+        state.insert(token, tx);
 
         let sent = send(&self.sock4, &self.sock6, ping).await?;
         Pong::new(rx, sent, state, token).await
@@ -100,7 +100,7 @@ async fn recv4(mut sock: RawRecv, state: State) -> Result<()> {
         if let (Ipv4Header { protocol: ICMP4, .. }, tail) = pkt {
             if let IcmpV4Packet::EchoReply(echo) = IcmpV4Packet::try_from(tail)? {
                 if let Ok(token) = echo.data.try_into().map(Token) {
-                    if let Some(tx) = state.remove(&token).await {
+                    if let Some(tx) = state.remove(&token) {
                         let _ = tx.send(now);
                     }
                 }
@@ -119,7 +119,7 @@ async fn recv6(mut sock: RawRecv, state: State) -> Result<()> {
 
         if let IcmpV6Packet::EchoReply(echo) = pkt {
             if let Ok(token) = echo.data.try_into().map(Token) {
-                if let Some(tx) = state.remove(&token).await {
+                if let Some(tx) = state.remove(&token) {
                     let _ = tx.send(now);
                 }
             }

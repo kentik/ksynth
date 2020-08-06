@@ -38,7 +38,7 @@ version  = "1.0.112"
 features = ["derive"]
 
 [dependencies.tokio]
-version  = "0.2.21"
+version  = "0.2.22"
 features = ["rt-threaded", "net"]
 
 [dependencies.netdiag]

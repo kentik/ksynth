@@ -65,7 +65,7 @@ impl Tracer {
         let state = self.state.clone();
 
         let (tx, rx) = channel();
-        state.insert(&probe, tx).await;
+        state.insert(&probe, tx);
 
         let sent = self.send(&probe).await?;
         let echo = timeout(expiry, rx);

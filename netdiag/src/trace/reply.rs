@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use anyhow::Result;
-use futures::{executor, ready};
+use futures::ready;
 use tokio::sync::oneshot::Receiver;
 use tokio::time::Timeout;
 use super::probe::Probe;
@@ -32,8 +32,8 @@ impl Reply {
         Self { echo, sent, probe, state }
     }
 
-    async fn release(&self) {
-        self.state.remove(&self.probe).await;
+    fn release(&self) {
+        self.state.remove(&self.probe);
     }
 }
 
@@ -60,6 +60,6 @@ impl Future for Reply {
 
 impl Drop for Reply {
     fn drop(&mut self) {
-        executor::block_on(self.release());
+        self.release();
     }
 }

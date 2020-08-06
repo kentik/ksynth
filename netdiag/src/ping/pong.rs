@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use anyhow::Result;
-use futures::{executor, ready};
+use futures::ready;
 use tokio::sync::oneshot::Receiver;
 use super::ping::Token;
 use super::state::State;
@@ -20,8 +20,8 @@ impl Pong {
         Self { rtt, sent, state, token }
     }
 
-    async fn release(&self) {
-        self.state.remove(&self.token).await;
+    fn release(&self) {
+        self.state.remove(&self.token);
     }
 }
 
@@ -38,6 +38,6 @@ impl Future for Pong {
 
 impl Drop for Pong {
     fn drop(&mut self) {
-        executor::block_on(self.release());
+        self.release();
     }
 }

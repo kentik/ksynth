@@ -3,10 +3,11 @@ use std::os::raw::c_int;
 use anyhow::Result;
 use capo::{Ambient, Cap, Caps};
 use libc::*;
-use super::{getuid, setuser};
+use nix::unistd::getuid;
+use super::setuser;
 
 pub fn apply(user: Option<&str>) -> Result<()> {
-    if user.is_some() && getuid()? == 0 {
+    if user.is_some() && getuid().is_root() {
         set_securebits(SECBIT_KEEP_CAPS)?;
     }
 

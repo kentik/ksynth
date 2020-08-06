@@ -1,4 +1,3 @@
-pub use user::getuid;
 pub use user::setuser;
 pub use unix::apply;
 

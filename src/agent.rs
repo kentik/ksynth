@@ -1,15 +1,14 @@
-use std::ffi::CStr;
 use std::fs::{self, File};
 use std::future::Future;
-use std::io::{Error as IoError, Read};
+use std::io::Read;
 use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
 use anyhow::{Error, Result};
 use clap::value_t;
 use ed25519_compact::{KeyPair, Seed};
-use libc::gethostname;
 use log::{debug, error, info};
+use nix::{unistd::gethostname, sys::utsname::uname};
 use signal_hook::{iterator::Signals, SIGINT, SIGTERM};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Sender};
@@ -75,7 +74,7 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     let proxy   = args.value_of("proxy");
     let ip4     = !args.is_present("ip6");
     let ip6     = !args.is_present("ip4");
-    let port    = value_t!(args, "port", u32)?;
+    let port    = args.value_of("port");
     let user    = args.value_of("user");
     let update  = args.is_present("update");
 
@@ -90,8 +89,6 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         Some(str) => str.to_owned(),
         None      => hostname()?,
     };
-
-    let company = company.map(u64::from_str).transpose()?;
 
     let net = Network {
         ip4: ip4,
@@ -118,10 +115,11 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         global:  global,
         region:  region,
         version: version.version.clone(),
-        company: company,
+        machine: machine(),
+        company: company.map(u64::from_str).transpose()?,
         proxy:   proxy.map(String::from),
-        port:    port,
-        bind:    args.value_of("bind").map(String::from), // Only used for passing back to api to get local ip.
+        port:    port.map(u16::from_str).transpose()?,
+        bind:    args.value_of("bind").map(String::from),
     })?;
 
     let runtime = Runtime::new()?;
@@ -168,12 +166,23 @@ fn init(path: &str) -> Result<KeyPair> {
 
 fn hostname() -> Result<String> {
     let mut buf = [0u8; 256];
-    Ok(unsafe {
-        let ptr = buf.as_mut_ptr() as *mut _;
-        let len = buf.len();
-        match gethostname(ptr, len) {
-            0 => CStr::from_ptr(ptr).to_string_lossy(),
-            _ => Err(IoError::last_os_error())?,
-        }
-    }.to_string())
+    let cstr = gethostname(&mut buf)?;
+    Ok(cstr.to_string_lossy().to_string())
+}
+
+fn machine() -> String {
+    let utsname = uname();
+
+    let mut machine = String::new();
+    machine.push_str(utsname.sysname());
+    machine.push_str(" ");
+    machine.push_str(utsname.nodename());
+    machine.push_str(" ");
+    machine.push_str(utsname.release());
+    machine.push_str(" ");
+    machine.push_str(utsname.version());
+    machine.push_str(" ");
+    machine.push_str(utsname.machine());
+
+    machine
 }

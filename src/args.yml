@@ -80,7 +80,6 @@ subcommands:
             env: KENTIK_PORT
             help: remote port
             takes_value: true
-            default_value: "443"
         - user:
             long: user
             help: run as user

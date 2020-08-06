@@ -1,5 +1,4 @@
 use std::str;
-use std::ffi::CStr;
 use std::sync::Arc;
 use std::time::Duration;
 use async_compression::futures::write::GzipEncoder;
@@ -15,21 +14,16 @@ use crate::{Error, error::{Application, Backend}};
 use crate::auth::Auth;
 use crate::config::Config;
 use crate::{okay::Okay, status::Report, tasks::Tasks};
-extern crate libc;
 
 #[derive(Debug)]
 pub struct Client {
     client:  HttpClient,
-    name:    String,
-    global:  bool,
-    company: Option<u64>,
-    version: String,
-    session: RwLock<Session>,
+    config:  Config,
     auth:    String,
     tasks:   String,
     status:  String,
     submit:  String,
-    bind:    Option<String>,
+    session: RwLock<Session>,
 }
 
 #[derive(Debug)]
@@ -53,7 +47,7 @@ pub struct Failure {
 
 impl Client {
     pub fn new(config: Config) -> Result<Self, Error> {
-        let Config { name, global, region, version, company, proxy, port, bind } = config;
+        let Config { region, port, proxy, .. } = &config;
 
         let domain = match region.to_ascii_uppercase().as_ref() {
             "US" => "kentik.com".to_owned(),
@@ -68,18 +62,20 @@ impl Client {
             client = client.proxy(proxy?);
         }
 
+        let mut api = format!("https://api.{}", domain);
+        if let Some(port) = port {
+            api.push(':');
+            api.push_str(&port.to_string());
+        }
+
         Ok(Self {
             client:  client.build()?,
-            name:    name,
-            global:  global,
-            company: company,
-            version: version,
-            bind:    bind,
+            config:  config,
+            auth:    format!("{}/api/agent/v1/syn/auth",   api),
+            tasks:   format!("{}/api/agent/v1/syn/tasks",  api),
+            status:  format!("{}/api/agent/v1/syn/status", api),
+            submit:  format!("https://flow.{}/chf", domain),
             session: RwLock::new(Session::None),
-            auth:    format!("https://api.{}:{}/api/agent/v1/syn/auth",   domain, port),
-            tasks:   format!("https://api.{}:{}/api/agent/v1/syn/tasks",  domain, port),
-            status:  format!("https://api.{}:{}/api/agent/v1/syn/status", domain, port),
-            submit:  format!("https://flow.{}/chf",                          domain),
         })
     }
 
@@ -93,38 +89,26 @@ impl Client {
             signature:  String,
             name:       &'a str,
             global:     bool,
-            os:         String,
-            bind:       Option<String>,
+            os:         &'a str,
+            bind:       Option<&'a String>,
         }
 
-        let company = self.company.as_ref().map(u64::to_string);
-        let bind = self.bind.as_ref().map(String::to_string);
+        let company = self.config.company.as_ref().map(u64::to_string);
 
         let key = &keys.pk;
         let now = get_time().sec.to_string();
         let sig = keys.sk.sign(now.as_bytes(), None);
-        let mut os_data = vec![String::from("")];
-        unsafe {
-            let mut uts : libc::utsname = std::mem::zeroed();
-            if libc::uname(&mut uts)  == 0 {
-                os_data = vec![CStr::from_ptr(uts.sysname[..].as_ptr()).to_string_lossy().into_owned(),
-                               CStr::from_ptr(uts.nodename[..].as_ptr()).to_string_lossy().into_owned(),
-                               CStr::from_ptr(uts.release[..].as_ptr()).to_string_lossy().into_owned(),
-                               CStr::from_ptr(uts.version[..].as_ptr()).to_string_lossy().into_owned(),
-                               CStr::from_ptr(uts.machine[..].as_ptr()).to_string_lossy().into_owned()];
-            }
-        }
 
         let auth = self.send(&self.auth, &Request {
             agent:      hex::encode(&key[..]),
             company_id: company,
-            version:    &self.version,
+            version:    &self.config.version,
             timestamp:  now,
             signature:  hex::encode(&sig[..]),
-            name:       &self.name,
-            global:     self.global,
-            os:         os_data.join(" "),
-            bind:       bind,
+            name:       &self.config.name,
+            global:     self.config.global,
+            os:         &self.config.machine,
+            bind:       self.config.bind.as_ref(),
         }).await?;
 
         if let Auth::Ok((_, session)) = &auth {

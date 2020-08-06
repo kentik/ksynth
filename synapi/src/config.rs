@@ -4,8 +4,9 @@ pub struct Config {
     pub global:  bool,
     pub region:  String,
     pub version: String,
+    pub machine: String,
     pub company: Option<u64>,
     pub proxy:   Option<String>,
-    pub port:    u32,
+    pub port:    Option<u16>,
     pub bind:    Option<String>,
 }

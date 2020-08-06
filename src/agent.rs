@@ -2,7 +2,6 @@ use std::fs::{self, File};
 use std::future::Future;
 use std::io::Read;
 use std::process;
-use std::str::FromStr;
 use std::sync::Arc;
 use anyhow::{Error, Result};
 use clap::value_t;
@@ -67,14 +66,14 @@ fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, mut tx: Sende
 
 pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     let id      = value_t!(args, "id", String)?;
-    let name    = args.value_of("name");
+    let name    = args.opt("name")?;
     let global  = args.is_present("global");
-    let company = args.value_of("company");
+    let company = args.opt("company")?;
     let region  = value_t!(args, "region", String)?;
-    let proxy   = args.value_of("proxy");
+    let proxy   = args.opt("proxy")?;
     let ip4     = !args.is_present("ip6");
     let ip6     = !args.is_present("ip4");
-    let port    = args.value_of("port");
+    let port    = args.opt("port")?;
     let user    = args.value_of("user");
     let update  = args.is_present("update");
 
@@ -86,8 +85,8 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     }
 
     let name = match name {
-        Some(str) => str.to_owned(),
-        None      => hostname()?,
+        Some(name) => name,
+        None       => hostname()?,
     };
 
     let net = Network {
@@ -116,10 +115,10 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         region:  region,
         version: version.version.clone(),
         machine: machine(),
-        company: company.map(u64::from_str).transpose()?,
-        proxy:   proxy.map(String::from),
-        port:    port.map(u16::from_str).transpose()?,
-        bind:    args.value_of("bind").map(String::from),
+        company: company,
+        proxy:   proxy,
+        port:    port,
+        bind:    args.opt("bind")?,
     })?;
 
     let runtime = Runtime::new()?;

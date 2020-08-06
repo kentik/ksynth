@@ -83,7 +83,7 @@ impl Client {
         #[derive(Debug, Serialize)]
         struct Request<'a> {
             agent:      String,
-            company_id: Option<String>,
+            company_id: Option<u64>,
             version:    &'a str,
             timestamp:  String,
             signature:  String,
@@ -93,15 +93,13 @@ impl Client {
             bind:       Option<&'a String>,
         }
 
-        let company = self.config.company.as_ref().map(u64::to_string);
-
         let key = &keys.pk;
         let now = get_time().sec.to_string();
         let sig = keys.sk.sign(now.as_bytes(), None);
 
         let auth = self.send(&self.auth, &Request {
             agent:      hex::encode(&key[..]),
-            company_id: company,
+            company_id: self.config.company,
             version:    &self.config.version,
             timestamp:  now,
             signature:  hex::encode(&sig[..]),

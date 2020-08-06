@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::env;
 use std::ffi::OsString;
+use std::fmt::Display;
 use std::ops::Deref;
 use std::rc::Rc;
-use clap::ArgMatches;
+use std::str::FromStr;
+use clap::{ArgMatches, Error, ErrorKind};
 use yaml_rust::Yaml;
 
 #[derive(Debug)]
@@ -28,6 +30,13 @@ impl<'a, 'y> Args<'a, 'y> {
             (name, Some(args)) => self.subargs(name, args),
             _                  => None,
         }
+    }
+
+    pub fn opt<T: FromStr>(&self, name: &str) -> Result<Option<T>, Error> where T::Err: Display {
+        self.value_of(name).map(T::from_str).transpose().map_err(|e| {
+            let msg = format!("invalid value for {}: {}", name, e);
+            Error::with_description(&msg, ErrorKind::InvalidValue)
+        })
     }
 
     fn subargs<'n>(&self, name: &'n str, args: &'a ArgMatches<'y>) -> Option<(&'n str, Self)> {

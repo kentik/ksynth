@@ -64,6 +64,11 @@ subcommands:
             env: KENTIK_COMPANY
             help: company ID
             takes_value: true
+        - site:
+            long: site
+            env: KENTIK_SITE
+            help: site ID
+            takes_value: true
         - proxy:
             long: proxy
             env: PROXY

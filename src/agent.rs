@@ -69,6 +69,7 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     let name    = args.opt("name")?;
     let global  = args.is_present("global");
     let company = args.opt("company")?;
+    let site    = args.opt("site")?;
     let region  = value_t!(args, "region", String)?;
     let proxy   = args.opt("proxy")?;
     let ip4     = !args.is_present("ip6");
@@ -116,6 +117,7 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         version: version.version.clone(),
         machine: machine(),
         company: company,
+        site:    site,
         proxy:   proxy,
         port:    port,
         bind:    args.opt("bind")?,

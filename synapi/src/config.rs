@@ -6,6 +6,7 @@ pub struct Config {
     pub version: String,
     pub machine: String,
     pub company: Option<u64>,
+    pub site:    Option<u64>,
     pub proxy:   Option<String>,
     pub port:    Option<u16>,
     pub bind:    Option<String>,

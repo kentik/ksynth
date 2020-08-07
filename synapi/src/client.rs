@@ -84,6 +84,7 @@ impl Client {
         struct Request<'a> {
             agent:      String,
             company_id: Option<u64>,
+            site:       Option<u64>,
             version:    &'a str,
             timestamp:  String,
             signature:  String,
@@ -100,6 +101,7 @@ impl Client {
         let auth = self.send(&self.auth, &Request {
             agent:      hex::encode(&key[..]),
             company_id: self.config.company,
+            site:       self.config.site,
             version:    &self.config.version,
             timestamp:  now,
             signature:  hex::encode(&sig[..]),

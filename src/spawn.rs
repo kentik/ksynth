@@ -24,12 +24,12 @@ impl Spawner {
         let task = Abortable::new(task, registration);
 
         tokio::spawn(async move {
-            status.exec(id).await;
+            status.exec(id);
             let r = match task.await {
                 Ok(result)   => result,
                 Err(Aborted) => Ok(())
             };
-            status.exit(id, r).await;
+            status.exit(id, r);
         });
 
         Handle { handle }

@@ -1,6 +1,7 @@
-use tokio::sync::Mutex;
+use std::collections::HashSet;
 use anyhow::{Error, Result};
 use log::{debug, error};
+use parking_lot::Mutex;
 
 #[derive(Debug, Default)]
 pub struct Status {
@@ -13,6 +14,7 @@ pub struct Tasks {
     pub running: u64,
     pub exited:  u64,
     pub failed:  u64,
+    pub active:  HashSet<u64>,
 }
 
 #[derive(Debug)]
@@ -21,19 +23,21 @@ pub struct Snapshot {
 }
 
 impl Status  {
-    pub async fn exec(&self, id: u64) {
+    pub fn exec(&self, id: u64) {
         debug!("task {} started", id);
-        let mut tasks = self.tasks.lock().await;
+        let mut tasks = self.tasks.lock();
         tasks.started += 1;
         tasks.running += 1;
+        tasks.active.insert(id);
     }
 
-    pub async fn exit(&self, id: u64, result: Result<()>) {
-        let mut tasks = self.tasks.lock().await;
+    pub fn exit(&self, id: u64, result: Result<()>) {
+        let mut tasks = self.tasks.lock();
         match result {
             Ok(()) => self.success(id, &mut tasks),
             Err(e) => self.failure(id, &mut tasks, e),
         }
+        tasks.active.remove(&id);
     }
 
     fn success(&self, id: u64, tasks: &mut Tasks) {
@@ -48,8 +52,8 @@ impl Status  {
         tasks.failed  += 1;
     }
 
-    pub async fn snapshot(&self) -> Snapshot {
-        let mut tasks = self.tasks.lock().await;
+    pub fn snapshot(&self) -> Snapshot {
+        let mut tasks = self.tasks.lock();
 
         let snapshot = Snapshot {
             tasks: tasks.clone(),

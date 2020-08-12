@@ -27,7 +27,9 @@ impl Monitor {
         loop {
             ticker.tick().await;
 
-            let snapshot = self.status.snapshot().await;
+            let snapshot = self.status.snapshot();
+
+            debug!("active tasks: {:?}", snapshot.tasks.active);
 
             let report = Report {
                 tasks: Tasks {
@@ -35,6 +37,7 @@ impl Monitor {
                     running: snapshot.tasks.running,
                     exited:  snapshot.tasks.exited,
                     failed:  snapshot.tasks.failed,
+                    active:  snapshot.tasks.active,
                 },
             };
 

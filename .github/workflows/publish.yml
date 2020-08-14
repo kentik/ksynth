@@ -71,9 +71,9 @@ jobs:
           aws-region: us-west-2
       - run: |
           aws s3 cp $BUCKET/ksynth-${{ matrix.target }} ksynth
-      - uses: kentik/notarize@master
+      - uses: kentik/actions/notary/submit@master
         with:
-          name: ksynth
+          name: ${{ github.event.repository.name }}
           version: ${{ needs.version.outputs.version }}
           arch: ${{ matrix.arch  }}
           system: linux
@@ -111,7 +111,7 @@ jobs:
       - id: package-deb
         uses: kentik/pkg@master
         with:
-          name: ksynth
+          name: ${{ github.event.repository.name }}
           version: ${{ needs.version.outputs.version }}
           arch: ${{ matrix.arch }}
           format: deb
@@ -119,7 +119,7 @@ jobs:
       - id: package-rpm
         uses: kentik/pkg@master
         with:
-          name: ksynth
+          name: ${{ github.event.repository.name }}
           version: ${{ needs.version.outputs.version }}
           arch: ${{ matrix.arch }}
           format: rpm

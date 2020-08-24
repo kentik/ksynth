@@ -77,6 +77,7 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     let port    = args.opt("port")?;
     let user    = args.value_of("user");
     let update  = args.is_present("update");
+    let release = !args.is_present("rc");
 
     let mut bind = Bind::default();
     if let Some(addrs) = args.values_of("bind") {
@@ -133,7 +134,7 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         }
     });
 
-    let updater = Updater::new(version, false, runtime)?;
+    let updater = Updater::new(version, release, runtime)?;
     let (abort, guard) = updater.exec(update);
 
     let signals = Signals::new(&[SIGINT, SIGTERM])?;

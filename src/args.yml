@@ -94,6 +94,11 @@ subcommands:
             env: AGENT_UPDATE
             help: enable updates
             takes_value: false
+        - rc:
+            long: rc
+            help: accept RCs
+            hidden: true
+            takes_value: false
   - ping:
       about: execute ping
       help_message: print help

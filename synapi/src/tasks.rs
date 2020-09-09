@@ -31,6 +31,7 @@ pub enum Config {
     Ping(PingConfig),
     Trace(TraceConfig),
     Fetch(FetchConfig),
+    Knock(KnockConfig),
     Unknown,
 }
 
@@ -61,6 +62,17 @@ pub struct FetchConfig {
     pub target:  String,
     pub period:  u64,
     pub expiry:  u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KnockConfig {
+    #[serde(skip)]
+    pub test_id: u64,
+    pub target:  String,
+    pub period:  u64,
+    pub count:   u64,
+    pub expiry:  u64,
+    pub port:    u16,
 }
 
 #[derive(Debug, Deserialize)]
@@ -114,6 +126,7 @@ impl<'d> Deserialize<'d> for Task {
             pub trace: Option<TraceConfig>,
             #[serde(rename = "http")]
             pub fetch: Option<FetchConfig>,
+            pub knock: Option<KnockConfig>,
             pub state: State,
             #[serde(deserialize_with = "id")]
             pub test_id: u64,
@@ -134,6 +147,9 @@ impl<'d> Deserialize<'d> for Task {
         } else if let Some(mut cfg) = c.fetch {
             cfg.test_id = c.test_id;
             Config::Fetch(cfg)
+        } else if let Some(mut cfg) = c.knock {
+            cfg.test_id = c.test_id;
+            Config::Knock(cfg)
         } else {
             Config::Unknown
         };

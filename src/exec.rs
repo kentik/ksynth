@@ -5,12 +5,12 @@ use log::{debug, error};
 use tokio::sync::mpsc::Receiver;
 use synapi::agent::Net;
 use synapi::tasks::{State, Config};
-use synapi::tasks::{PingConfig, TraceConfig, FetchConfig};
-use netdiag::{Bind, Pinger, Tracer};
+use synapi::tasks::{PingConfig, TraceConfig, FetchConfig, KnockConfig};
+use netdiag::{Bind, Knocker, Pinger, Tracer};
 use crate::export::{Exporter, Envoy, Target};
 use crate::spawn::{Spawner, Handle};
 use crate::status::Status;
-use crate::task::{Fetcher, Ping, Trace, Fetch};
+use crate::task::{Fetch, Fetcher, Knock, Ping, Trace};
 use crate::watch::{Event, Tasks};
 
 pub struct Executor {
@@ -24,6 +24,7 @@ pub struct Executor {
     pinger:  Arc<Pinger>,
     tracer:  Arc<Tracer>,
     fetcher: Arc<Fetcher>,
+    knocker: Arc<Knocker>,
 }
 
 #[derive(Debug)]
@@ -41,6 +42,7 @@ impl Executor {
         let pinger  = Pinger::new(&bind).await?;
         let tracer  = Tracer::new(&bind).await?;
         let fetcher = Fetcher::new(&bind)?;
+        let knocker = Knocker::new(&bind).await?;
 
         Ok(Self {
             tasks:   HashMap::new(),
@@ -53,6 +55,7 @@ impl Executor {
             pinger:  Arc::new(pinger),
             tracer:  Arc::new(tracer),
             fetcher: Arc::new(fetcher),
+            knocker: Arc::new(knocker),
         })
     }
 
@@ -123,6 +126,7 @@ impl Executor {
             Config::Ping(cfg)  => self.ping(id, cfg, envoy).await?,
             Config::Trace(cfg) => self.trace(id, cfg, envoy).await?,
             Config::Fetch(cfg) => self.fetch(id, cfg, envoy).await?,
+            Config::Knock(cfg) => self.knock(id, cfg, envoy).await?,
             _                  => Err(anyhow!("unsupported type"))?,
         };
 
@@ -155,5 +159,12 @@ impl Executor {
         let client = self.fetcher.clone();
         let fetch = Fetch::new(id, cfg, envoy, client);
         Ok(self.spawner.spawn(id, fetch.exec()))
+    }
+
+    async fn knock(&self, id: u64, cfg: KnockConfig, envoy: Envoy) -> Result<Handle> {
+        let Network { ip4, ip6, .. } = self.network;
+        let client = self.knocker.clone();
+        let knock = Knock::new(id, cfg, envoy, client);
+        Ok(self.spawner.spawn(id, knock.exec(ip4, ip6)))
     }
 }

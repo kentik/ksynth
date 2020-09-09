@@ -28,6 +28,7 @@ pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
 
         match record {
             Record::Fetch(data)   => cs.fetch(msg, agent, data),
+            Record::Knock(data)   => cs.knock(msg, agent, data),
             Record::Ping(data)    => cs.ping(msg, agent, data),
             Record::Trace(data)   => cs.trace(msg, agent, data),
             Record::Error(data)   => cs.error(msg, agent, data),
@@ -57,6 +58,7 @@ struct Columns {
     rtt:    Stats,
     route:  u32,
     time:   u32,
+    port:   u32,
 }
 
 struct Stats {
@@ -98,6 +100,7 @@ impl Columns {
             },
             route:   lookup("STR00")?,
             time:    lookup("INT01")?,
+            port:    lookup("INT08")?,
         })
     }
 
@@ -120,6 +123,30 @@ impl Columns {
         customs.next(self.status, |v| v.set_uint16_val(status));
         customs.next(self.ttlb,   |v| v.set_uint32_val(as_micros(rtt)));
         customs.next(self.size,   |v| v.set_uint32_val(size));
+    }
+
+    fn knock(&self, mut msg: Builder, agent: u64, data: &Knock) {
+        let Knock { id, test_id, addr, port, sent, lost, rtt, .. } = *data;
+
+        match addr {
+            IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
+            IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
+        };
+
+        let mut customs = Customs::new("knock", msg,  13);
+        customs.next(self.app,     |v| v.set_uint32_val(AGENT));
+        customs.next(self.agent,   |v| v.set_uint64_val(agent));
+        customs.next(self.kind,    |v| v.set_uint32_val(KNOCK));
+        customs.next(self.task,    |v| v.set_uint64_val(id));
+        customs.next(self.test,    |v| v.set_uint64_val(test_id));
+        customs.next(self.port,    |v| v.set_uint32_val(port.into()));
+        customs.next(self.sent,    |v| v.set_uint32_val(sent));
+        customs.next(self.lost,    |v| v.set_uint32_val(lost));
+        customs.next(self.rtt.min, |v| v.set_uint32_val(as_micros(rtt.min)));
+        customs.next(self.rtt.max, |v| v.set_uint32_val(as_micros(rtt.max)));
+        customs.next(self.rtt.avg, |v| v.set_uint32_val(as_micros(rtt.avg)));
+        customs.next(self.rtt.std, |v| v.set_uint32_val(as_micros(rtt.std)));
+        customs.next(self.rtt.jit, |v| v.set_uint32_val(as_micros(rtt.jit)));
     }
 
     fn ping(&self, mut msg: Builder, agent: u64, data: &Ping) {
@@ -196,3 +223,4 @@ const TIMEOUT: u32 = 1;
 const PING:    u32 = 2;
 const FETCH:   u32 = 3;
 const TRACE:   u32 = 4;
+const KNOCK:   u32 = 5;

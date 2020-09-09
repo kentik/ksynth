@@ -19,6 +19,7 @@ pub enum Record {
     Fetch(Fetch),
     Ping(Ping),
     Trace(Trace),
+    Knock(Knock),
     Error(Error),
     Timeout(Timeout),
 }
@@ -31,6 +32,17 @@ pub struct Fetch {
     pub status:  u16,
     pub rtt:     Duration,
     pub size:    usize,
+}
+
+#[derive(Debug)]
+pub struct Knock {
+    pub id:      u64,
+    pub test_id: u64,
+    pub addr:    IpAddr,
+    pub port:    u16,
+    pub sent:    u32,
+    pub lost:    u32,
+    pub rtt:     Summary,
 }
 
 #[derive(Debug)]
@@ -74,6 +86,12 @@ pub struct Timeout {
 impl From<Fetch> for Record  {
     fn from(fetch: Fetch) -> Self {
         Record::Fetch(fetch)
+    }
+}
+
+impl From<Knock> for Record  {
+    fn from(knock: Knock) -> Self {
+        Record::Knock(knock)
     }
 }
 

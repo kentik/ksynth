@@ -1,5 +1,8 @@
 pub use bind::Bind;
 
+pub use knock::Knock;
+pub use knock::Knocker;
+
 pub use ping::Ping;
 pub use ping::Pinger;
 
@@ -11,5 +14,6 @@ pub use trace::Tracer;
 pub mod icmp;
 
 mod bind;
+mod knock;
 mod ping;
 mod trace;

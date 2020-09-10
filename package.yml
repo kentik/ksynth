@@ -18,13 +18,4 @@ units:
   - pkg/etc/systemd/system/ksynth.service
 scripts:
   "post-install": pkg/scripts/post-install
-conditional:
-  - when: format == "deb"
-    units:
-      - pkg/etc/systemd/system/ksynth-update-deb.service
-      - pkg/etc/systemd/system/ksynth-update-deb.timer
-  - when: format == "rpm"
-    units:
-      - pkg/etc/systemd/system/ksynth-update-rpm.service
-      - pkg/etc/systemd/system/ksynth-update-rpm.timer
 user: ksynth

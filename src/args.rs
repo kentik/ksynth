@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::env;
-use std::ffi::OsString;
 use std::fmt::Display;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -12,7 +11,7 @@ use yaml_rust::Yaml;
 pub struct Args<'a, 'y> {
     args: &'a ArgMatches<'y>,
     yaml: &'y Yaml,
-    vars: Rc<HashMap<String, OsString>>,
+    vars: Rc<HashMap<String, String>>,
 }
 
 impl<'a, 'y> Args<'a, 'y> {
@@ -52,18 +51,21 @@ impl<'a, 'y> Args<'a, 'y> {
     }
 
     fn is_set(&self, name: &str) -> bool {
-        self.vars.contains_key(name)
+        self.vars.get(name).map(|value| {
+            value == "" || value.eq_ignore_ascii_case("true")
+        }).unwrap_or(false)
     }
 
-    fn vars(yaml: &Yaml) -> Option<Rc<HashMap<String, OsString>>> {
+    fn vars(yaml: &Yaml) -> Option<Rc<HashMap<String, String>>> {
         let mut vars = HashMap::new();
 
         for arg in yaml["args"].as_vec()? {
             let (name, args) = arg.as_hash()?.into_iter().next()?;
             if let Some(var) = args["env"].as_str() {
                 if let Some(value) = env::var_os(var) {
-                    let name  = name.as_str()?;
-                    vars.insert(name.to_owned(), value);
+                    let name  = name.as_str()?.to_owned();
+                    let value = value.to_string_lossy().into_owned();
+                    vars.insert(name, value);
                 }
             }
         }
@@ -74,8 +76,9 @@ impl<'a, 'y> Args<'a, 'y> {
                 let (name, args) = arg.as_hash()?.into_iter().next()?;
                 if let Some(var) = args["env"].as_str() {
                     if let Some(value) = env::var_os(var) {
-                        let name  = name.as_str()?;
-                        vars.insert(name.to_owned(), value);
+                        let name  = name.as_str()?.to_owned();
+                        let value = value.to_string_lossy().into_owned();
+                        vars.insert(name, value);
                     }
                 }
             }

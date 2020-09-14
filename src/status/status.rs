@@ -40,6 +40,14 @@ impl Status  {
         tasks.active.remove(&id);
     }
 
+    pub fn stop(&self, id: u64) {
+        debug!("task {} stopped", id);
+        let mut tasks = self.tasks.lock();
+        tasks.running -= 1;
+        tasks.exited  += 1;
+        tasks.active.remove(&id);
+    }
+
     fn success(&self, id: u64, tasks: &mut Tasks) {
         debug!("task {} finished", id);
         tasks.running -= 1;

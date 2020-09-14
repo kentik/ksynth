@@ -1,7 +1,7 @@
 use std::future::Future;
 use std::sync::Arc;
 use anyhow::Result;
-use futures::future::{Abortable, Aborted, AbortHandle};
+use futures::future::{Abortable, AbortHandle};
 use crate::status::Status;
 
 pub struct Spawner {
@@ -9,7 +9,9 @@ pub struct Spawner {
 }
 
 pub struct Handle {
-    handle: AbortHandle
+    id:     u64,
+    handle: AbortHandle,
+    status: Arc<Status>,
 }
 
 impl Spawner {
@@ -21,23 +23,19 @@ impl Spawner {
         let (handle, registration) = AbortHandle::new_pair();
         let status = self.status.clone();
 
-        let task = Abortable::new(task, registration);
-
-        tokio::spawn(async move {
+        tokio::spawn(Abortable::new(async move {
             status.exec(id);
-            let r = match task.await {
-                Ok(result)   => result,
-                Err(Aborted) => Ok(())
-            };
+            let r = task.await;
             status.exit(id, r);
-        });
+        }, registration));
 
-        Handle { handle }
+        Handle { id, handle, status: self.status.clone() }
     }
 }
 
 impl Drop for Handle {
     fn drop(&mut self) {
+        self.status.stop(self.id);
         self.handle.abort();
     }
 }

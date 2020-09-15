@@ -19,10 +19,10 @@ pub struct Group {
 
 #[derive(Debug)]
 pub struct Task {
-    pub id:     u64,
+    pub task:   u64,
+    pub test:   u64,
     pub config: Config,
     pub state:  State,
-    pub test_id: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -37,8 +37,6 @@ pub enum Config {
 
 #[derive(Debug, Deserialize)]
 pub struct PingConfig {
-    #[serde(skip)]
-    pub test_id: u64,
     pub target:  String,
     pub period:  u64,
     pub count:   u64,
@@ -47,8 +45,6 @@ pub struct PingConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct TraceConfig {
-    #[serde(skip)]
-    pub test_id: u64,
     pub target:  String,
     pub period:  u64,
     pub limit:   u64,
@@ -57,8 +53,6 @@ pub struct TraceConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct FetchConfig {
-    #[serde(skip)]
-    pub test_id: u64,
     pub target:  String,
     pub period:  u64,
     pub expiry:  u64,
@@ -66,8 +60,6 @@ pub struct FetchConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct KnockConfig {
-    #[serde(skip)]
-    pub test_id: u64,
     pub target:  String,
     pub period:  u64,
     pub count:   u64,
@@ -134,26 +126,22 @@ impl<'d> Deserialize<'d> for Task {
 
         let c = TaskContainer::deserialize(de)?;
 
-        let id    = c.id;
+        let task  = c.id;
+        let test  = c.test_id;
         let state = c.state;
-        let test_id = c.test_id;
 
-        let config = if let Some(mut cfg) = c.ping {
-            cfg.test_id = c.test_id;
+        let config = if let Some(cfg) = c.ping {
             Config::Ping(cfg)
-        } else if let Some(mut cfg) = c.trace {
-            cfg.test_id = c.test_id;
+        } else if let Some(cfg) = c.trace {
             Config::Trace(cfg)
-        } else if let Some(mut cfg) = c.fetch {
-            cfg.test_id = c.test_id;
+        } else if let Some(cfg) = c.fetch {
             Config::Fetch(cfg)
-        } else if let Some(mut cfg) = c.knock {
-            cfg.test_id = c.test_id;
+        } else if let Some(cfg) = c.knock {
             Config::Knock(cfg)
         } else {
             Config::Unknown
         };
 
-        Ok(Task { id, config, state, test_id })
+        Ok(Task { task, test, config, state })
     }
 }

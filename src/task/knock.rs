@@ -9,11 +9,11 @@ use netdiag::{self, Knocker};
 use synapi::tasks::KnockConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::resolve;
+use super::{resolve, Task};
 
 pub struct Knock {
-    id:      u64,
-    test_id: u64,
+    task:    u64,
+    test:    u64,
     target:  String,
     port:    u16,
     period:  Duration,
@@ -24,21 +24,25 @@ pub struct Knock {
 }
 
 impl Knock {
-    pub fn new(id: u64, cfg: KnockConfig, envoy: Envoy, knocker: Arc<Knocker>) -> Self {
-        let KnockConfig { test_id, target, port, period, count, expiry } = cfg;
-
-        let period = Duration::from_secs(period);
-        let count  = count as usize;
-        let expiry = Duration::from_millis(expiry);
-
-        Self { id, test_id, target, port, period, count, expiry, envoy, knocker }
+    pub fn new(task: Task, cfg: KnockConfig, knocker: Arc<Knocker>) -> Self {
+        Self {
+            task:    task.task,
+            test:    task.test,
+            target:  cfg.target,
+            port:    cfg.port,
+            period:  Duration::from_secs(cfg.period),
+            count:   cfg.count as usize,
+            expiry:  Duration::from_millis(cfg.expiry),
+            envoy:   task.envoy,
+            knocker: knocker,
+        }
     }
 
     pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
         loop {
-            let Self { id, test_id, target, port, .. } = &self;
+            let Self { task, test, target, port, .. } = &self;
 
-            debug!("{}: test {}, target {}:{}", id, test_id, target, port);
+            debug!("{}: test {}, target {}:{}", task, test, target, port);
 
             let result = self.knock(self.count, ip4, ip6);
 
@@ -80,32 +84,32 @@ impl Knock {
     }
 
     async fn success(&self, out: Output) {
-        debug!("{}: {}", self.id, out);
+        debug!("{}: {}", self.task, out);
         self.envoy.export(record::Knock {
-            id:      self.id,
-            test_id: self.test_id,
-            addr:    out.addr,
-            port:    out.port,
-            sent:    out.sent,
-            lost:    out.lost,
-            rtt:     out.rtt,
+            task: self.task,
+            test: self.test,
+            addr: out.addr,
+            port: out.port,
+            sent: out.sent,
+            lost: out.lost,
+            rtt:  out.rtt,
         }).await;
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: error: {}", self.id, err);
+        warn!("{}: error: {}", self.task, err);
         self.envoy.export(record::Error {
-            id:      self.id,
-            test_id: self.test_id,
-            cause:   err.to_string(),
+            task:  self.task,
+            test:  self.test,
+            cause: err.to_string(),
         }).await;
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.id);
+        warn!("{}: timeout", self.task);
         self.envoy.export(record::Timeout {
-            id:      self.id,
-            test_id: self.test_id,
+            task: self.task,
+            test: self.test,
         }).await;
     }
 }

@@ -105,7 +105,7 @@ impl Columns {
     }
 
     fn fetch(&self, mut msg: Builder, agent: u64, data: &Fetch) {
-        let Fetch { id, test_id, addr, status, rtt, size, .. } = *data;
+        let Fetch { task, test, addr, status, rtt, size, .. } = *data;
 
         let size = u32::try_from(size).unwrap_or(0);
 
@@ -118,15 +118,15 @@ impl Columns {
         customs.next(self.app,    |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,  |v| v.set_uint64_val(agent));
         customs.next(self.kind,   |v| v.set_uint32_val(FETCH));
-        customs.next(self.task,   |v| v.set_uint64_val(id));
-        customs.next(self.test,   |v| v.set_uint64_val(test_id));
+        customs.next(self.task,   |v| v.set_uint64_val(task));
+        customs.next(self.test,   |v| v.set_uint64_val(test));
         customs.next(self.status, |v| v.set_uint16_val(status));
         customs.next(self.ttlb,   |v| v.set_uint32_val(as_micros(rtt)));
         customs.next(self.size,   |v| v.set_uint32_val(size));
     }
 
     fn knock(&self, mut msg: Builder, agent: u64, data: &Knock) {
-        let Knock { id, test_id, addr, port, sent, lost, rtt, .. } = *data;
+        let Knock { task, test, addr, port, sent, lost, rtt, .. } = *data;
 
         match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
@@ -137,8 +137,8 @@ impl Columns {
         customs.next(self.app,     |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,   |v| v.set_uint64_val(agent));
         customs.next(self.kind,    |v| v.set_uint32_val(KNOCK));
-        customs.next(self.task,    |v| v.set_uint64_val(id));
-        customs.next(self.test,    |v| v.set_uint64_val(test_id));
+        customs.next(self.task,    |v| v.set_uint64_val(task));
+        customs.next(self.test,    |v| v.set_uint64_val(test));
         customs.next(self.port,    |v| v.set_uint32_val(port.into()));
         customs.next(self.sent,    |v| v.set_uint32_val(sent));
         customs.next(self.lost,    |v| v.set_uint32_val(lost));
@@ -150,7 +150,7 @@ impl Columns {
     }
 
     fn ping(&self, mut msg: Builder, agent: u64, data: &Ping) {
-        let Ping { id, test_id, addr, sent, lost, rtt, .. } = *data;
+        let Ping { task, test, addr, sent, lost, rtt, .. } = *data;
 
         match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
@@ -161,8 +161,8 @@ impl Columns {
         customs.next(self.app,     |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,   |v| v.set_uint64_val(agent));
         customs.next(self.kind,    |v| v.set_uint32_val(PING));
-        customs.next(self.task,    |v| v.set_uint64_val(id));
-        customs.next(self.test,    |v| v.set_uint64_val(test_id));
+        customs.next(self.task,    |v| v.set_uint64_val(task));
+        customs.next(self.test,    |v| v.set_uint64_val(test));
         customs.next(self.sent,    |v| v.set_uint32_val(sent));
         customs.next(self.lost,    |v| v.set_uint32_val(lost));
         customs.next(self.rtt.min, |v| v.set_uint32_val(as_micros(rtt.min)));
@@ -173,7 +173,7 @@ impl Columns {
     }
 
     fn trace(&self, mut msg: Builder, agent: u64, data: &Trace) {
-        let Trace { id, test_id, addr, time, .. } = *data;
+        let Trace { task, test, addr, time, .. } = *data;
 
         let route = &data.route;
 
@@ -186,8 +186,8 @@ impl Columns {
         customs.next(self.app,   |v| v.set_uint32_val(AGENT));
         customs.next(self.agent, |v| v.set_uint64_val(agent));
         customs.next(self.kind,  |v| v.set_uint32_val(TRACE));
-        customs.next(self.task,  |v| v.set_uint64_val(id));
-        customs.next(self.test,  |v| v.set_uint64_val(test_id));
+        customs.next(self.task,  |v| v.set_uint64_val(task));
+        customs.next(self.test,  |v| v.set_uint64_val(test));
         customs.next(self.route, |v| v.set_str_val(route));
         customs.next(self.time,  |v| v.set_uint32_val(as_micros(time)));
     }
@@ -197,8 +197,8 @@ impl Columns {
         customs.next(self.app,   |v| v.set_uint32_val(AGENT));
         customs.next(self.agent, |v| v.set_uint64_val(agent));
         customs.next(self.kind,  |v| v.set_uint32_val(ERROR));
-        customs.next(self.task,  |v| v.set_uint64_val(data.id));
-        customs.next(self.test,  |v| v.set_uint64_val(data.test_id));
+        customs.next(self.task,  |v| v.set_uint64_val(data.task));
+        customs.next(self.test,  |v| v.set_uint64_val(data.test));
         customs.next(self.cause, |v| v.set_str_val(&data.cause));
     }
 
@@ -207,8 +207,8 @@ impl Columns {
         customs.next(self.app,   |v| v.set_uint32_val(AGENT));
         customs.next(self.agent, |v| v.set_uint64_val(agent));
         customs.next(self.kind,  |v| v.set_uint32_val(TIMEOUT));
-        customs.next(self.task,  |v| v.set_uint64_val(data.id));
-        customs.next(self.test,  |v| v.set_uint64_val(data.test_id));
+        customs.next(self.task,  |v| v.set_uint64_val(data.task));
+        customs.next(self.test,  |v| v.set_uint64_val(data.test));
     }
 }
 

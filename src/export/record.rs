@@ -26,8 +26,8 @@ pub enum Record {
 
 #[derive(Debug)]
 pub struct Fetch {
-    pub id:      u64,
-    pub test_id: u64,
+    pub task:    u64,
+    pub test:    u64,
     pub addr:    IpAddr,
     pub status:  u16,
     pub rtt:     Duration,
@@ -36,8 +36,8 @@ pub struct Fetch {
 
 #[derive(Debug)]
 pub struct Knock {
-    pub id:      u64,
-    pub test_id: u64,
+    pub task:    u64,
+    pub test:    u64,
     pub addr:    IpAddr,
     pub port:    u16,
     pub sent:    u32,
@@ -47,8 +47,8 @@ pub struct Knock {
 
 #[derive(Debug)]
 pub struct Ping {
-    pub id:      u64,
-    pub test_id: u64,
+    pub task:    u64,
+    pub test:    u64,
     pub addr:    IpAddr,
     pub sent:    u32,
     pub lost:    u32,
@@ -57,8 +57,8 @@ pub struct Ping {
 
 #[derive(Debug)]
 pub struct Trace {
-    pub id:      u64,
-    pub test_id: u64,
+    pub task:    u64,
+    pub test:    u64,
     pub addr:    IpAddr,
     pub route:   String,
     pub time:    Duration,
@@ -72,15 +72,15 @@ pub struct Hop {
 
 #[derive(Debug)]
 pub struct Error {
-    pub id:      u64,
-    pub test_id: u64,
+    pub task:   u64,
+    pub test:   u64,
     pub cause:  String,
 }
 
 #[derive(Debug)]
 pub struct Timeout {
-    pub id:      u64,
-    pub test_id: u64,
+    pub task: u64,
+    pub test: u64,
 }
 
 impl From<Fetch> for Record  {

@@ -9,11 +9,11 @@ use tokio::time::{delay_for, timeout};
 use netdiag::{self, Node, Tracer};
 use synapi::tasks::TraceConfig;
 use crate::export::{record, Hop, Envoy};
-use super::resolve;
+use super::{resolve, Task};
 
 pub struct Trace {
-    id:      u64,
-    test_id: u64,
+    task:    u64,
+    test:    u64,
     target:  String,
     period:  Duration,
     limit:   usize,
@@ -23,19 +23,22 @@ pub struct Trace {
 }
 
 impl Trace {
-    pub fn new(id: u64, cfg: TraceConfig, envoy: Envoy, tracer: Arc<Tracer>) -> Self {
-        let TraceConfig { test_id, target, period, limit, expiry } = cfg;
-
-        let period = Duration::from_secs(period);
-        let limit  = limit as usize;
-        let expiry = Duration::from_millis(expiry);
-
-        Self { id, test_id, target, period, limit, expiry, envoy, tracer }
+    pub fn new(task: Task, cfg: TraceConfig, tracer: Arc<Tracer>) -> Self {
+        Self {
+            task:   task.task,
+            test:   task.test,
+            target: cfg.target,
+            period: Duration::from_secs(cfg.period),
+            limit:  cfg.limit as usize,
+            expiry: Duration::from_millis(cfg.expiry),
+            envoy:  task.envoy,
+            tracer: tracer,
+        }
     }
 
     pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
         loop {
-            debug!("{}: test {}, target {}", self.id, self.test_id, self.target);
+            debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
             let result = self.trace(ip4, ip6);
 
@@ -68,7 +71,7 @@ impl Trace {
     }
 
     async fn success(&self, out: Output) -> Result<()> {
-        debug!("{}: {}", self.id, out);
+        debug!("{}: {}", self.task, out);
 
         let route = out.route.into_iter().enumerate().map(|(hop, nodes)| {
             let mut map = HashMap::<IpAddr, Vec<u64>>::new();
@@ -86,30 +89,30 @@ impl Trace {
         let route = serde_json::to_string(&route)?;
 
         self.envoy.export(record::Trace {
-            id:      self.id,
-            test_id: self.test_id,
-            addr:    out.addr,
-            route:   route,
-            time:    out.time,
+            task:  self.task,
+            test:  self.test,
+            addr:  out.addr,
+            route: route,
+            time:  out.time,
         }).await;
 
         Ok(())
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: {}", self.id, err);
+        warn!("{}: {}", self.task, err);
         self.envoy.export(record::Error {
-            id:      self.id,
-            test_id: self.test_id,
-            cause:   err.to_string(),
+            task:  self.task,
+            test:  self.test,
+            cause: err.to_string(),
         }).await;
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.id);
+        warn!("{}: timeout", self.task);
         self.envoy.export(record::Timeout {
-            id:      self.id,
-            test_id: self.test_id,
+            task: self.task,
+            test: self.test,
         }).await;
     }
 }

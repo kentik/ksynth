@@ -7,10 +7,10 @@ use synapi::agent::Net;
 use synapi::tasks::{State, Config};
 use synapi::tasks::{PingConfig, TraceConfig, FetchConfig, KnockConfig};
 use netdiag::{Bind, Knocker, Pinger, Tracer};
-use crate::export::{Exporter, Envoy, Target};
+use crate::export::{Exporter, Target};
 use crate::spawn::{Spawner, Handle};
 use crate::status::Status;
-use crate::task::{Fetch, Fetcher, Knock, Ping, Trace};
+use crate::task::{Task, Fetch, Fetcher, Knock, Ping, Trace};
 use crate::watch::{Event, Tasks};
 
 pub struct Executor {
@@ -104,29 +104,37 @@ impl Executor {
             });
 
             for task in group.tasks {
-                let envoy = self.ex.envoy(target.clone());
+                let id     = task.task;
+                let test   = task.test;
+                let config = task.config;
+                let state  = task.state;
 
-                let result = match task.state {
-                    State::Created => self.insert(task.id, task.config, envoy).await,
-                    State::Deleted => self.delete(task.id),
-                    State::Updated => self.insert(task.id, task.config, envoy).await,
+                let envoy  = self.ex.envoy(target.clone());
+                let task   = Task::new(id, test, envoy);
+
+                let result = match state {
+                    State::Created => self.insert(task, config).await,
+                    State::Deleted => self.delete(id),
+                    State::Updated => self.insert(task, config).await,
                 };
 
                 match result {
-                    Ok(_)  => debug!("created task {}", task.id),
-                    Err(e) => error!("invalid task {}: {}", task.id, e),
+                    Ok(_)  => debug!("created task {}", id),
+                    Err(e) => error!("invalid task {}: {}", id, e),
                 }
             }
         }
         Ok(())
     }
 
-    async fn insert(&mut self, id: u64, cfg: Config, envoy: Envoy) -> Result<()> {
+    async fn insert(&mut self, task: Task, cfg: Config) -> Result<()> {
+        let id = task.task;
+
         let handle = match cfg {
-            Config::Ping(cfg)  => self.ping(id, cfg, envoy).await?,
-            Config::Trace(cfg) => self.trace(id, cfg, envoy).await?,
-            Config::Fetch(cfg) => self.fetch(id, cfg, envoy).await?,
-            Config::Knock(cfg) => self.knock(id, cfg, envoy).await?,
+            Config::Ping(cfg)  => self.ping(id, task, cfg)?,
+            Config::Trace(cfg) => self.trace(id, task, cfg)?,
+            Config::Fetch(cfg) => self.fetch(id, task, cfg)?,
+            Config::Knock(cfg) => self.knock(id, task, cfg)?,
             _                  => Err(anyhow!("unsupported type"))?,
         };
 
@@ -141,30 +149,26 @@ impl Executor {
         Ok(())
     }
 
-    async fn ping(&self, id: u64, cfg: PingConfig, envoy: Envoy) -> Result<Handle> {
+    fn ping(&self, id: u64, task: Task, cfg: PingConfig) -> Result<Handle> {
         let Network { ip4, ip6, .. } = self.network;
-        let pinger = self.pinger.clone();
-        let ping = Ping::new(id, cfg, envoy, pinger);
+        let ping = Ping::new(task, cfg, self.pinger.clone());
         Ok(self.spawner.spawn(id, ping.exec(ip4, ip6)))
     }
 
-    async fn trace(&self, id: u64, cfg: TraceConfig, envoy: Envoy) -> Result<Handle> {
+    fn trace(&self, id: u64, task: Task, cfg: TraceConfig) -> Result<Handle> {
         let Network { ip4, ip6, .. } = self.network;
-        let tracer = self.tracer.clone();
-        let trace = Trace::new(id, cfg, envoy, tracer);
+        let trace = Trace::new(task, cfg, self.tracer.clone());
         Ok(self.spawner.spawn(id, trace.exec(ip4, ip6)))
     }
 
-    async fn fetch(&self, id: u64, cfg: FetchConfig, envoy: Envoy) -> Result<Handle> {
-        let client = self.fetcher.clone();
-        let fetch = Fetch::new(id, cfg, envoy, client);
+    fn fetch(&self, id: u64, task: Task, cfg: FetchConfig) -> Result<Handle> {
+        let fetch = Fetch::new(task, cfg, self.fetcher.clone());
         Ok(self.spawner.spawn(id, fetch.exec()))
     }
 
-    async fn knock(&self, id: u64, cfg: KnockConfig, envoy: Envoy) -> Result<Handle> {
+    fn knock(&self, id: u64, task: Task, cfg: KnockConfig) -> Result<Handle> {
         let Network { ip4, ip6, .. } = self.network;
-        let client = self.knocker.clone();
-        let knock = Knock::new(id, cfg, envoy, client);
+        let knock = Knock::new(task, cfg, self.knocker.clone());
         Ok(self.spawner.spawn(id, knock.exec(ip4, ip6)))
     }
 }

@@ -2,7 +2,7 @@ use std::fmt;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::{Error,Result}  ;
+use anyhow::{Error, Result};
 use futures::{Stream, StreamExt, TryStreamExt};
 use futures::stream::unfold;
 use log::{debug, warn};
@@ -12,11 +12,11 @@ use netdiag::{self, Pinger};
 use synapi::tasks::PingConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::resolve;
+use super::{resolve, Task};
 
 pub struct Ping {
-    id:      u64,
-    test_id: u64,
+    task:    u64,
+    test:    u64,
     target:  String,
     period:  Duration,
     count:   usize,
@@ -26,19 +26,22 @@ pub struct Ping {
 }
 
 impl Ping {
-    pub fn new(id: u64, cfg: PingConfig, envoy: Envoy, pinger: Arc<Pinger>) -> Self {
-        let PingConfig { test_id, target, period, count, expiry } = cfg;
-
-        let period = Duration::from_secs(period);
-        let count  = count as usize;
-        let expiry = Duration::from_millis(expiry);
-
-        Self { id, test_id, target, period, count, expiry, envoy, pinger }
+    pub fn new(task: Task, cfg: PingConfig, pinger: Arc<Pinger>) -> Self {
+        Self {
+            task:   task.task,
+            test:   task.test,
+            target: cfg.target,
+            period: Duration::from_secs(cfg.period),
+            count:  cfg.count as usize,
+            expiry: Duration::from_millis(cfg.expiry),
+            envoy:  task.envoy,
+            pinger: pinger,
+        }
     }
 
     pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
         loop {
-            debug!("{}: test {}, target {}", self.id, self.test_id, self.target);
+            debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
             let result = self.ping(self.count, ip4, ip6);
 
@@ -71,10 +74,10 @@ impl Ping {
     }
 
     async fn success(&self, out: Output) {
-        debug!("{}: {}", self.id, out);
+        debug!("{}: {}", self.task, out);
         self.envoy.export(record::Ping {
-            id:   self.id,
-            test_id: self.test_id,
+            task: self.task,
+            test: self.test,
             addr: out.addr,
             sent: out.sent,
             lost: out.lost,
@@ -83,19 +86,19 @@ impl Ping {
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: error: {}", self.id, err);
+        warn!("{}: error: {}", self.task, err);
         self.envoy.export(record::Error {
-            id:    self.id,
-            test_id: self.test_id,
+            task:  self.task,
+            test:  self.test,
             cause: err.to_string(),
         }).await;
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.id);
+        warn!("{}: timeout", self.task);
         self.envoy.export(record::Timeout {
-            id: self.id,
-            test_id: self.test_id,
+            task: self.task,
+            test: self.test,
         }).await;
     }
 }

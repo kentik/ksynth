@@ -10,10 +10,11 @@ use tokio::time::{delay_for, timeout};
 use netdiag::Bind;
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
+use super::Task;
 
 pub struct Fetch {
-    id:      u64,
-    test_id: u64,
+    task:    u64,
+    test:    u64,
     target:  String,
     period:  Duration,
     expiry:  Duration,
@@ -22,18 +23,21 @@ pub struct Fetch {
 }
 
 impl Fetch {
-    pub fn new(id: u64, cfg: FetchConfig, envoy: Envoy, client: Arc<Fetcher>) -> Self {
-        let FetchConfig { test_id, target, period, expiry } = cfg;
-
-        let period = Duration::from_secs(period);
-        let expiry = Duration::from_millis(expiry);
-
-        Self { id, test_id, target, period, expiry, envoy, client }
+    pub fn new(task: Task, cfg: FetchConfig, client: Arc<Fetcher>) -> Self {
+        Self {
+            task:   task.task,
+            test:   task.test,
+            target: cfg.target,
+            period: Duration::from_secs(cfg.period),
+            expiry: Duration::from_millis(cfg.expiry),
+            envoy:  task.envoy,
+            client: client,
+        }
     }
 
     pub async fn exec(self) -> Result<()> {
         loop {
-            debug!("{}: test {}, target {}", self.id, self.test_id, self.target);
+            debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
             let result = self.client.get(&self.target);
 
@@ -48,10 +52,10 @@ impl Fetch {
     }
 
     async fn success(&self, out: Output) {
-        debug!("{}: {}", self.id, out);
+        debug!("{}: {}", self.task, out);
         self.envoy.export(record::Fetch {
-            id:      self.id,
-            test_id: self.test_id,
+            task:    self.task,
+            test:    self.test,
             addr:    out.addr,
             status:  out.status.as_u16(),
             rtt:     out.rtt,
@@ -60,19 +64,19 @@ impl Fetch {
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: error: {}", self.id, err);
+        warn!("{}: error: {}", self.task, err);
         self.envoy.export(record::Error {
-            id:    self.id,
-            test_id: self.test_id,
+            task:  self.task,
+            test:  self.test,
             cause: err.to_string(),
         }).await;
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.id);
+        warn!("{}: timeout", self.task);
         self.envoy.export(record::Timeout {
-            id: self.id,
-            test_id: self.test_id,
+            task: self.task,
+            test: self.test,
         }).await;
     }
 }

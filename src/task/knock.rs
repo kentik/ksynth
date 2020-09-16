@@ -9,42 +9,44 @@ use netdiag::{self, Knocker};
 use synapi::tasks::KnockConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::{resolve, Task};
+use super::{Resolver, Task};
 
 pub struct Knock {
-    task:    u64,
-    test:    u64,
-    target:  String,
-    port:    u16,
-    period:  Duration,
-    count:   usize,
-    expiry:  Duration,
-    envoy:   Envoy,
-    knocker: Arc<Knocker>,
+    task:     u64,
+    test:     u64,
+    target:   String,
+    port:     u16,
+    period:   Duration,
+    count:    usize,
+    expiry:   Duration,
+    envoy:    Envoy,
+    knocker:  Arc<Knocker>,
+    resolver: Resolver,
 }
 
 impl Knock {
     pub fn new(task: Task, cfg: KnockConfig, knocker: Arc<Knocker>) -> Self {
         Self {
-            task:    task.task,
-            test:    task.test,
-            target:  cfg.target,
-            port:    cfg.port,
-            period:  Duration::from_secs(cfg.period),
-            count:   cfg.count as usize,
-            expiry:  Duration::from_millis(cfg.expiry),
-            envoy:   task.envoy,
-            knocker: knocker,
+            task:     task.task,
+            test:     task.test,
+            target:   cfg.target,
+            port:     cfg.port,
+            period:   Duration::from_secs(cfg.period),
+            count:    cfg.count as usize,
+            expiry:   Duration::from_millis(cfg.expiry),
+            envoy:    task.envoy,
+            knocker:  knocker,
+            resolver: task.resolver,
         }
     }
 
-    pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
+    pub async fn exec(self) -> Result<()> {
         loop {
             let Self { task, test, target, port, .. } = &self;
 
             debug!("{}: test {}, target {}:{}", task, test, target, port);
 
-            let result = self.knock(self.count, ip4, ip6);
+            let result = self.knock(self.count);
 
             match timeout(self.expiry, result).await {
                 Ok(Ok(rtt)) => self.success(rtt).await,
@@ -56,10 +58,10 @@ impl Knock {
         }
     }
 
-    async fn knock(&self, count: usize, ip4: bool, ip6: bool) -> Result<Output> {
+    async fn knock(&self, count: usize) -> Result<Output> {
         let knocker = &self.knocker;
 
-        let addr = resolve(&self.target, ip4, ip6).await?;
+        let addr = self.resolver.lookup(&self.target).await?;
         let port = self.port;
 
         let knock = netdiag::Knock {

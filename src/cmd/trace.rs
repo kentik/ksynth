@@ -5,8 +5,11 @@ use anyhow::Result;
 use clap::{value_t, values_t};
 use tokio::net::UdpSocket;
 use tokio::time::delay_for;
+use trust_dns_resolver::TokioAsyncResolver;
+use trust_dns_resolver::system_conf::read_system_conf;
 use netdiag::{Bind, Node, Probe, Tracer};
 use crate::args::Args;
+use crate::task::Resolver;
 use super::resolve;
 
 pub async fn trace(args: Args<'_, '_>) -> Result<()> {
@@ -25,6 +28,10 @@ pub async fn trace(args: Args<'_, '_>) -> Result<()> {
         }
     }
 
+    let (config, options) = read_system_conf()?;
+    let resolver = TokioAsyncResolver::tokio(config, options).await?;
+    let resolver = Resolver::new(resolver.clone(), ip4, ip6);
+
     let delay  = Duration::from_millis(delay);
     let expiry = Duration::from_millis(expiry);
 
@@ -32,7 +39,7 @@ pub async fn trace(args: Args<'_, '_>) -> Result<()> {
     let route4 = UdpSocket::bind(bind.sa4()).await?;
     let route6 = UdpSocket::bind(bind.sa6()).await?;
 
-    for (host, addr) in resolve(hosts, ip4, ip6).await {
+    for (host, addr) in resolve(&resolver, hosts).await {
         println!("trace {} ({})", host, addr);
 
         let route = match addr {

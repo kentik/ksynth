@@ -10,28 +10,30 @@ use tokio::time::{delay_for, timeout};
 use netdiag::Bind;
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
-use super::Task;
+use super::{Resolver, Task};
 
 pub struct Fetch {
-    task:    u64,
-    test:    u64,
-    target:  String,
-    period:  Duration,
-    expiry:  Duration,
-    envoy:   Envoy,
-    client:  Arc<Fetcher>,
+    task:     u64,
+    test:     u64,
+    target:   String,
+    period:   Duration,
+    expiry:   Duration,
+    envoy:    Envoy,
+    client:   Arc<Fetcher>,
+    resolver: Resolver,
 }
 
 impl Fetch {
     pub fn new(task: Task, cfg: FetchConfig, client: Arc<Fetcher>) -> Self {
         Self {
-            task:   task.task,
-            test:   task.test,
-            target: cfg.target,
-            period: Duration::from_secs(cfg.period),
-            expiry: Duration::from_millis(cfg.expiry),
-            envoy:  task.envoy,
-            client: client,
+            task:     task.task,
+            test:     task.test,
+            target:   cfg.target,
+            period:   Duration::from_secs(cfg.period),
+            expiry:   Duration::from_millis(cfg.expiry),
+            envoy:    task.envoy,
+            client:   client,
+            resolver: task.resolver,
         }
     }
 
@@ -39,6 +41,7 @@ impl Fetch {
         loop {
             debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
+            let _ = &self.resolver;
             let result = self.client.get(&self.target);
 
             match timeout(self.expiry, result).await {

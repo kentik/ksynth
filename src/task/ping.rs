@@ -12,38 +12,40 @@ use netdiag::{self, Pinger};
 use synapi::tasks::PingConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::{resolve, Task};
+use super::{Resolver, Task};
 
 pub struct Ping {
-    task:    u64,
-    test:    u64,
-    target:  String,
-    period:  Duration,
-    count:   usize,
-    expiry:  Duration,
-    envoy:   Envoy,
-    pinger:  Arc<Pinger>,
+    task:     u64,
+    test:     u64,
+    target:   String,
+    period:   Duration,
+    count:    usize,
+    expiry:   Duration,
+    envoy:    Envoy,
+    pinger:   Arc<Pinger>,
+    resolver: Resolver,
 }
 
 impl Ping {
     pub fn new(task: Task, cfg: PingConfig, pinger: Arc<Pinger>) -> Self {
         Self {
-            task:   task.task,
-            test:   task.test,
-            target: cfg.target,
-            period: Duration::from_secs(cfg.period),
-            count:  cfg.count as usize,
-            expiry: Duration::from_millis(cfg.expiry),
-            envoy:  task.envoy,
-            pinger: pinger,
+            task:     task.task,
+            test:     task.test,
+            target:   cfg.target,
+            period:   Duration::from_secs(cfg.period),
+            count:    cfg.count as usize,
+            expiry:   Duration::from_millis(cfg.expiry),
+            envoy:    task.envoy,
+            pinger:   pinger,
+            resolver: task.resolver,
         }
     }
 
-    pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
+    pub async fn exec(self) -> Result<()> {
         loop {
             debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
-            let result = self.ping(self.count, ip4, ip6);
+            let result = self.ping(self.count);
 
             match timeout(self.expiry, result).await {
                 Ok(Ok(rtt)) => self.success(rtt).await,
@@ -55,10 +57,10 @@ impl Ping {
         }
     }
 
-    async fn ping(&self, count: usize, ip4: bool, ip6: bool) -> Result<Output> {
+    async fn ping(&self, count: usize) -> Result<Output> {
         let pinger = self.pinger.clone();
 
-        let addr = resolve(&self.target, ip4, ip6).await?;
+        let addr = self.resolver.lookup(&self.target).await?;
 
         let rtt  = ping(pinger, addr).take(count).try_collect::<Vec<_>>().await?;
         let sent = rtt.len() as u32;

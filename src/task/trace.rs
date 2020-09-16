@@ -9,38 +9,40 @@ use tokio::time::{delay_for, timeout};
 use netdiag::{self, Node, Tracer};
 use synapi::tasks::TraceConfig;
 use crate::export::{record, Hop, Envoy};
-use super::{resolve, Task};
+use super::{Resolver, Task};
 
 pub struct Trace {
-    task:    u64,
-    test:    u64,
-    target:  String,
-    period:  Duration,
-    limit:   usize,
-    expiry:  Duration,
-    envoy:   Envoy,
-    tracer:  Arc<Tracer>,
+    task:     u64,
+    test:     u64,
+    target:   String,
+    period:   Duration,
+    limit:    usize,
+    expiry:   Duration,
+    envoy:    Envoy,
+    tracer:   Arc<Tracer>,
+    resolver: Resolver,
 }
 
 impl Trace {
     pub fn new(task: Task, cfg: TraceConfig, tracer: Arc<Tracer>) -> Self {
         Self {
-            task:   task.task,
-            test:   task.test,
-            target: cfg.target,
-            period: Duration::from_secs(cfg.period),
-            limit:  cfg.limit as usize,
-            expiry: Duration::from_millis(cfg.expiry),
-            envoy:  task.envoy,
-            tracer: tracer,
+            task:     task.task,
+            test:     task.test,
+            target:   cfg.target,
+            period:   Duration::from_secs(cfg.period),
+            limit:    cfg.limit as usize,
+            expiry:   Duration::from_millis(cfg.expiry),
+            envoy:    task.envoy,
+            tracer:   tracer,
+            resolver: task.resolver,
         }
     }
 
-    pub async fn exec(self, ip4: bool, ip6: bool) -> Result<()> {
+    pub async fn exec(self) -> Result<()> {
         loop {
             debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
-            let result = self.trace(ip4, ip6);
+            let result = self.trace();
 
             match timeout(self.expiry, result).await {
                 Ok(Ok(stats)) => self.success(stats).await?,
@@ -52,9 +54,9 @@ impl Trace {
         }
     }
 
-    async fn trace(&self, ip4: bool, ip6: bool) -> Result<Output> {
+    async fn trace(&self) -> Result<Output> {
         let time = Instant::now();
-        let addr = resolve(&self.target, ip4, ip6).await?;
+        let addr = self.resolver.lookup(&self.target).await?;
 
         let route = self.tracer.route(netdiag::Trace {
             addr:   addr,

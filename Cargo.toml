@@ -43,6 +43,9 @@ features = ["derive"]
 version  = "0.2.22"
 features = ["rt-threaded", "net"]
 
+[dependencies.trust-dns-resolver]
+version  = "0.19.5"
+
 [dependencies.netdiag]
 path = "netdiag"
 

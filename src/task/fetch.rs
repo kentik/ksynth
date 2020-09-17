@@ -4,8 +4,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use bytes::Bytes;
-use reqwest::{Client, StatusCode};
 use log::{debug, warn};
+use reqwest::{Client, Method, StatusCode, Url};
+use reqwest::header::HOST;
 use tokio::time::{delay_for, timeout};
 use netdiag::Bind;
 use synapi::tasks::FetchConfig;
@@ -41,8 +42,8 @@ impl Fetch {
         loop {
             debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
-            let _ = &self.resolver;
-            let result = self.client.get(&self.target);
+            let target = Url::parse(&self.target)?;
+            let result = self.fetch(target);
 
             match timeout(self.expiry, result).await {
                 Ok(Ok(stats)) => self.success(stats).await,
@@ -52,6 +53,18 @@ impl Fetch {
 
             delay_for(self.period).await;
         }
+    }
+
+    async fn fetch(&self, mut target: Url) -> Result<Output> {
+        let mut host = None;
+
+        if let Some(name) = target.domain().map(str::to_owned) {
+            let addr = self.resolver.lookup(&name).await?;
+            target.set_ip_host(addr).expect("IP address");
+            host = Some(name);
+        }
+
+        self.client.get(target, host).await
     }
 
     async fn success(&self, out: Output) {
@@ -99,9 +112,16 @@ impl Fetcher {
         Ok(Self { client })
     }
 
-    pub async fn get(&self, url: &str) -> Result<Output> {
+    pub async fn get(&self, url: Url, host: Option<String>) -> Result<Output> {
+        let mut req = self.client.request(Method::GET, url);
+
+        if let Some(host) = host {
+            req = req.header(HOST, host);
+        }
+
+        let req  = req.build()?;
         let sent = Instant::now();
-        let res = self.client.get(url).send().await?;
+        let res  = self.client.execute(req).await?;
 
         let addr = match res.remote_addr() {
             Some(sa) => sa.ip(),

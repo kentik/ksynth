@@ -9,12 +9,13 @@ use tokio::time::{delay_for, timeout};
 use netdiag::{self, Node, Tracer};
 use synapi::tasks::TraceConfig;
 use crate::export::{record, Hop, Envoy};
-use super::{Resolver, Task};
+use super::{Network, Resolver, Task};
 
 pub struct Trace {
     task:     u64,
     test:     u64,
     target:   String,
+    network:  Network,
     period:   Duration,
     limit:    usize,
     expiry:   Duration,
@@ -28,6 +29,7 @@ impl Trace {
         Self {
             task:     task.task,
             test:     task.test,
+            network:  task.network,
             target:   cfg.target,
             period:   Duration::from_secs(cfg.period),
             limit:    cfg.limit as usize,
@@ -56,7 +58,7 @@ impl Trace {
 
     async fn trace(&self) -> Result<Output> {
         let time = Instant::now();
-        let addr = self.resolver.lookup(&self.target).await?;
+        let addr = self.resolver.lookup(&self.target, self.network).await?;
 
         let route = self.tracer.route(netdiag::Trace {
             addr:   addr,

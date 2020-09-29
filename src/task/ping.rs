@@ -12,11 +12,12 @@ use netdiag::{self, Pinger};
 use synapi::tasks::PingConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::{Resolver, Task};
+use super::{Network, Resolver, Task};
 
 pub struct Ping {
     task:     u64,
     test:     u64,
+    network:  Network,
     target:   String,
     period:   Duration,
     count:    usize,
@@ -31,6 +32,7 @@ impl Ping {
         Self {
             task:     task.task,
             test:     task.test,
+            network:  task.network,
             target:   cfg.target,
             period:   Duration::from_secs(cfg.period),
             count:    cfg.count as usize,
@@ -60,7 +62,7 @@ impl Ping {
     async fn ping(&self, count: usize) -> Result<Output> {
         let pinger = self.pinger.clone();
 
-        let addr = self.resolver.lookup(&self.target).await?;
+        let addr = self.resolver.lookup(&self.target, self.network).await?;
 
         let rtt  = ping(pinger, addr).take(count).try_collect::<Vec<_>>().await?;
         let sent = rtt.len() as u32;

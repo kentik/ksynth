@@ -8,7 +8,7 @@ use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::system_conf::read_system_conf;
 use netdiag::{Bind, Pinger, Ping};
 use crate::args::Args;
-use crate::task::Resolver;
+use crate::task::{Network, Resolver};
 use super::resolve;
 
 pub async fn ping(args: Args<'_, '_>) -> Result<()> {
@@ -26,16 +26,22 @@ pub async fn ping(args: Args<'_, '_>) -> Result<()> {
         }
     }
 
+    let net = match (ip4, ip6) {
+        (true, false) => Network::IPv4,
+        (false, true) => Network::IPv6,
+        _             => Network::Dual,
+    };
+
     let (config, options) = read_system_conf()?;
     let resolver = TokioAsyncResolver::tokio(config, options).await?;
-    let resolver = Resolver::new(resolver.clone(), ip4, ip6);
+    let resolver = Resolver::new(resolver.clone());
 
     let pinger = Arc::new(Pinger::new(&bind).await?);
 
     let delay  = Duration::from_millis(delay);
     let expiry = Duration::from_millis(expiry);
 
-    for (host, addr) in resolve(&resolver, hosts).await {
+    for (host, addr) in resolve(&resolver, hosts, net).await {
         println!("ping {} ({})", host, addr);
 
         let ident = random();

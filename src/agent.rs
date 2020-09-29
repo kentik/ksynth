@@ -14,10 +14,11 @@ use tokio::sync::mpsc::{channel, Sender};
 use synapi::{Client, Config};
 use netdiag::Bind;
 use crate::args::Args;
-use crate::exec::{Executor, Network};
+use crate::exec::Executor;
 use crate::export::Exporter;
 use crate::secure;
 use crate::status::Monitor;
+use crate::task::Network;
 use crate::update::Updater;
 use crate::version::Version;
 use crate::watch::Watcher;
@@ -32,7 +33,7 @@ impl Agent {
         Self { client, keys }
     }
 
-    pub async fn exec(self, bind: Bind, net: Network) -> Result<()> {
+    pub async fn exec(self, bind: Bind, net: Option<Network>) -> Result<()> {
         let client = Arc::new(self.client);
         let keys   = self.keys;
 
@@ -91,10 +92,10 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         None       => hostname()?,
     };
 
-    let net = Network {
-        ip4: ip4,
-        ip6: ip6,
-        set: !ip4 || !ip6,
+    let net = match (ip4, ip6) {
+        (true, false) => Some(Network::IPv4),
+        (false, true) => Some(Network::IPv6),
+        _             => None,
     };
 
     info!("initializing {} {}", version.name, version.version);

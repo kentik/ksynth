@@ -9,11 +9,12 @@ use netdiag::{self, Knocker};
 use synapi::tasks::KnockConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::{Resolver, Task};
+use super::{Network, Resolver, Task};
 
 pub struct Knock {
     task:     u64,
     test:     u64,
+    network:  Network,
     target:   String,
     port:     u16,
     period:   Duration,
@@ -29,6 +30,7 @@ impl Knock {
         Self {
             task:     task.task,
             test:     task.test,
+            network:  task.network,
             target:   cfg.target,
             port:     cfg.port,
             period:   Duration::from_secs(cfg.period),
@@ -61,7 +63,7 @@ impl Knock {
     async fn knock(&self, count: usize) -> Result<Output> {
         let knocker = &self.knocker;
 
-        let addr = self.resolver.lookup(&self.target).await?;
+        let addr = self.resolver.lookup(&self.target, self.network).await?;
         let port = self.port;
 
         let knock = netdiag::Knock {

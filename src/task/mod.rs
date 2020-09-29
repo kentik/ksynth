@@ -1,4 +1,5 @@
 pub use resolve::Resolver;
+pub use task::Network;
 pub use task::Task;
 
 pub use ping::Ping;

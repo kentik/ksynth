@@ -12,7 +12,7 @@ use netdiag::{Bind, Knocker, Pinger, Tracer};
 use crate::export::{Exporter, Target};
 use crate::spawn::{Spawner, Handle};
 use crate::status::Status;
-use crate::task::{Task, Resolver, Fetch, Fetcher, Knock, Ping, Trace};
+use crate::task::{Network, Task, Resolver, Fetch, Fetcher, Knock, Ping, Trace};
 use crate::watch::{Event, Tasks};
 
 pub struct Executor {
@@ -20,7 +20,7 @@ pub struct Executor {
     rx:       Receiver<Event>,
     ex:       Arc<Exporter>,
     bind:     Bind,
-    network:  Network,
+    network:  Option<Network>,
     resolver: TokioAsyncResolver,
     status:   Arc<Status>,
     spawner:  Arc<Spawner>,
@@ -30,15 +30,8 @@ pub struct Executor {
     knocker:  Arc<Knocker>,
 }
 
-#[derive(Debug)]
-pub struct Network {
-    pub ip4: bool,
-    pub ip6: bool,
-    pub set: bool,
-}
-
 impl Executor {
-    pub async fn new(rx: Receiver<Event>, ex: Arc<Exporter>, bind: Bind, net: Network) -> Result<Self> {
+    pub async fn new(rx: Receiver<Event>, ex: Arc<Exporter>, bind: Bind, net: Option<Network>) -> Result<Self> {
         let (config, options) = read_system_conf()?;
 
         let resolver = TokioAsyncResolver::tokio(config, options).await?;
@@ -90,19 +83,7 @@ impl Executor {
     }
 
     async fn tasks(&mut self, Tasks { agent, tasks }: Tasks) -> Result<()> {
-        if !self.network.set {
-            let (ip4, ip6) = match agent.net {
-                Net::IPv4 => (true,  false),
-                Net::IPv6 => (false, true ),
-                Net::Dual => (true,  true ),
-            };
-
-            self.network.ip4 = ip4;
-            self.network.ip6 = ip6;
-        }
-
-        let resolver = self.resolver.clone();
-        let resolver = Resolver::new(resolver, self.network.ip4, self.network.ip6);
+        let resolver = Resolver::new(self.resolver.clone());
 
         for group in tasks {
             let target = Arc::new(Target {
@@ -114,13 +95,22 @@ impl Executor {
             });
 
             for task in group.tasks {
-                let id     = task.task;
-                let test   = task.test;
-                let config = task.config;
-                let state  = task.state;
+                let id      = task.task;
+                let test    = task.test;
+                let config  = task.config;
+                let state   = task.state;
+                let family  = task.family;
+
+                let network = self.network.unwrap_or_else(|| {
+                    match family {
+                        Net::IPv4 => Network::IPv4,
+                        Net::IPv6 => Network::IPv6,
+                        Net::Dual => Network::Dual,
+                    }
+                });
 
                 let envoy  = self.ex.envoy(target.clone());
-                let task   = Task::new(id, test, envoy, resolver.clone());
+                let task   = Task::new(id, test, network, envoy, resolver.clone());
 
                 let result = match state {
                     State::Created => self.insert(task, config).await,

@@ -1,5 +1,6 @@
 use serde::{Deserialize, de::Deserializer};
 use crate::serde::id;
+use super::agent::Net;
 
 #[derive(Debug, Deserialize)]
 pub struct Tasks {
@@ -22,6 +23,7 @@ pub struct Task {
     pub task:   u64,
     pub test:   u64,
     pub config: Config,
+    pub family: Net,
     pub state:  State,
 }
 
@@ -122,13 +124,15 @@ impl<'d> Deserialize<'d> for Task {
             pub state: State,
             #[serde(deserialize_with = "id")]
             pub test_id: u64,
+            pub family:  Net,
         }
 
         let c = TaskContainer::deserialize(de)?;
 
-        let task  = c.id;
-        let test  = c.test_id;
-        let state = c.state;
+        let task   = c.id;
+        let test   = c.test_id;
+        let family = c.family;
+        let state  = c.state;
 
         let config = if let Some(cfg) = c.ping {
             Config::Ping(cfg)
@@ -142,6 +146,6 @@ impl<'d> Deserialize<'d> for Task {
             Config::Unknown
         };
 
-        Ok(Task { task, test, config, state })
+        Ok(Task { task, test, config, family, state })
     }
 }

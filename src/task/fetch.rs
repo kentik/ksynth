@@ -11,11 +11,12 @@ use tokio::time::{delay_for, timeout};
 use netdiag::Bind;
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
-use super::{Resolver, Task};
+use super::{Network, Resolver, Task};
 
 pub struct Fetch {
     task:     u64,
     test:     u64,
+    network:  Network,
     target:   String,
     period:   Duration,
     expiry:   Duration,
@@ -29,6 +30,7 @@ impl Fetch {
         Self {
             task:     task.task,
             test:     task.test,
+            network:  task.network,
             target:   cfg.target,
             period:   Duration::from_secs(cfg.period),
             expiry:   Duration::from_millis(cfg.expiry),
@@ -59,7 +61,7 @@ impl Fetch {
         let mut host = None;
 
         if let Some(name) = target.domain().map(str::to_owned) {
-            let addr = self.resolver.lookup(&name).await?;
+            let addr = self.resolver.lookup(&name, self.network).await?;
             target.set_ip_host(addr).expect("IP address");
             host = Some(name);
         }

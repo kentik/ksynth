@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use bytes::Bytes;
 use log::{debug, warn};
-use reqwest::{Client, Method, StatusCode, Url};
+use reqwest::{Client, Method, Request, RequestBuilder, StatusCode, Url};
 use reqwest::header::HOST;
 use tokio::time::{delay_for, timeout};
 use netdiag::Bind;
@@ -58,6 +58,8 @@ impl Fetch {
     }
 
     async fn fetch(&self, mut target: Url) -> Result<Output> {
+        let method   = Method::GET;
+        let start    = Instant::now();
         let mut host = None;
 
         if let Some(name) = target.domain().map(str::to_owned) {
@@ -66,7 +68,8 @@ impl Fetch {
             host = Some(name);
         }
 
-        self.client.get(target, host).await
+        let req = self.client.request(method, target, host).build()?;
+        self.client.execute(start, req).await
     }
 
     async fn success(&self, out: Output) {
@@ -109,21 +112,21 @@ impl Fetcher {
         let mut client = Client::builder();
         client = client.timeout(Duration::from_secs(10));
         client = client.local_address(bind.sa4().ip());
+        client = client.pool_max_idle_per_host(0);
         let client = client.build()?;
 
         Ok(Self { client })
     }
 
-    pub async fn get(&self, url: Url, host: Option<String>) -> Result<Output> {
-        let mut req = self.client.request(Method::GET, url);
-
-        if let Some(host) = host {
-            req = req.header(HOST, host);
+    pub fn request(&self, method: Method, url: Url, host: Option<String>) -> RequestBuilder {
+        match host {
+            Some(addr) => self.client.request(method, url).header(HOST, addr),
+            None       => self.client.request(method, url)
         }
+    }
 
-        let req  = req.build()?;
-        let sent = Instant::now();
-        let res  = self.client.execute(req).await?;
+    pub async fn execute(&self, start: Instant, req: Request) -> Result<Output> {
+        let res = self.client.execute(req).await?;
 
         let addr = match res.remote_addr() {
             Some(sa) => sa.ip(),
@@ -133,7 +136,7 @@ impl Fetcher {
         let status = res.status();
         let body   = res.bytes().await?;
         let time   = Instant::now();
-        let rtt    = time.saturating_duration_since(sent);
+        let rtt    = time.saturating_duration_since(start);
 
         Ok(Output { addr, status, rtt, body })
     }

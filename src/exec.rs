@@ -7,12 +7,12 @@ use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::system_conf::read_system_conf;
 use synapi::agent::Net;
 use synapi::tasks::{State, Config};
-use synapi::tasks::{PingConfig, TraceConfig, FetchConfig, KnockConfig};
+use synapi::tasks::{PingConfig, TraceConfig, FetchConfig, KnockConfig, QueryConfig};
 use netdiag::{Bind, Knocker, Pinger, Tracer};
 use crate::export::{Exporter, Target};
 use crate::spawn::{Spawner, Handle};
 use crate::status::Status;
-use crate::task::{Network, Task, Resolver, Fetch, Fetcher, Knock, Ping, Trace};
+use crate::task::{Network, Task, Resolver, Fetch, Fetcher, Knock, Ping, Query, Trace};
 use crate::watch::{Event, Tasks};
 
 pub struct Executor {
@@ -135,7 +135,8 @@ impl Executor {
             Config::Trace(cfg) => self.trace(id, task, cfg)?,
             Config::Fetch(cfg) => self.fetch(id, task, cfg)?,
             Config::Knock(cfg) => self.knock(id, task, cfg)?,
-            _                  => Err(anyhow!("unsupported type"))?,
+            Config::Query(cfg) => self.query(id, task, cfg).await?,
+            Config::Unknown    => Err(anyhow!("unsupported type"))?,
         };
 
         self.tasks.insert(id, handle);
@@ -167,5 +168,10 @@ impl Executor {
     fn knock(&self, id: u64, task: Task, cfg: KnockConfig) -> Result<Handle> {
         let knock = Knock::new(task, cfg, self.knocker.clone());
         Ok(self.spawner.spawn(id, knock.exec()))
+    }
+
+    async fn query(&self, id: u64, task: Task, cfg: QueryConfig) -> Result<Handle> {
+        let query = Query::new(task, cfg).await?;
+        Ok(self.spawner.spawn(id, query.exec()))
     }
 }

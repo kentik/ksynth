@@ -30,6 +30,7 @@ pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
             Record::Fetch(data)   => cs.fetch(msg, agent, data),
             Record::Knock(data)   => cs.knock(msg, agent, data),
             Record::Ping(data)    => cs.ping(msg, agent, data),
+            Record::Query(data)   => cs.query(msg, agent, data),
             Record::Trace(data)   => cs.trace(msg, agent, data),
             Record::Error(data)   => cs.error(msg, agent, data),
             Record::Timeout(data) => cs.timeout(msg, agent, data),
@@ -59,6 +60,7 @@ struct Columns {
     route:  u32,
     time:   u32,
     port:   u32,
+    data:   u32,
 }
 
 struct Stats {
@@ -101,6 +103,7 @@ impl Columns {
             route:   lookup("STR00")?,
             time:    lookup("INT01")?,
             port:    lookup("INT08")?,
+            data:    lookup("STR00")?,
         })
     }
 
@@ -172,6 +175,20 @@ impl Columns {
         customs.next(self.rtt.jit, |v| v.set_uint32_val(as_micros(rtt.jit)));
     }
 
+    fn query(&self, msg: Builder, agent: u64, data: &Query) {
+        let Query { task, test, time, .. } = *data;
+        let data = &data.data;
+
+        let mut customs = Customs::new("query", msg, 7);
+        customs.next(self.app,   |v| v.set_uint32_val(AGENT));
+        customs.next(self.agent, |v| v.set_uint64_val(agent));
+        customs.next(self.kind,  |v| v.set_uint32_val(QUERY));
+        customs.next(self.task,  |v| v.set_uint64_val(task));
+        customs.next(self.test,  |v| v.set_uint64_val(test));
+        customs.next(self.data,  |v| v.set_str_val(data));
+        customs.next(self.time,  |v| v.set_uint32_val(as_micros(time)));
+    }
+
     fn trace(&self, mut msg: Builder, agent: u64, data: &Trace) {
         let Trace { task, test, addr, time, .. } = *data;
 
@@ -224,3 +241,4 @@ const PING:    u32 = 2;
 const FETCH:   u32 = 3;
 const TRACE:   u32 = 4;
 const KNOCK:   u32 = 5;
+const QUERY:   u32 = 6;

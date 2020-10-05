@@ -34,6 +34,7 @@ pub enum Config {
     Trace(TraceConfig),
     Fetch(FetchConfig),
     Knock(KnockConfig),
+    Query(QueryConfig),
     Unknown,
 }
 
@@ -67,6 +68,19 @@ pub struct KnockConfig {
     pub count:   u64,
     pub expiry:  u64,
     pub port:    u16,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct QueryConfig {
+    pub target:  String,
+    pub period:  u64,
+    pub count:   u64,
+    pub expiry:  u64,
+    #[serde(rename = "resolver")]
+    pub server:  String,
+    pub port:    u16,
+    #[serde(rename = "type")]
+    pub record:  String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,6 +135,8 @@ impl<'d> Deserialize<'d> for Task {
             #[serde(rename = "http")]
             pub fetch: Option<FetchConfig>,
             pub knock: Option<KnockConfig>,
+            #[serde(rename = "dns")]
+            pub query: Option<QueryConfig>,
             pub state: State,
             #[serde(deserialize_with = "id")]
             pub test_id: u64,
@@ -142,6 +158,8 @@ impl<'d> Deserialize<'d> for Task {
             Config::Fetch(cfg)
         } else if let Some(cfg) = c.knock {
             Config::Knock(cfg)
+        } else if let Some(cfg) = c.query {
+            Config::Query(cfg)
         } else {
             Config::Unknown
         };

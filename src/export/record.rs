@@ -17,9 +17,10 @@ pub struct Target {
 #[derive(Debug)]
 pub enum Record {
     Fetch(Fetch),
-    Ping(Ping),
-    Trace(Trace),
     Knock(Knock),
+    Ping(Ping),
+    Query(Query),
+    Trace(Trace),
     Error(Error),
     Timeout(Timeout),
 }
@@ -53,6 +54,14 @@ pub struct Ping {
     pub sent:    u32,
     pub lost:    u32,
     pub rtt:     Summary,
+}
+
+#[derive(Debug)]
+pub struct Query {
+    pub task:    u64,
+    pub test:    u64,
+    pub data:    String,
+    pub time:    Duration,
 }
 
 #[derive(Debug)]
@@ -98,6 +107,12 @@ impl From<Knock> for Record  {
 impl From<Ping> for Record  {
     fn from(ping: Ping) -> Self {
         Record::Ping(ping)
+    }
+}
+
+impl From<Query> for Record  {
+    fn from(query: Query) -> Self {
+        Record::Query(query)
     }
 }
 

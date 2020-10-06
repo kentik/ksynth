@@ -11,7 +11,7 @@ use nix::{unistd::gethostname, sys::utsname::uname};
 use signal_hook::{iterator::Signals, SIGINT, SIGTERM};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Sender};
-use synapi::{Client, Config};
+use synapi::{Client, Config, Region};
 use netdiag::Bind;
 use crate::args::Args;
 use crate::exec::Executor;
@@ -71,11 +71,10 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     let global  = args.is_present("global");
     let company = args.opt("company")?;
     let site    = args.opt("site")?;
-    let region  = value_t!(args, "region", String)?;
+    let region  = value_t!(args, "region", Region)?;
     let proxy   = args.opt("proxy")?;
     let ip4     = !args.is_present("ip6");
     let ip6     = !args.is_present("ip4");
-    let port    = args.opt("port")?;
     let user    = args.value_of("user");
     let update  = args.is_present("update");
     let release = !args.is_present("rc");
@@ -121,7 +120,6 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         company: company,
         site:    site,
         proxy:   proxy,
-        port:    port,
         bind:    args.opt("bind")?,
     })?;
 

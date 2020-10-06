@@ -80,11 +80,6 @@ subcommands:
             help: region
             takes_value: true
             default_value: "US"
-        - port:
-            long: port
-            env: KENTIK_PORT
-            help: remote port
-            takes_value: true
         - user:
             long: user
             help: run as user

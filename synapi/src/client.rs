@@ -47,13 +47,7 @@ pub struct Failure {
 
 impl Client {
     pub fn new(config: Config) -> Result<Self, Error> {
-        let Config { region, port, proxy, .. } = &config;
-
-        let domain = match region.to_ascii_uppercase().as_ref() {
-            "US" => "kentik.com".to_owned(),
-            "EU" => "kentik.eu".to_owned(),
-            name => format!("{}.kentik.com", name.to_ascii_lowercase()),
-        };
+        let Config { region, proxy, .. } = &config;
 
         let mut client = HttpClient::builder();
         client = client.timeout(Duration::from_secs(30));
@@ -62,19 +56,18 @@ impl Client {
             client = client.proxy(proxy?);
         }
 
-        let mut api = format!("https://api.{}", domain);
-        if let Some(port) = port {
-            api.push(':');
-            api.push_str(&port.to_string());
-        }
+        let auth   = format!("{}/auth",   region.api);
+        let tasks  = format!("{}/tasks",  region.api);
+        let status = format!("{}/status", region.api);
+        let submit = region.flow.clone();
 
         Ok(Self {
             client:  client.build()?,
             config:  config,
-            auth:    format!("{}/api/agent/v1/syn/auth",   api),
-            tasks:   format!("{}/api/agent/v1/syn/tasks",  api),
-            status:  format!("{}/api/agent/v1/syn/status", api),
-            submit:  format!("https://flow.{}/chf", domain),
+            auth:    auth,
+            tasks:   tasks,
+            status:  status,
+            submit:  submit,
             session: RwLock::new(Session::None),
         })
     }

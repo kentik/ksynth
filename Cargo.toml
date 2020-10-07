@@ -5,38 +5,38 @@ authors = ["Will <will@kentik.com>"]
 edition = "2018"
 
 [dependencies]
-anyhow        = "1.0.31"
-bytes         = "0.5.4"
-capnp         = "0.12.3"
+anyhow        = "1.0.33"
+bytes         = "0.5.6"
+capnp         = "0.13.4"
 env_logger    = "0.7.1"
-futures       = "0.3.5"
+futures       = "0.3.6"
 hex           = "0.4.2"
-libc          = "0.2.71"
-log           = "0.4.8"
+libc          = "0.2.79"
+log           = "0.4.11"
 nix           = "0.18.0"
 parking_lot   = "0.11.0"
 rand          = "0.7.3"
-signal-hook   = "0.1.15"
-serde_json    = "1.0.55"
+signal-hook   = "0.1.16"
+serde_json    = "1.0.58"
 yaml-rust     = "0.3.5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 capo          = "0.0.1"
 
 [dependencies.clap]
-version  = "2.33.1"
+version  = "2.33.3"
 features = ["yaml"]
 
 [dependencies.ed25519-compact]
-version  = "0.1.6"
+version  = "0.1.8"
 
 [dependencies.reqwest]
-version  = "0.10.4"
+version  = "0.10.8"
 features = ["gzip", "rustls-tls", "trust-dns"]
 default-features = false
 
 [dependencies.serde]
-version  = "1.0.112"
+version  = "1.0.116"
 features = ["derive"]
 
 [dependencies.tokio]
@@ -65,11 +65,11 @@ path = "notary"
 path = "synapi"
 
 [build-dependencies]
-capnpc = "0.12.3"
-anyhow = "1.0.31"
+capnpc = "0.13.1"
+anyhow = "1.0.33"
 
 [build-dependencies.git2]
-version  = "0.13.6"
+version  = "0.13.11"
 features = []
 default-features = false
 

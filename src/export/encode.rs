@@ -123,7 +123,7 @@ impl Columns {
         customs.next(self.kind,   |v| v.set_uint32_val(FETCH));
         customs.next(self.task,   |v| v.set_uint64_val(task));
         customs.next(self.test,   |v| v.set_uint64_val(test));
-        customs.next(self.status, |v| v.set_uint16_val(status));
+        customs.next(self.status, |v| v.set_uint32_val(status.into()));
         customs.next(self.ttlb,   |v| v.set_uint32_val(as_micros(rtt)));
         customs.next(self.size,   |v| v.set_uint32_val(size));
     }

@@ -3,40 +3,37 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
-use bytes::Bytes;
+use hyper::{Body, Method, Request, StatusCode, Uri};
+use hyper::body::HttpBody;
+use hyper::client::connect::HttpInfo;
 use log::{debug, warn};
-use reqwest::{Client, Method, Request, RequestBuilder, StatusCode, Url};
-use reqwest::header::HOST;
 use tokio::time::{delay_for, timeout};
+use trust_dns_resolver::TokioAsyncResolver;
 use netdiag::Bind;
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
-use super::{Network, Resolver, Task};
+use super::{Network, Resolver, Task, http::{Expiry, HttpClient}};
 
 pub struct Fetch {
-    task:     u64,
-    test:     u64,
-    network:  Network,
-    target:   String,
-    period:   Duration,
-    expiry:   Duration,
-    envoy:    Envoy,
-    client:   Arc<Fetcher>,
-    resolver: Resolver,
+    task:   u64,
+    test:   u64,
+    target: String,
+    period: Duration,
+    expiry: Duration,
+    envoy:  Envoy,
+    client: Arc<Fetcher>,
 }
 
 impl Fetch {
     pub fn new(task: Task, cfg: FetchConfig, client: Arc<Fetcher>) -> Self {
         Self {
-            task:     task.task,
-            test:     task.test,
-            network:  task.network,
-            target:   cfg.target,
-            period:   Duration::from_secs(cfg.period),
-            expiry:   Duration::from_millis(cfg.expiry),
-            envoy:    task.envoy,
-            client:   client,
-            resolver: task.resolver,
+            task:   task.task,
+            test:   task.test,
+            target: cfg.target,
+            period: Duration::from_secs(cfg.period),
+            expiry: Duration::from_millis(cfg.expiry),
+            envoy:  task.envoy,
+            client: client,
         }
     }
 
@@ -44,7 +41,7 @@ impl Fetch {
         loop {
             debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
-            let target = Url::parse(&self.target)?;
+            let target = self.target.parse()?;
             let result = self.fetch(target);
 
             match timeout(self.expiry, result).await {
@@ -57,18 +54,11 @@ impl Fetch {
         }
     }
 
-    async fn fetch(&self, mut target: Url) -> Result<Output> {
+    async fn fetch(&self, target: Uri) -> Result<Output> {
         let method   = Method::GET;
         let start    = Instant::now();
-        let mut host = None;
 
-        if let Some(name) = target.domain().map(str::to_owned) {
-            let addr = self.resolver.lookup(&name, self.network).await?;
-            target.set_ip_host(addr).expect("IP address");
-            host = Some(name);
-        }
-
-        let req = self.client.request(method, target, host).build()?;
+        let req = self.client.request(method, target)?;
         self.client.execute(start, req).await
     }
 
@@ -80,7 +70,7 @@ impl Fetch {
             addr:    out.addr,
             status:  out.status.as_u16(),
             rtt:     out.rtt,
-            size:    out.body.len(),
+            size:    out.bytes,
         }).await;
     }
 
@@ -104,41 +94,43 @@ impl Fetch {
 
 #[derive(Clone)]
 pub struct Fetcher {
-    client: Client,
+    client: HttpClient,
 }
 
 impl Fetcher {
-    pub fn new(bind: &Bind) -> Result<Self> {
-        let mut client = Client::builder();
-        client = client.timeout(Duration::from_secs(10));
-        client = client.local_address(bind.sa4().ip());
-        client = client.pool_max_idle_per_host(0);
-        let client = client.build()?;
-
+    pub fn new(bind: &Bind, network: Option<Network>, resolver: TokioAsyncResolver) -> Result<Self> {
+        let network  = network.unwrap_or(Network::Dual);
+        let resolver = Resolver::new(resolver);
+        let expiry   = Expiry {
+            connect: Duration::from_secs(10),
+            request: Duration::from_secs(60),
+        };
+        let client = HttpClient::new(bind, network, resolver, expiry)?;
         Ok(Self { client })
     }
 
-    pub fn request(&self, method: Method, url: Url, host: Option<String>) -> RequestBuilder {
-        match host {
-            Some(addr) => self.client.request(method, url).header(HOST, addr),
-            None       => self.client.request(method, url)
-        }
+    pub fn request(&self, method: Method, url: Uri) -> Result<Request<Body>> {
+        Ok(Request::builder().method(method).uri(url).body(Body::empty())?)
     }
 
-    pub async fn execute(&self, start: Instant, req: Request) -> Result<Output> {
-        let res = self.client.execute(req).await?;
+    pub async fn execute(&self, start: Instant, req: Request<Body>) -> Result<Output> {
+        let mut res = self.client.request(req).await?;
 
-        let addr = match res.remote_addr() {
-            Some(sa) => sa.ip(),
-            None     => IpAddr::V4(0.into()),
+        let addr = match res.extensions().get::<HttpInfo>() {
+            Some(info) => info.remote_addr().ip(),
+            None       => IpAddr::V4(0.into()),
         };
 
+        let mut bytes: usize = 0;
+        while let Some(chunk) = res.data().await {
+            bytes += chunk?.len();
+        }
+
         let status = res.status();
-        let body   = res.bytes().await?;
         let time   = Instant::now();
         let rtt    = time.saturating_duration_since(start);
 
-        Ok(Output { addr, status, rtt, body })
+        Ok(Output { addr, status, rtt, bytes })
     }
 }
 
@@ -147,14 +139,13 @@ pub struct Output {
     addr:   IpAddr,
     status: StatusCode,
     rtt:    Duration,
-    body:   Bytes,
+    bytes:  usize,
 }
 
 impl fmt::Display for Output {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self { rtt, status, body, .. } = self;
+        let Self { rtt, status, bytes, .. } = self;
         let status = status.as_u16();
-        let size   = body.len();
-        write!(f, "rtt: {:.2?}, status: {}, bytes: {}", rtt, status, size)
+        write!(f, "rtt: {:.2?}, status: {}, bytes: {}", rtt, status, bytes)
     }
 }

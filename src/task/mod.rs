@@ -1,3 +1,4 @@
+pub use self::http::HttpClient;
 pub use resolve::Resolver;
 pub use task::Network;
 pub use task::Task;
@@ -8,6 +9,7 @@ pub use fetch::{Fetch, Fetcher};
 pub use knock::Knock;
 pub use query::Query;
 
+mod http;
 mod resolve;
 mod task;
 

@@ -1,6 +1,6 @@
 use std::net::*;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Bind {
     sa4: Option<SocketAddrV4>,
     sa6: Option<SocketAddrV6>,

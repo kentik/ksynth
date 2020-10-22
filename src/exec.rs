@@ -40,7 +40,7 @@ impl Executor {
 
         let pinger   = Pinger::new(&bind).await?;
         let tracer   = Tracer::new(&bind).await?;
-        let fetcher  = Fetcher::new(&bind)?;
+        let fetcher  = Fetcher::new(&bind, net, resolver.clone())?;
         let knocker  = Knocker::new(&bind).await?;
 
         Ok(Self {

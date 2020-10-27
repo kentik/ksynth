@@ -7,62 +7,72 @@ use rand::distributions::Uniform;
 use parking_lot::Mutex;
 use tokio::sync::oneshot::Sender;
 use tokio::task;
-use super::probe::Probe;
+use super::probe::{Protocol, Key, PORT_MIN, PORT_MAX};
 use super::reply::Echo;
-
-const PORT_MIN: u16 = 33434;
-const PORT_MAX: u16 = 65407;
 
 #[derive(Debug)]
 pub struct State {
     range:  Uniform<u16>,
-    source: Mutex<HashMap<SocketAddr, ()>>,
+    tcp:    Mutex<HashMap<SocketAddr, ()>>,
+    udp:    Mutex<HashMap<SocketAddr, ()>>,
     state:  Mutex<HashMap<Key, Sender<Echo>>>,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
-struct Key(SocketAddr, SocketAddr);
-
 #[derive(Debug)]
-pub struct Lease<'s>(&'s State, SocketAddr);
+pub struct Lease<'s> {
+    state: &'s State,
+    proto: Protocol,
+    addr:  SocketAddr,
+}
 
 impl State {
     pub fn new() -> Self {
         Self {
             range:  Uniform::new(PORT_MIN, PORT_MAX),
-            source: Default::default(),
+            tcp:    Default::default(),
+            udp:    Default::default(),
             state:  Default::default(),
         }
     }
 
-    pub async fn reserve(&self, src: IpAddr, dst: IpAddr) -> (Lease<'_>, SocketAddr) {
+    pub async fn reserve(&self, proto: Protocol, src: IpAddr) -> Lease<'_> {
+        let map = match proto {
+            Protocol::TCP(..) => &self.tcp,
+            Protocol::UDP(..) => &self.udp,
+        };
+
         loop {
             let port = thread_rng().sample(self.range);
             let src  = SocketAddr::new(src, port);
-            let dst  = SocketAddr::new(dst, PORT_MIN);
 
-            if let Entry::Vacant(e) = self.source.lock().entry(src) {
-                let src = Lease(self, src);
+            if let Entry::Vacant(e) = map.lock().entry(src) {
                 e.insert(());
-                return (src, dst);
+                return Lease::new(self, proto, src)
             }
 
             task::yield_now().await;
         }
     }
 
-    pub fn release(&self, src: &SocketAddr) {
-        self.source.lock().remove(src);
+    pub fn release(&self, proto: Protocol, src: &SocketAddr) {
+        match proto {
+            Protocol::TCP(..) => self.tcp.lock().remove(src),
+            Protocol::UDP(..) => self.udp.lock().remove(src),
+        };
     }
 
-    pub fn insert(&self, probe: &Probe, tx: Sender<Echo>) {
-        let key = Key(probe.src(), probe.dst());
+    pub fn insert(&self, key: Key, tx: Sender<Echo>) {
         self.state.lock().insert(key, tx);
     }
 
-    pub fn remove(&self, probe: &Probe) -> Option<Sender<Echo>> {
-        let key = Key(probe.src(), probe.dst());
-        self.state.lock().remove(&key)
+    pub fn remove(&self, key: &Key) -> Option<Sender<Echo>> {
+        self.state.lock().remove(key)
+    }
+}
+
+impl<'s> Lease<'s> {
+    fn new(state: &'s State, proto: Protocol, addr: SocketAddr) -> Self {
+        Self { state, proto, addr }
     }
 }
 
@@ -70,12 +80,12 @@ impl Deref for Lease<'_> {
     type Target = SocketAddr;
 
     fn deref(&self) -> &Self::Target {
-        &self.1
+        &self.addr
     }
 }
 
 impl Drop for Lease<'_> {
     fn drop(&mut self) {
-        self.0.release(&self.1);
+        self.state.release(self.proto, &self.addr);
     }
 }

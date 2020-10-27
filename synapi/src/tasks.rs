@@ -48,10 +48,14 @@ pub struct PingConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct TraceConfig {
-    pub target:  String,
-    pub period:  u64,
-    pub limit:   u64,
-    pub expiry:  u64,
+    #[serde(default)]
+    pub protocol: String,
+    #[serde(default)]
+    pub port:     u16,
+    pub target:   String,
+    pub period:   u64,
+    pub limit:    u64,
+    pub expiry:   u64,
 }
 
 #[derive(Debug, Deserialize)]

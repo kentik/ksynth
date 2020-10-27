@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use log::{debug, warn};
 use tokio::time::{delay_for, timeout};
-use netdiag::{self, Node, Tracer};
+use netdiag::{self, Node, Protocol, Tracer};
 use synapi::tasks::TraceConfig;
 use crate::export::{record, Hop, Envoy};
 use super::{Network, Resolver, Task};
@@ -14,6 +14,7 @@ use super::{Network, Resolver, Task};
 pub struct Trace {
     task:     u64,
     test:     u64,
+    protocol: Protocol,
     target:   String,
     network:  Network,
     period:   Duration,
@@ -26,10 +27,19 @@ pub struct Trace {
 
 impl Trace {
     pub fn new(task: Task, cfg: TraceConfig, tracer: Arc<Tracer>) -> Self {
+        let TraceConfig { protocol, port, .. } = cfg;
+
+        let protocol = match &*protocol {
+            "TCP" if port > 0 => Protocol::TCP(port),
+            "UDP" if port > 0 => Protocol::UDP(port),
+            _                 => Protocol::default(),
+        };
+
         Self {
             task:     task.task,
             test:     task.test,
             network:  task.network,
+            protocol: protocol,
             target:   cfg.target,
             period:   Duration::from_secs(cfg.period),
             limit:    cfg.limit as usize,
@@ -61,6 +71,7 @@ impl Trace {
         let addr = self.resolver.lookup(&self.target, self.network).await?;
 
         let route = self.tracer.route(netdiag::Trace {
+            proto:  self.protocol,
             addr:   addr,
             probes: 3,
             limit:  self.limit,
@@ -81,7 +92,7 @@ impl Trace {
             let mut map = HashMap::<IpAddr, Vec<u64>>::new();
 
             for node in nodes {
-                if let Node::Node(_, addr, rtt) = node {
+                if let Node::Node(_, addr, rtt, _) = node {
                     let rtt = rtt.as_micros() as u64;
                     map.entry(addr).or_default().push(rtt);
                 }

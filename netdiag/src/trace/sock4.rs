@@ -1,55 +1,62 @@
-use std::convert::TryFrom;
 use std::net::{IpAddr, SocketAddr};
 use std::time::Instant;
 use std::sync::Arc;
 use anyhow::Result;
-use etherparse::{Ipv4Header, IpTrafficClass};
-use libc::{IPPROTO_RAW, c_int};
+use etherparse::{Ipv4Header, IpTrafficClass, TcpHeaderSlice};
+use libc::{IPPROTO_TCP, IPPROTO_UDP, c_int};
 use raw_socket::tokio::prelude::*;
+use raw_socket::tokio::{RawRecv, RawSend};
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use crate::Bind;
-use crate::icmp::{IcmpV4Packet, icmp4::Unreachable};
-use super::probe::ProbeV4;
+use super::probe::{Key, Probe};
 use super::reply::Echo;
 use super::state::State;
 
 pub struct Sock4 {
-    sock:  Mutex<RawSocket>,
+    tcp:   Mutex<RawSend>,
+    udp:   Mutex<RawSend>,
     route: Mutex<UdpSocket>,
 }
 
 impl Sock4 {
     pub async fn new(bind: &Bind, state: Arc<State>) -> Result<Self> {
-        let ipv4 = Domain::ipv4();
-        let icmp = Protocol::icmpv4();
-        let raw  = Protocol::from(IPPROTO_RAW);
+        let ipv4  = Domain::ipv4();
+        let tcp   = Protocol::from(IPPROTO_TCP);
+        let udp   = Protocol::from(IPPROTO_UDP);
 
-        let icmp  = RawSocket::new(ipv4, Type::raw(), Some(icmp))?;
-        let sock  = RawSocket::new(ipv4, Type::raw(), Some(raw))?;
+        let tcp   = RawSocket::new(ipv4, Type::raw(), Some(tcp))?;
+        let udp   = RawSocket::new(ipv4, Type::raw(), Some(udp))?;
         let route = UdpSocket::bind(bind.sa4()).await?;
 
-        sock.bind(bind.sa4()).await?;
+        tcp.bind(bind.sa4()).await?;
+        udp.bind(bind.sa4()).await?;
 
         let enable: c_int = 6;
-        sock.set_sockopt(Level::IPV4, Name::IPV4_HDRINCL, &enable)?;
+        tcp.set_sockopt(Level::IPV4, Name::IPV4_HDRINCL, &enable)?;
+        udp.set_sockopt(Level::IPV4, Name::IPV4_HDRINCL, &enable)?;
+        let (rx, tcp) = tcp.split();
+        let (_,  udp) = udp.split();
 
-        tokio::spawn(recv(icmp, state));
+        tokio::spawn(recv(rx, state));
 
         Ok(Self {
-            sock:  Mutex::new(sock),
+            tcp:   Mutex::new(tcp),
+            udp:   Mutex::new(udp),
             route: Mutex::new(route),
         })
     }
 
-    pub async fn send(&self, probe: &ProbeV4) -> Result<Instant> {
+    pub async fn send(&self, probe: &Probe, ttl: u8) -> Result<Instant> {
         let mut pkt = [0u8; 64];
 
-        let pkt = probe.encode(&mut pkt)?;
-        let dst = &probe.dst;
+        let pkt = probe.encode(&mut pkt, ttl)?;
+        let dst = probe.dst();
 
-        let mut sock = self.sock.lock().await;
-        sock.send_to(&pkt, dst).await?;
+        match probe {
+            Probe::TCP(..) => self.tcp.lock().await,
+            Probe::UDP(..) => self.udp.lock().await,
+        }.send_to(&pkt, &dst).await?;
 
         Ok(Instant::now())
     }
@@ -61,7 +68,7 @@ impl Sock4 {
     }
 }
 
-async fn recv(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
+async fn recv(mut sock: RawRecv, state: Arc<State>) -> Result<()> {
     let mut pkt = [0u8; 64];
     loop {
         let (n, from) = sock.recv_from(&mut pkt).await?;
@@ -69,32 +76,20 @@ async fn recv(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
         let now = Instant::now();
         let pkt = Ipv4Header::read_from_slice(&pkt[..n])?;
 
-        if let (Ipv4Header { protocol: ICMP, .. }, tail) = pkt {
-            let icmp = IcmpV4Packet::try_from(tail)?;
+        if let (ip @ Ipv4Header { protocol: TCP, .. }, tail) = pkt {
+            let src = IpAddr::V4(ip.source.into());
+            let dst = IpAddr::V4(ip.destination.into());
 
-            if let IcmpV4Packet::TimeExceeded(pkt) = icmp {
-                if let Some(probe) = ProbeV4::decode(pkt)? {
-                    if let Some(tx) = state.remove(&probe) {
-                        let _ = tx.send(Echo(from.ip(), now, false));
-                    }
-                }
-            } else if let IcmpV4Packet::Unreachable(what) = icmp {
-                let pkt = match what {
-                    Unreachable::Net(pkt)      => pkt,
-                    Unreachable::Host(pkt)     => pkt,
-                    Unreachable::Protocol(pkt) => pkt,
-                    Unreachable::Port(pkt)     => pkt,
-                    Unreachable::Other(_, pkt) => pkt,
-                };
+            let pkt = TcpHeaderSlice::from_slice(&tail)?;
+            let src = SocketAddr::new(src, pkt.source_port());
+            let dst = SocketAddr::new(dst, pkt.destination_port());
+            let key = Key(dst, src);
 
-                if let Some(probe) = ProbeV4::decode(pkt)? {
-                    if let Some(tx) = state.remove(&probe) {
-                        let _ = tx.send(Echo(from.ip(), now, true));
-                    }
-                }
+            if let Some(tx) = state.remove(&key) {
+                let _ = tx.send(Echo(from.ip(), now, true));
             }
         }
     }
 }
 
-const ICMP: u8 = IpTrafficClass::Icmp as u8;
+const TCP: u8 = IpTrafficClass::Tcp as u8;

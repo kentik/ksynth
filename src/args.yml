@@ -137,6 +137,10 @@ subcommands:
             help: probe count
             value_name: probes
             default_value: "3"
+        - tcp:
+            long: tcp
+            help: use TCP probes
+            value_name: port
         - host:
             index: 1
             help: host

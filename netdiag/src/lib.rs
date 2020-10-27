@@ -8,6 +8,7 @@ pub use ping::Pinger;
 
 pub use trace::Node;
 pub use trace::Probe;
+pub use trace::Protocol;
 pub use trace::Trace;
 pub use trace::Tracer;
 

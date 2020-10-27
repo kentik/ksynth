@@ -7,7 +7,7 @@ use tokio::net::UdpSocket;
 use tokio::time::delay_for;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::system_conf::read_system_conf;
-use netdiag::{Bind, Node, Probe, Tracer};
+use netdiag::{Bind, Node, Probe, Protocol, Tracer};
 use crate::args::Args;
 use crate::task::{Network, Resolver};
 use super::resolve;
@@ -53,32 +53,38 @@ pub async fn trace(args: Args<'_, '_>) -> Result<()> {
             IpAddr::V6(..) => &route6,
         };
 
-        let mut dst = SocketAddr::new(addr, 33434);
-        route.connect(dst).await?;
+        let proto  = match args.opt("tcp")? {
+            Some(port) => Protocol::TCP(port),
+            None       => Protocol::default(),
+        };
+
+        route.connect(SocketAddr::new(addr, 1234)).await?;
         let src = route.local_addr()?;
 
-        for ttl in 1..=limit {
+        let mut done = false;
+        let mut ttl  = 1;
+
+        while !done && ttl <= limit {
             let mut nodes = HashMap::<IpAddr, Vec<String>>::new();
+            let mut probe = Probe::new(proto, src, addr)?;
 
             for _ in 0..probes {
-                let probe = Probe::new(src, dst, ttl as u8)?;
-                let node  = tracer.probe(probe, expiry).await?;
+                let node = tracer.probe(&probe, ttl as u8, expiry).await?;
 
-                if let Node::Node(_, addr, rtt) = node {
-                    let rtt  = format!("{:>0.2?}", rtt);
-                    nodes.entry(addr).or_default().push(rtt);
+                if let Node::Node(_, ip, rtt, last) = node {
+                    let rtt = format!("{:>0.2?}", rtt);
+                    nodes.entry(ip).or_default().push(rtt);
+                    done = last || ip == addr;
                 }
 
-                dst.set_port(dst.port() + 1);
+                probe.increment();
 
                 delay_for(delay).await;
             }
 
             print(&nodes, ttl, probes);
 
-            if nodes.contains_key(&addr) {
-                break;
-            }
+            ttl += 1;
         }
     }
 

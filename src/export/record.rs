@@ -60,7 +60,8 @@ pub struct Ping {
 pub struct Query {
     pub task:    u64,
     pub test:    u64,
-    pub data:    String,
+    pub record:  String,
+    pub answers: String,
     pub time:    Duration,
 }
 

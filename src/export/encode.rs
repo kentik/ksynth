@@ -61,6 +61,7 @@ struct Columns {
     time:   u32,
     port:   u32,
     data:   u32,
+    record: u32,
 }
 
 struct Stats {
@@ -104,6 +105,7 @@ impl Columns {
             time:    lookup("INT01")?,
             port:    lookup("INT08")?,
             data:    lookup("STR00")?,
+            record:  lookup("STR01")?,
         })
     }
 
@@ -177,16 +179,18 @@ impl Columns {
 
     fn query(&self, msg: Builder, agent: u64, data: &Query) {
         let Query { task, test, time, .. } = *data;
-        let data = &data.data;
+        let record  = &data.record;
+        let answers = &data.answers;
 
-        let mut customs = Customs::new("query", msg, 7);
-        customs.next(self.app,   |v| v.set_uint32_val(AGENT));
-        customs.next(self.agent, |v| v.set_uint64_val(agent));
-        customs.next(self.kind,  |v| v.set_uint32_val(QUERY));
-        customs.next(self.task,  |v| v.set_uint64_val(task));
-        customs.next(self.test,  |v| v.set_uint64_val(test));
-        customs.next(self.data,  |v| v.set_str_val(data));
-        customs.next(self.time,  |v| v.set_uint32_val(as_micros(time)));
+        let mut customs = Customs::new("query", msg, 8);
+        customs.next(self.app,    |v| v.set_uint32_val(AGENT));
+        customs.next(self.agent,  |v| v.set_uint64_val(agent));
+        customs.next(self.kind,   |v| v.set_uint32_val(QUERY));
+        customs.next(self.task,   |v| v.set_uint64_val(task));
+        customs.next(self.test,   |v| v.set_uint64_val(test));
+        customs.next(self.data,   |v| v.set_str_val(answers));
+        customs.next(self.record, |v| v.set_str_val(record));
+        customs.next(self.time,   |v| v.set_uint32_val(as_micros(time)));
     }
 
     fn trace(&self, mut msg: Builder, agent: u64, data: &Trace) {

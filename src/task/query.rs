@@ -72,7 +72,7 @@ impl Query {
         let time = time.elapsed();
 
         match res.response_code() {
-            ResponseCode::NoError => Ok(Output::new(time, res)),
+            ResponseCode::NoError => Ok(Output::new(record, time, res)?),
             code                  => Err(anyhow!("{}", code)),
         }
     }
@@ -80,10 +80,11 @@ impl Query {
     async fn success(&self, out: Output) {
         debug!("{}: {}", self.task, out);
         self.envoy.export(record::Query {
-            task: self.task,
-            test: self.test,
-            data: out.data,
-            time: out.time,
+            task:    self.task,
+            test:    self.test,
+            record:  out.record,
+            answers: out.answers,
+            time:    out.time,
         }).await;
     }
 
@@ -107,12 +108,13 @@ impl Query {
 
 #[derive(Debug)]
 struct Output {
-    data: String,
-    time: Duration,
+    record:  String,
+    answers: String,
+    time:    Duration,
 }
 
 impl Output {
-    fn new(time: Duration, res: DnsResponse) -> Self {
+    fn new(record: RecordType, time: Duration, res: DnsResponse) -> Result<Self> {
         let mut answers = res.answers().iter().map(|rec| {
             match rec.rdata() {
                 RData::A(addr)     => addr.to_string(),
@@ -127,15 +129,15 @@ impl Output {
         }).collect::<Vec<_>>();
         answers.sort_unstable();
 
-        Self {
-            data: answers.join(","),
-            time: time,
-        }
+        let record  = record.to_string();
+        let answers = serde_json::to_string(&answers)?;
+
+        Ok(Self { record, answers, time })
     }
 }
 
 impl fmt::Display for Output {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} time {:?}", self.data, self.time)
+        write!(f, "{} {} time {:?}", self.record, self.answers, self.time)
     }
 }

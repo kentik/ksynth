@@ -11,3 +11,6 @@ pub mod record;
 mod custom;
 mod encode;
 mod export;
+
+#[cfg(test)]
+mod test;

@@ -62,6 +62,7 @@ struct Columns {
     port:   u32,
     data:   u32,
     record: u32,
+    code:   u32,
 }
 
 struct Stats {
@@ -106,6 +107,7 @@ impl Columns {
             port:    lookup("INT08")?,
             data:    lookup("STR00")?,
             record:  lookup("STR01")?,
+            code:    lookup("INT02")?,
         })
     }
 
@@ -178,16 +180,17 @@ impl Columns {
     }
 
     fn query(&self, msg: Builder, agent: u64, data: &Query) {
-        let Query { task, test, time, .. } = *data;
+        let Query { task, test, code, time, .. } = *data;
         let record  = &data.record;
         let answers = &data.answers;
 
-        let mut customs = Customs::new("query", msg, 8);
+        let mut customs = Customs::new("query", msg, 9);
         customs.next(self.app,    |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,  |v| v.set_uint64_val(agent));
         customs.next(self.kind,   |v| v.set_uint32_val(QUERY));
         customs.next(self.task,   |v| v.set_uint64_val(task));
         customs.next(self.test,   |v| v.set_uint64_val(test));
+        customs.next(self.code,   |v| v.set_uint32_val(code.into()));
         customs.next(self.data,   |v| v.set_str_val(answers));
         customs.next(self.record, |v| v.set_str_val(record));
         customs.next(self.time,   |v| v.set_uint32_val(as_micros(time)));
@@ -237,12 +240,12 @@ fn as_micros(d: Duration) -> u32 {
     u32::try_from(d.as_micros()).unwrap_or(0)
 }
 
-const AGENT:   u32 = 10;
+pub const AGENT:   u32 = 10;
 
-const ERROR:   u32 = 0;
-const TIMEOUT: u32 = 1;
-const PING:    u32 = 2;
-const FETCH:   u32 = 3;
-const TRACE:   u32 = 4;
-const KNOCK:   u32 = 5;
-const QUERY:   u32 = 6;
+pub const ERROR:   u32 = 0;
+pub const TIMEOUT: u32 = 1;
+pub const PING:    u32 = 2;
+pub const FETCH:   u32 = 3;
+pub const TRACE:   u32 = 4;
+pub const KNOCK:   u32 = 5;
+pub const QUERY:   u32 = 6;

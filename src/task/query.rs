@@ -1,7 +1,7 @@
 use std::fmt;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result};
 use log::{debug, warn};
 use tokio::net::UdpSocket;
 use tokio::time::{delay_for, timeout};
@@ -71,10 +71,7 @@ impl Query {
         let res  = self.client.query(target, class, record).await?;
         let time = time.elapsed();
 
-        match res.response_code() {
-            ResponseCode::NoError => Ok(Output::new(record, time, res)?),
-            code                  => Err(anyhow!("{}", code)),
-        }
+        Ok(Output::new(record, time, res)?)
     }
 
     async fn success(&self, out: Output) {
@@ -82,6 +79,7 @@ impl Query {
         self.envoy.export(record::Query {
             task:    self.task,
             test:    self.test,
+            code:    out.code.into(),
             record:  out.record,
             answers: out.answers,
             time:    out.time,
@@ -108,6 +106,7 @@ impl Query {
 
 #[derive(Debug)]
 struct Output {
+    code:    ResponseCode,
     record:  String,
     answers: String,
     time:    Duration,
@@ -129,15 +128,20 @@ impl Output {
         }).collect::<Vec<_>>();
         answers.sort_unstable();
 
+        let code    = res.response_code();
         let record  = record.to_string();
         let answers = serde_json::to_string(&answers)?;
 
-        Ok(Self { record, answers, time })
+        Ok(Self { code, record, answers, time })
     }
 }
 
 impl fmt::Display for Output {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} {} time {:?}", self.record, self.answers, self.time)
+        let Self { code, record, answers, time } = self;
+        write!(f, "{} {} time {:?}", record, match code {
+            ResponseCode::NoError => answers as &dyn fmt::Display,
+            _                     => code    as &dyn fmt::Display,
+        }, time)
     }
 }

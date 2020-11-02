@@ -78,7 +78,6 @@ pub struct KnockConfig {
 pub struct QueryConfig {
     pub target:  String,
     pub period:  u64,
-    pub count:   u64,
     pub expiry:  u64,
     #[serde(rename = "resolver")]
     pub server:  String,
@@ -118,7 +117,7 @@ pub struct Column {
     pub kind: Kind,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Kind {
     UInt32,

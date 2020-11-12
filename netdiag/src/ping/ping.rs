@@ -90,7 +90,7 @@ async fn send(sock4: &Mutex<RawSend>, sock6: &Mutex<RawSend>, ping: &Ping) -> Re
 }
 
 async fn recv4(mut sock: RawRecv, state: State) -> Result<()> {
-    let mut pkt = [0u8; 64];
+    let mut pkt = [0u8; 128];
     loop {
         let (n, _) = sock.recv_from(&mut pkt).await?;
 

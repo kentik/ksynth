@@ -59,7 +59,7 @@ impl Sock4 {
 }
 
 async fn recv(mut sock: RawRecv, state: Arc<State>) -> Result<()> {
-    let mut pkt = [0u8; 64];
+    let mut pkt = [0u8; 128];
     loop {
         let (n, _from) = sock.recv_from(&mut pkt).await?;
 

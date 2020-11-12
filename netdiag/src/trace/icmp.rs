@@ -23,7 +23,7 @@ pub async fn spawn(state: Arc<State>) -> Result<()> {
 }
 
 async fn recv4(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
-    let mut pkt = [0u8; 64];
+    let mut pkt = [0u8; 128];
     loop {
         let (n, from) = sock.recv_from(&mut pkt).await?;
 

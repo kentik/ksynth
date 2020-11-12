@@ -1,8 +1,10 @@
 use std::convert::{TryFrom, TryInto};
+use std::future::Future;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 use anyhow::Result;
 use etherparse::{Ipv4Header, IpTrafficClass};
+use log::{debug, error};
 use tokio::sync::{Mutex, oneshot::channel};
 use rand::prelude::*;
 use raw_socket::{Domain, Type, Protocol};
@@ -52,11 +54,11 @@ impl Pinger {
 
         let (rx, tx) = sock4.split();
         let sock4 = Mutex::new(tx);
-        tokio::spawn(recv4(rx, state.clone()));
+        spawn("recv4", recv4(rx, state.clone()));
 
         let (rx, tx) = sock6.split();
         let sock6 = Mutex::new(tx);
-        tokio::spawn(recv6(rx, state.clone()));
+        spawn("recv6", recv6(rx, state.clone()));
 
         Ok(Self { sock4, sock6, state })
     }
@@ -125,6 +127,15 @@ async fn recv6(mut sock: RawRecv, state: State) -> Result<()> {
             }
         }
     }
+}
+
+fn spawn<F: Future<Output = Result<()>> + Send + 'static>(name: &'static str, future: F) {
+    tokio::spawn(async move {
+        match future.await {
+            Ok(()) => debug!("{} finished", name),
+            Err(e) => error!("{} failed: {}", name, e),
+        }
+    });
 }
 
 const ICMP4: u8 = IpTrafficClass::Icmp as u8;

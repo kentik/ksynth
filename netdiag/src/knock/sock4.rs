@@ -4,6 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use etherparse::{Ipv4Header, IpTrafficClass, TcpHeader};
 use libc::{IPPROTO_TCP, c_int};
+use log::{debug, error};
 use raw_socket::tokio::prelude::*;
 use raw_socket::tokio::{RawRecv, RawSend};
 use tokio::net::UdpSocket;
@@ -31,7 +32,12 @@ impl Sock4 {
         sock.set_sockopt(Level::IPV4, Name::IPV4_HDRINCL, &enable)?;
         let (rx, tx) = sock.split();
 
-        tokio::spawn(recv(rx, state));
+        tokio::spawn(async move {
+            match recv(rx, state).await {
+                Ok(()) => debug!("recv finished"),
+                Err(e) => error!("recv failed: {}", e),
+            }
+        });
 
         Ok(Self {
             sock:  Mutex::new(tx),

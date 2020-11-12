@@ -32,7 +32,7 @@ impl Tracer {
     pub async fn new(bind: &Bind) -> Result<Self> {
         let state = Arc::new(State::new());
 
-        icmp::spawn(state.clone()).await?;
+        icmp::recv(state.clone()).await?;
         let sock4 = Sock4::new(bind, state.clone()).await?;
         let sock6 = Sock6::new(bind, state.clone()).await?;
 

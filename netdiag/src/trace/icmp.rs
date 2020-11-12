@@ -1,23 +1,25 @@
 use std::convert::TryFrom;
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Instant;
 use anyhow::Result;
 use etherparse::{IpTrafficClass, Ipv4Header};
+use log::{debug, error};
 use raw_socket::tokio::prelude::*;
 use crate::icmp::{icmp4, icmp6, IcmpV4Packet, IcmpV6Packet};
 use super::probe::Probe;
 use super::reply::Echo;
 use super::state::State;
 
-pub async fn spawn(state: Arc<State>) -> Result<()> {
+pub async fn recv(state: Arc<State>) -> Result<()> {
     let ipv4 = Domain::ipv4();
     let ipv6 = Domain::ipv6();
 
     let icmp4 = RawSocket::new(ipv4, Type::raw(), Some(Protocol::icmpv4()))?;
     let icmp6 = RawSocket::new(ipv6, Type::raw(), Some(Protocol::icmpv6()))?;
 
-    tokio::spawn(recv4(icmp4, state.clone()));
-    tokio::spawn(recv6(icmp6, state.clone()));
+    spawn("recv4", recv4(icmp4, state.clone()));
+    spawn("recv6", recv6(icmp6, state.clone()));
 
     Ok(())
 }
@@ -86,6 +88,15 @@ async fn recv6(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
             }
         }
     }
+}
+
+fn spawn<F: Future<Output = Result<()>> + Send + 'static>(name: &'static str, future: F) {
+    tokio::spawn(async move {
+        match future.await {
+            Ok(()) => debug!("{} finished", name),
+            Err(e) => error!("{} failed: {}", name, e),
+        }
+    });
 }
 
 const ICMP: u8 = IpTrafficClass::Icmp as u8;

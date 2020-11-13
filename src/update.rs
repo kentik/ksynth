@@ -4,6 +4,7 @@ use anyhow::Result;
 use ed25519_compact::PublicKey;
 use log::{debug, error, info};
 use futures::future::{Abortable, Aborted, AbortHandle, AbortRegistration};
+use rand::prelude::*;
 use tokio::runtime::{Builder, Runtime};
 use tokio::time::{interval_at, Instant};
 use notary::{Artifact, Client, Query, Updates};
@@ -43,7 +44,8 @@ impl Updater {
     fn watch(self, enable: bool, registration: AbortRegistration) -> Result<()> {
         let Self { primary, mut runtime, updates } = self;
 
-        let start  = Instant::now() + Duration::from_secs(60 * 2);
+        let delay  = thread_rng().gen_range(60 * 2, 60 * 10);
+        let start  = Instant::now() + Duration::from_secs(delay);
         let period = Duration::from_secs(60 * 60 * 24);
 
         let update = runtime.block_on(Abortable::new(async {

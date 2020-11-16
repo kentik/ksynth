@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::{anyhow, Result};
-use log::{debug, error};
+use log::{debug, error, warn};
 use tokio::sync::mpsc::Receiver;
 use trust_dns_resolver::TokioAsyncResolver;
+use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use trust_dns_resolver::system_conf::read_system_conf;
 use synapi::agent::Net;
 use synapi::tasks::{State, Config};
@@ -32,9 +33,7 @@ pub struct Executor {
 
 impl Executor {
     pub async fn new(rx: Receiver<Event>, ex: Arc<Exporter>, bind: Bind, net: Option<Network>) -> Result<Self> {
-        let (config, options) = read_system_conf()?;
-
-        let resolver = TokioAsyncResolver::tokio(config, options).await?;
+        let resolver = resolver().await?;
         let status   = Arc::new(Status::default());
         let spawner  = Spawner::new(status.clone());
 
@@ -174,4 +173,14 @@ impl Executor {
         let query = Query::new(task, cfg).await?;
         Ok(self.spawner.spawn(id, query.exec()))
     }
+}
+
+async fn resolver() -> Result<TokioAsyncResolver> {
+    let (config, options) = read_system_conf().unwrap_or_else(|e| {
+        warn!("resolver configuration error: {}", e);
+        let config  = ResolverConfig::google();
+        let options = ResolverOpts::default();
+        (config, options)
+    });
+    Ok(TokioAsyncResolver::tokio(config, options).await?)
 }

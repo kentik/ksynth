@@ -8,12 +8,13 @@ use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use trust_dns_resolver::system_conf::read_system_conf;
 use synapi::agent::Net;
 use synapi::tasks::{State, Config};
-use synapi::tasks::{PingConfig, TraceConfig, FetchConfig, KnockConfig, QueryConfig};
+use synapi::tasks::{FetchConfig, KnockConfig, PingConfig, QueryConfig, ShakeConfig, TraceConfig};
 use netdiag::{Bind, Knocker, Pinger, Tracer};
 use crate::export::{Exporter, Target};
 use crate::spawn::{Spawner, Handle};
 use crate::status::Status;
-use crate::task::{Network, Task, Resolver, Fetch, Fetcher, Knock, Ping, Query, Trace};
+use crate::task::{Network, Task, Resolver, Fetcher, Shaker};
+use crate::task::{Fetch, Knock, Ping, Query, Shake, Trace};
 use crate::watch::{Event, Tasks};
 
 pub struct Executor {
@@ -25,10 +26,11 @@ pub struct Executor {
     resolver: TokioAsyncResolver,
     status:   Arc<Status>,
     spawner:  Arc<Spawner>,
-    pinger:   Arc<Pinger>,
-    tracer:   Arc<Tracer>,
     fetcher:  Arc<Fetcher>,
     knocker:  Arc<Knocker>,
+    pinger:   Arc<Pinger>,
+    shaker:   Arc<Shaker>,
+    tracer:   Arc<Tracer>,
 }
 
 impl Executor {
@@ -37,10 +39,11 @@ impl Executor {
         let status   = Arc::new(Status::default());
         let spawner  = Spawner::new(status.clone());
 
-        let pinger   = Pinger::new(&bind).await?;
-        let tracer   = Tracer::new(&bind).await?;
         let fetcher  = Fetcher::new(&bind, net, resolver.clone())?;
         let knocker  = Knocker::new(&bind).await?;
+        let pinger   = Pinger::new(&bind).await?;
+        let shaker   = Shaker::new(&bind)?;
+        let tracer   = Tracer::new(&bind).await?;
 
         Ok(Self {
             tasks:    HashMap::new(),
@@ -51,10 +54,11 @@ impl Executor {
             resolver: resolver,
             status:   status,
             spawner:  Arc::new(spawner),
-            pinger:   Arc::new(pinger),
-            tracer:   Arc::new(tracer),
             fetcher:  Arc::new(fetcher),
             knocker:  Arc::new(knocker),
+            pinger:   Arc::new(pinger),
+            shaker:   Arc::new(shaker),
+            tracer:   Arc::new(tracer),
         })
     }
 
@@ -130,12 +134,14 @@ impl Executor {
         let id = task.task;
 
         let handle = match cfg {
-            Config::Ping(cfg)  => self.ping(id, task, cfg)?,
-            Config::Trace(cfg) => self.trace(id, task, cfg)?,
             Config::Fetch(cfg) => self.fetch(id, task, cfg)?,
             Config::Knock(cfg) => self.knock(id, task, cfg)?,
+            Config::Ping(cfg)  => self.ping(id, task, cfg)?,
             Config::Query(cfg) => self.query(id, task, cfg).await?,
-            Config::Unknown    => Err(anyhow!("unsupported type"))?,
+            #[cfg(feature = "experimental")]
+            Config::Shake(cfg) => self.shake(id, task, cfg)?,
+            Config::Trace(cfg) => self.trace(id, task, cfg)?,
+            _                  => Err(anyhow!("unsupported type"))?,
         };
 
         self.tasks.insert(id, handle);
@@ -149,16 +155,6 @@ impl Executor {
         Ok(())
     }
 
-    fn ping(&self, id: u64, task: Task, cfg: PingConfig) -> Result<Handle> {
-        let ping = Ping::new(task, cfg, self.pinger.clone());
-        Ok(self.spawner.spawn(id, ping.exec()))
-    }
-
-    fn trace(&self, id: u64, task: Task, cfg: TraceConfig) -> Result<Handle> {
-        let trace = Trace::new(task, cfg, self.tracer.clone());
-        Ok(self.spawner.spawn(id, trace.exec()))
-    }
-
     fn fetch(&self, id: u64, task: Task, cfg: FetchConfig) -> Result<Handle> {
         let fetch = Fetch::new(task, cfg, self.fetcher.clone());
         Ok(self.spawner.spawn(id, fetch.exec()))
@@ -169,9 +165,25 @@ impl Executor {
         Ok(self.spawner.spawn(id, knock.exec()))
     }
 
+    fn ping(&self, id: u64, task: Task, cfg: PingConfig) -> Result<Handle> {
+        let ping = Ping::new(task, cfg, self.pinger.clone());
+        Ok(self.spawner.spawn(id, ping.exec()))
+    }
+
     async fn query(&self, id: u64, task: Task, cfg: QueryConfig) -> Result<Handle> {
         let query = Query::new(task, cfg).await?;
         Ok(self.spawner.spawn(id, query.exec()))
+    }
+
+    #[allow(dead_code)]
+    fn shake(&self, id: u64, task: Task, cfg: ShakeConfig) -> Result<Handle> {
+        let shake = Shake::new(task, cfg, self.shaker.clone());
+        Ok(self.spawner.spawn(id, shake.exec()))
+    }
+
+    fn trace(&self, id: u64, task: Task, cfg: TraceConfig) -> Result<Handle> {
+        let trace = Trace::new(task, cfg, self.tracer.clone());
+        Ok(self.spawner.spawn(id, trace.exec()))
     }
 }
 

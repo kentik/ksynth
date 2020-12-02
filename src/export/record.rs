@@ -20,6 +20,7 @@ pub enum Record {
     Knock(Knock),
     Ping(Ping),
     Query(Query),
+    Shake(Shake),
     Trace(Trace),
     Error(Error),
     Timeout(Timeout),
@@ -63,6 +64,15 @@ pub struct Query {
     pub code:    u16,
     pub record:  String,
     pub answers: String,
+    pub time:    Duration,
+}
+
+#[derive(Clone, Debug)]
+pub struct Shake {
+    pub task:    u64,
+    pub test:    u64,
+    pub addr:    IpAddr,
+    pub port:    u16,
     pub time:    Duration,
 }
 
@@ -115,6 +125,12 @@ impl From<Ping> for Record  {
 impl From<Query> for Record  {
     fn from(query: Query) -> Self {
         Record::Query(query)
+    }
+}
+
+impl From<Shake> for Record  {
+    fn from(shake: Shake) -> Self {
+        Record::Shake(shake)
     }
 }
 

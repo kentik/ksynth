@@ -107,6 +107,26 @@ fn encode_query() -> Result<()> {
 }
 
 #[test]
+fn encode_shake() -> Result<()> {
+    let mut rng = thread_rng();
+
+    let record = Shake::gen(&mut rng);
+    let target = target(&mut rng);
+    let values = serde(&target, record.clone())?;
+
+    assert_eq!(Value::from(AGENT),        values["APP_PROTOCOL"]);
+    assert_eq!(Value::from(target.agent), values["INT64_00"]);
+    assert_eq!(Value::from(record.task),  values["INT64_01"]);
+    assert_eq!(Value::from(record.test),  values["INT64_02"]);
+    assert_eq!(Value::from(SHAKE),        values["INT00"]);
+    assert_eq!(Value::from(record.time),  values["INT01"]);
+    assert_eq!(Value::from(record.port),  values["INT08"]);
+    assert_eq!(Value::from(record.addr),  dst_addr(record.addr, &values));
+
+    Ok(())
+}
+
+#[test]
 fn encode_trace() -> Result<()> {
     let mut rng = thread_rng();
 
@@ -362,6 +382,18 @@ impl Random for Query  {
             record:  random(rng),
             answers: random(rng),
             time:    random(rng),
+        }
+    }
+}
+
+impl Random for Shake  {
+    fn gen<R: Rng>(rng: &mut R) -> Self {
+        Self {
+            task: random(rng),
+            test: random(rng),
+            addr: random(rng),
+            port: random(rng),
+            time: random(rng),
         }
     }
 }

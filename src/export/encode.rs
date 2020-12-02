@@ -31,6 +31,7 @@ pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
             Record::Knock(data)   => cs.knock(msg, agent, data),
             Record::Ping(data)    => cs.ping(msg, agent, data),
             Record::Query(data)   => cs.query(msg, agent, data),
+            Record::Shake(data)   => cs.shake(msg, agent, data),
             Record::Trace(data)   => cs.trace(msg, agent, data),
             Record::Error(data)   => cs.error(msg, agent, data),
             Record::Timeout(data) => cs.timeout(msg, agent, data),
@@ -164,7 +165,7 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new("ping", msg,  12);
+        let mut customs = Customs::new("ping", msg, 12);
         customs.next(self.app,     |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,   |v| v.set_uint64_val(agent));
         customs.next(self.kind,    |v| v.set_uint32_val(PING));
@@ -194,6 +195,24 @@ impl Columns {
         customs.next(self.data,   |v| v.set_str_val(answers));
         customs.next(self.record, |v| v.set_str_val(record));
         customs.next(self.time,   |v| v.set_uint32_val(as_micros(time)));
+    }
+
+    fn shake(&self, mut msg: Builder, agent: u64, data: &Shake) {
+        let Shake { task, test, addr, port, time, .. } = *data;
+
+        match addr {
+            IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
+            IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
+        };
+
+        let mut customs = Customs::new("shake", msg, 7);
+        customs.next(self.app,   |v| v.set_uint32_val(AGENT));
+        customs.next(self.agent, |v| v.set_uint64_val(agent));
+        customs.next(self.kind,  |v| v.set_uint32_val(SHAKE));
+        customs.next(self.task,  |v| v.set_uint64_val(task));
+        customs.next(self.test,  |v| v.set_uint64_val(test));
+        customs.next(self.port,  |v| v.set_uint32_val(port.into()));
+        customs.next(self.time,  |v| v.set_uint32_val(as_micros(time)));
     }
 
     fn trace(&self, mut msg: Builder, agent: u64, data: &Trace) {
@@ -249,3 +268,4 @@ pub const FETCH:   u32 = 3;
 pub const TRACE:   u32 = 4;
 pub const KNOCK:   u32 = 5;
 pub const QUERY:   u32 = 6;
+pub const SHAKE:   u32 = 7;

@@ -46,11 +46,13 @@ jobs:
         if: ${{ matrix.cross }}
       - run: brew install capnp
         if: ${{ startsWith(matrix.builder, 'macos') }}
+      - id: cargo-args
+        run: .github/scripts/cargo-args
       - uses: actions-rs/cargo@v1
         with:
           use-cross: ${{ matrix.cross }}
           command: build
-          args: --release --target ${{ matrix.target }}
+          args: --release --target ${{ matrix.target }} ${{ steps.cargo-args.outputs.args }}
       - uses: actions/upload-artifact@v2
         with:
           name: ksynth-${{ matrix.target }}

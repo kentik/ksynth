@@ -4,6 +4,9 @@ version = "0.0.0"
 authors = ["Will <will@kentik.com>"]
 edition = "2018"
 
+[features]
+experimental = []
+
 [dependencies]
 anyhow        = "1.0.33"
 bytes         = "0.5.6"
@@ -23,7 +26,9 @@ rustls        = "0.18.1"
 serde_json    = "1.0.58"
 signal-hook   = "0.1.16"
 socket2       = "0.3.15"
+tokio-rustls  = "0.14.1"
 tower-service = "0.3.0"
+webpki        = "0.21.3"
 webpki-roots  = "0.20.0"
 yaml-rust     = "0.3.5"
 

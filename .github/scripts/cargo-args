@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -eu -o pipefail
+
+features=()
+
+if [ "$GITHUB_REF" = "refs/heads/next" ]; then
+    features+=("experimental")
+fi
+
+arguments=()
+
+if [ ${#features[@]} -gt 0 ]; then
+    arguments+=("--features")
+    arguments+=("${features[*]}")
+fi
+
+echo "::set-output name=args::${arguments[*]}"

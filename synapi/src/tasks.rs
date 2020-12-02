@@ -30,32 +30,13 @@ pub struct Task {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Config {
-    Ping(PingConfig),
-    Trace(TraceConfig),
     Fetch(FetchConfig),
     Knock(KnockConfig),
+    Ping(PingConfig),
     Query(QueryConfig),
+    Shake(ShakeConfig),
+    Trace(TraceConfig),
     Unknown,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PingConfig {
-    pub target:  String,
-    pub period:  u64,
-    pub count:   u64,
-    pub expiry:  u64,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct TraceConfig {
-    #[serde(default)]
-    pub protocol: String,
-    #[serde(default)]
-    pub port:     u16,
-    pub target:   String,
-    pub period:   u64,
-    pub limit:    u64,
-    pub expiry:   u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +56,14 @@ pub struct KnockConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct PingConfig {
+    pub target:  String,
+    pub period:  u64,
+    pub count:   u64,
+    pub expiry:  u64,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct QueryConfig {
     pub target:  String,
     pub period:  u64,
@@ -84,6 +73,26 @@ pub struct QueryConfig {
     pub port:    u16,
     #[serde(rename = "type")]
     pub record:  String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ShakeConfig {
+    pub target:   String,
+    pub port:     u16,
+    pub period:   u64,
+    pub expiry:   u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TraceConfig {
+    #[serde(default)]
+    pub protocol: String,
+    #[serde(default)]
+    pub port:     u16,
+    pub target:   String,
+    pub period:   u64,
+    pub limit:    u64,
+    pub expiry:   u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -132,14 +141,15 @@ impl<'d> Deserialize<'d> for Task {
         struct TaskContainer {
             #[serde(deserialize_with = "id")]
             pub id:    u64,
-            pub ping:  Option<PingConfig>,
-            #[serde(rename = "traceroute")]
-            pub trace: Option<TraceConfig>,
             #[serde(rename = "http")]
             pub fetch: Option<FetchConfig>,
             pub knock: Option<KnockConfig>,
+            pub ping:  Option<PingConfig>,
             #[serde(rename = "dns")]
             pub query: Option<QueryConfig>,
+            pub shake: Option<ShakeConfig>,
+            #[serde(rename = "traceroute")]
+            pub trace: Option<TraceConfig>,
             pub state: State,
             #[serde(deserialize_with = "id")]
             pub test_id: u64,
@@ -153,16 +163,18 @@ impl<'d> Deserialize<'d> for Task {
         let family = c.family;
         let state  = c.state;
 
-        let config = if let Some(cfg) = c.ping {
-            Config::Ping(cfg)
-        } else if let Some(cfg) = c.trace {
-            Config::Trace(cfg)
-        } else if let Some(cfg) = c.fetch {
+        let config = if let Some(cfg) = c.fetch {
             Config::Fetch(cfg)
         } else if let Some(cfg) = c.knock {
             Config::Knock(cfg)
+        } else if let Some(cfg) = c.ping {
+            Config::Ping(cfg)
         } else if let Some(cfg) = c.query {
             Config::Query(cfg)
+        } else if let Some(cfg) = c.shake {
+            Config::Shake(cfg)
+        } else if let Some(cfg) = c.trace {
+            Config::Trace(cfg)
         } else {
             Config::Unknown
         };

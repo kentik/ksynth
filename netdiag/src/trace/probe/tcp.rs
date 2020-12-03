@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::io::Cursor;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use anyhow::Result;
@@ -28,8 +29,8 @@ impl TCPv4 {
         let dst = Ipv4Addr::from(ip.destination);
 
         let mut buf = [80u8; 64];
-        let n = tail.len().min(buf.len());
-        buf[..n].copy_from_slice(tail);
+        let n = min(buf.len(), tail.len());
+        buf[..n].copy_from_slice(&tail[..n]);
 
         let pkt = TcpHeaderSlice::from_slice(&buf)?;
         let src = SocketAddrV4::new(src, pkt.source_port());
@@ -72,8 +73,8 @@ impl TCPv6 {
         let dst = Ipv6Addr::from(ip.destination);
 
         let mut buf = [80u8; 64];
-        let n = tail.len().min(buf.len());
-        buf[..n].copy_from_slice(tail);
+        let n = min(buf.len(), tail.len());
+        buf[..n].copy_from_slice(&tail[..n]);
 
         let pkt = TcpHeaderSlice::from_slice(&buf)?;
         let src = SocketAddrV6::new(src, pkt.source_port(), 0, 0);

@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use anyhow::Result;
 use rustls::ClientConfig;
+use rustls_native_certs::load_native_certs;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpStream;
 use tokio_rustls::{TlsConnector, client::TlsStream};
@@ -17,7 +18,11 @@ pub struct Shaker {
 impl Shaker {
     pub fn new(bind: &Bind) -> Result<Self> {
         let mut cfg = ClientConfig::new();
-        cfg.root_store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
+
+        match load_native_certs() {
+            Ok(store) => cfg.root_store.roots.extend_from_slice(&store.roots),
+            Err(_)    => cfg.root_store.add_server_trust_anchors(&TLS_SERVER_ROOTS),
+        };
 
         Ok(Self {
             bind:    bind.clone(),

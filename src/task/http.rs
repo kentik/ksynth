@@ -10,13 +10,11 @@ use hyper::{Body, Client, Request, Response};
 use hyper::service::Service;
 use hyper_rustls::HttpsConnector;
 use rustls::ClientConfig;
-use rustls_native_certs::load_native_certs;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use webpki_roots::TLS_SERVER_ROOTS;
 use netdiag::Bind;
-use super::{Network, Resolver};
+use super::{Config, Network, Resolver};
 
 #[derive(Clone)]
 pub struct HttpClient {
@@ -31,21 +29,19 @@ pub struct Expiry {
 }
 
 impl HttpClient {
-    pub fn new(bind: &Bind, network: Network, resolver: Resolver, expiry: Expiry) -> Result<Self> {
+    pub fn new(cfg: &Config, expiry: Expiry) -> Result<Self> {
+        let Config { bind, network, resolver, roots } = cfg.clone();
+
         let mut cfg = ClientConfig::new();
         cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-
-        match load_native_certs() {
-            Ok(store) => cfg.root_store.roots.extend_from_slice(&store.roots),
-            Err(_)    => cfg.root_store.add_server_trust_anchors(&TLS_SERVER_ROOTS),
-        };
+        cfg.root_store     = roots;
 
         let mut builder = Client::builder();
         builder.pool_idle_timeout(Duration::from_secs(30));
         builder.pool_max_idle_per_host(1);
 
-        let bind   = bind.clone();
-        let http   = Connector::new(bind, network, resolver, expiry.connect);
+        let net    = network.unwrap_or(Network::Dual);
+        let http   = Connector::new(bind, net, resolver, expiry.connect);
         let https  = HttpsConnector::from((http, cfg));
         let client = builder.build(https);
 

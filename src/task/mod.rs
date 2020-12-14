@@ -1,5 +1,5 @@
-pub use self::http::HttpClient;
 pub use resolve::Resolver;
+pub use task::Config;
 pub use task::Network;
 pub use task::Task;
 pub use tls::Shaker;

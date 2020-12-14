@@ -2,13 +2,12 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use anyhow::Result;
 use rustls::ClientConfig;
-use rustls_native_certs::load_native_certs;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpStream;
 use tokio_rustls::{TlsConnector, client::TlsStream};
 use webpki::DNSNameRef;
-use webpki_roots::TLS_SERVER_ROOTS;
 use netdiag::Bind;
+use crate::task::Config;
 
 pub struct Shaker {
     bind:    Bind,
@@ -16,16 +15,14 @@ pub struct Shaker {
 }
 
 impl Shaker {
-    pub fn new(bind: &Bind) -> Result<Self> {
-        let mut cfg = ClientConfig::new();
+    pub fn new(cfg: &Config) -> Result<Self> {
+        let Config { bind, roots, .. } = cfg.clone();
 
-        match load_native_certs() {
-            Ok(store) => cfg.root_store.roots.extend_from_slice(&store.roots),
-            Err(_)    => cfg.root_store.add_server_trust_anchors(&TLS_SERVER_ROOTS),
-        };
+        let mut cfg = ClientConfig::new();
+        cfg.root_store = roots;
 
         Ok(Self {
-            bind:    bind.clone(),
+            bind:    bind,
             connect: TlsConnector::from(Arc::new(cfg)),
         })
     }

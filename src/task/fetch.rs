@@ -8,11 +8,9 @@ use hyper::body::HttpBody;
 use hyper::client::connect::HttpInfo;
 use log::{debug, warn};
 use tokio::time::{delay_for, timeout};
-use trust_dns_resolver::TokioAsyncResolver;
-use netdiag::Bind;
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
-use super::{Network, Resolver, Task, http::{Expiry, HttpClient}};
+use super::{Config, Task, http::{Expiry, HttpClient}};
 
 pub struct Fetch {
     task:   u64,
@@ -98,14 +96,12 @@ pub struct Fetcher {
 }
 
 impl Fetcher {
-    pub fn new(bind: &Bind, network: Option<Network>, resolver: TokioAsyncResolver) -> Result<Self> {
-        let network  = network.unwrap_or(Network::Dual);
-        let resolver = Resolver::new(resolver);
-        let expiry   = Expiry {
+    pub fn new(cfg: &Config) -> Result<Self> {
+        let expiry = Expiry {
             connect: Duration::from_secs(10),
             request: Duration::from_secs(60),
         };
-        let client = HttpClient::new(bind, network, resolver, expiry)?;
+        let client = HttpClient::new(cfg, expiry)?;
         Ok(Self { client })
     }
 

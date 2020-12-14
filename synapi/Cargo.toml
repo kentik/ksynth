@@ -1,6 +1,6 @@
 [package]
 name    = "synapi"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["Will <will@kentik.com>"]
 edition = "2018"
 
@@ -11,7 +11,6 @@ rand          = "0.7.3"
 rustls        = "0.18.0"
 serde_json    = "1.0.58"
 time          = "0.1.42"
-webpki-roots  = "0.20.0"
 
 [dependencies.async-compression]
 version  = "0.3.5"
@@ -31,9 +30,6 @@ version  = "0.10.8"
 features = ["gzip", "json", "rustls-tls"]
 default-features = false
 
-[dependencies.rustls-native-certs]
-version  = "0.4.0"
-
 [dependencies.serde]
 version  = "1.0.116"
 features = ["derive"]
@@ -43,9 +39,10 @@ version  = "0.2.22"
 features = ["sync"]
 
 [dev-dependencies]
-anyhow     = "1.0.33"
-log        = "0.4.11"
-env_logger = "0.7.1"
+anyhow       = "1.0.33"
+log          = "0.4.11"
+env_logger   = "0.7.1"
+webpki-roots = "0.20.0"
 
 [dev-dependencies.tokio]
 version  = "0.2.22"

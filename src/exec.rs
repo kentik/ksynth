@@ -1,19 +1,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::{anyhow, Result};
-use log::{debug, error, warn};
+use log::{debug, error};
 use tokio::sync::mpsc::Receiver;
-use trust_dns_resolver::TokioAsyncResolver;
-use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
-use trust_dns_resolver::system_conf::read_system_conf;
 use synapi::agent::Net;
-use synapi::tasks::{State, Config};
+use synapi::tasks::{State, TaskConfig};
 use synapi::tasks::{FetchConfig, KnockConfig, PingConfig, QueryConfig, ShakeConfig, TraceConfig};
 use netdiag::{Bind, Knocker, Pinger, Tracer};
 use crate::export::{Exporter, Target};
 use crate::spawn::{Spawner, Handle};
 use crate::status::Status;
-use crate::task::{Network, Task, Resolver, Fetcher, Shaker};
+use crate::task::{Config, Network, Task, Resolver, Fetcher, Shaker};
 use crate::task::{Fetch, Knock, Ping, Query, Shake, Trace};
 use crate::watch::{Event, Tasks};
 
@@ -23,7 +20,7 @@ pub struct Executor {
     ex:       Arc<Exporter>,
     bind:     Bind,
     network:  Option<Network>,
-    resolver: TokioAsyncResolver,
+    resolver: Resolver,
     status:   Arc<Status>,
     spawner:  Arc<Spawner>,
     fetcher:  Arc<Fetcher>,
@@ -34,15 +31,16 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub async fn new(rx: Receiver<Event>, ex: Arc<Exporter>, bind: Bind, net: Option<Network>) -> Result<Self> {
-        let resolver = resolver().await?;
+    pub async fn new(rx: Receiver<Event>, ex: Arc<Exporter>, cfg: Config) -> Result<Self> {
+        let Config { bind, network, resolver, .. } = cfg.clone();
+
         let status   = Arc::new(Status::default());
         let spawner  = Spawner::new(status.clone());
 
-        let fetcher  = Fetcher::new(&bind, net, resolver.clone())?;
+        let fetcher  = Fetcher::new(&cfg)?;
         let knocker  = Knocker::new(&bind).await?;
         let pinger   = Pinger::new(&bind).await?;
-        let shaker   = Shaker::new(&bind)?;
+        let shaker   = Shaker::new(&cfg)?;
         let tracer   = Tracer::new(&bind).await?;
 
         Ok(Self {
@@ -50,7 +48,7 @@ impl Executor {
             rx:       rx,
             ex:       ex,
             bind:     bind,
-            network:  net,
+            network:  network,
             resolver: resolver,
             status:   status,
             spawner:  Arc::new(spawner),
@@ -86,7 +84,7 @@ impl Executor {
     }
 
     async fn tasks(&mut self, Tasks { agent, tasks }: Tasks) -> Result<()> {
-        let resolver = Resolver::new(self.resolver.clone());
+        let resolver = self.resolver.clone();
 
         for group in tasks {
             let target = Arc::new(Target {
@@ -130,18 +128,18 @@ impl Executor {
         Ok(())
     }
 
-    async fn insert(&mut self, task: Task, cfg: Config) -> Result<()> {
+    async fn insert(&mut self, task: Task, cfg: TaskConfig) -> Result<()> {
         let id = task.task;
 
         let handle = match cfg {
-            Config::Fetch(cfg) => self.fetch(id, task, cfg)?,
-            Config::Knock(cfg) => self.knock(id, task, cfg)?,
-            Config::Ping(cfg)  => self.ping(id, task, cfg)?,
-            Config::Query(cfg) => self.query(id, task, cfg).await?,
+            TaskConfig::Fetch(cfg) => self.fetch(id, task, cfg)?,
+            TaskConfig::Knock(cfg) => self.knock(id, task, cfg)?,
+            TaskConfig::Ping(cfg)  => self.ping(id, task, cfg)?,
+            TaskConfig::Query(cfg) => self.query(id, task, cfg).await?,
             #[cfg(feature = "experimental")]
-            Config::Shake(cfg) => self.shake(id, task, cfg)?,
-            Config::Trace(cfg) => self.trace(id, task, cfg)?,
-            _                  => Err(anyhow!("unsupported type"))?,
+            TaskConfig::Shake(cfg) => self.shake(id, task, cfg)?,
+            TaskConfig::Trace(cfg) => self.trace(id, task, cfg)?,
+            _                      => Err(anyhow!("unsupported type"))?,
         };
 
         self.tasks.insert(id, handle);
@@ -185,14 +183,4 @@ impl Executor {
         let trace = Trace::new(task, cfg, self.tracer.clone());
         Ok(self.spawner.spawn(id, trace.exec()))
     }
-}
-
-async fn resolver() -> Result<TokioAsyncResolver> {
-    let (config, options) = read_system_conf().unwrap_or_else(|e| {
-        warn!("resolver configuration error: {}", e);
-        let config  = ResolverConfig::google();
-        let options = ResolverOpts::default();
-        (config, options)
-    });
-    Ok(TokioAsyncResolver::tokio(config, options).await?)
 }

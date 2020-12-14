@@ -22,14 +22,14 @@ pub struct Group {
 pub struct Task {
     pub task:   u64,
     pub test:   u64,
-    pub config: Config,
+    pub config: TaskConfig,
     pub family: Net,
     pub state:  State,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Config {
+pub enum TaskConfig {
     Fetch(FetchConfig),
     Knock(KnockConfig),
     Ping(PingConfig),
@@ -164,19 +164,19 @@ impl<'d> Deserialize<'d> for Task {
         let state  = c.state;
 
         let config = if let Some(cfg) = c.fetch {
-            Config::Fetch(cfg)
+            TaskConfig::Fetch(cfg)
         } else if let Some(cfg) = c.knock {
-            Config::Knock(cfg)
+            TaskConfig::Knock(cfg)
         } else if let Some(cfg) = c.ping {
-            Config::Ping(cfg)
+            TaskConfig::Ping(cfg)
         } else if let Some(cfg) = c.query {
-            Config::Query(cfg)
+            TaskConfig::Query(cfg)
         } else if let Some(cfg) = c.shake {
-            Config::Shake(cfg)
+            TaskConfig::Shake(cfg)
         } else if let Some(cfg) = c.trace {
-            Config::Trace(cfg)
+            TaskConfig::Trace(cfg)
         } else {
-            Config::Unknown
+            TaskConfig::Unknown
         };
 
         Ok(Task { task, test, config, family, state })

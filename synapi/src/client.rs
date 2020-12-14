@@ -1,3 +1,4 @@
+use std::mem;
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,11 +9,9 @@ use log::error;
 use reqwest::{Client as HttpClient, Proxy};
 use reqwest::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use rustls::ClientConfig;
-use rustls_native_certs::load_native_certs;
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use time::get_time;
 use tokio::sync::RwLock;
-use webpki_roots::TLS_SERVER_ROOTS;
 use crate::{Error, error::{Application, Backend}};
 use crate::auth::Auth;
 use crate::config::Config;
@@ -49,16 +48,12 @@ pub struct Failure {
 }
 
 impl Client {
-    pub fn new(config: Config) -> Result<Self, Error> {
-        let Config { region, proxy, .. } = &config;
+    pub fn new(mut config: Config) -> Result<Self, Error> {
+        let Config { region, proxy, roots, .. } = &mut config;
 
         let mut cfg = ClientConfig::new();
         cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-
-        match load_native_certs() {
-            Ok(store) => cfg.root_store.roots.extend_from_slice(&store.roots),
-            Err(_)    => cfg.root_store.add_server_trust_anchors(&TLS_SERVER_ROOTS),
-        };
+        mem::swap(&mut cfg.root_store, roots);
 
         let mut client = HttpClient::builder();
         client = client.timeout(Duration::from_secs(30));

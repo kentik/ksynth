@@ -6,19 +6,25 @@ use std::sync::Arc;
 use anyhow::{Error, Result};
 use clap::value_t;
 use ed25519_compact::{KeyPair, Seed};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use nix::{unistd::gethostname, sys::utsname::uname};
+use rustls::RootCertStore;
+use rustls_native_certs::load_native_certs;
 use signal_hook::{iterator::Signals, SIGINT, SIGTERM};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Sender};
-use synapi::{Client, Config, Region};
+use trust_dns_resolver::TokioAsyncResolver;
+use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
+use trust_dns_resolver::system_conf::read_system_conf;
+use webpki_roots::TLS_SERVER_ROOTS;
+use synapi::{Client, Config as ClientConfig, Region};
 use netdiag::Bind;
 use crate::args::Args;
 use crate::exec::Executor;
 use crate::export::Exporter;
 use crate::secure;
 use crate::status::Monitor;
-use crate::task::Network;
+use crate::task::{Config, Network, Resolver};
 use crate::update::Updater;
 use crate::version::Version;
 use crate::watch::Watcher;
@@ -26,22 +32,31 @@ use crate::watch::Watcher;
 pub struct Agent {
     client: Client,
     keys:   KeyPair,
+    roots:  RootCertStore,
 }
 
 impl Agent {
-    pub fn new(client: Client, keys: KeyPair) -> Self {
-        Self { client, keys }
+    pub fn new(client: Client, keys: KeyPair, roots: RootCertStore) -> Self {
+        Self { client, keys, roots }
     }
 
     pub async fn exec(self, bind: Bind, net: Option<Network>) -> Result<()> {
         let client = Arc::new(self.client);
         let keys   = self.keys;
+        let roots  = self.roots;
+
+        let config = Config {
+            bind:     bind,
+            network:  net,
+            resolver: resolver().await?,
+            roots:    roots,
+        };
 
         let (tx, mut rx) = channel(16);
 
         let (watcher, tasks) = Watcher::new(client.clone(), keys);
         let exporter = Arc::new(Exporter::new(client.clone()));
-        let executor = Executor::new(tasks, exporter.clone(), bind, net).await?;
+        let executor = Executor::new(tasks, exporter.clone(), config).await?;
         let monitor  = Monitor::new(client, executor.status());
 
         spawn(monitor.exec(),  tx.clone());
@@ -111,7 +126,8 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         error!("agent security failure: {}", e);
     }
 
-    let client = Client::new(Config {
+    let roots  = trust_roots();
+    let client = Client::new(ClientConfig {
         name:    name,
         global:  global,
         region:  region,
@@ -121,10 +137,11 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         site:    site,
         proxy:   proxy,
         bind:    args.opt("bind")?,
+        roots:   roots.clone(),
     })?;
 
     let runtime = Runtime::new()?;
-    let agent   = Agent::new(client, keys);
+    let agent   = Agent::new(client, keys, roots);
 
     runtime.spawn(async move {
         if let Err(e) = agent.exec(bind, net).await {
@@ -186,4 +203,30 @@ fn machine() -> String {
     machine.push_str(utsname.machine());
 
     machine
+}
+
+async fn resolver() -> Result<Resolver> {
+    let (config, options) = read_system_conf().unwrap_or_else(|e| {
+        warn!("resolver configuration error: {}", e);
+        let config  = ResolverConfig::google();
+        let options = ResolverOpts::default();
+        (config, options)
+    });
+    Ok(Resolver::new(TokioAsyncResolver::tokio(config, options).await?))
+}
+
+fn trust_roots() -> RootCertStore {
+    let mut store = RootCertStore::empty();
+
+    match load_native_certs() {
+        Ok(system)  => store.roots.extend_from_slice(&system.roots),
+        Err((_, e)) => warn!("invalid trust store: {}", e),
+    };
+
+    if store.roots.is_empty() {
+        warn!("using static trust roots");
+        store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
+    }
+
+    store
 }

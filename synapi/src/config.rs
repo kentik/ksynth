@@ -1,6 +1,7 @@
 use std::str::FromStr;
+use rustls::RootCertStore;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Config {
     pub name:    String,
     pub global:  bool,
@@ -11,6 +12,7 @@ pub struct Config {
     pub site:    Option<u64>,
     pub proxy:   Option<String>,
     pub bind:    Option<String>,
+    pub roots:   RootCertStore,
 }
 
 #[derive(Debug)]

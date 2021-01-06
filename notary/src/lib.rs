@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_field_names)]
+
 pub use artifact::Artifact;
 pub use artifact::Arch;
 pub use artifact::System;

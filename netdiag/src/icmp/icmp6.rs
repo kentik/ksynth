@@ -40,8 +40,8 @@ impl<'a> TryFrom<&'a [u8]> for IcmpV6Packet<'a> {
             return Err(anyhow!("invalid slice"));
         }
 
-        let kind = u8::try_from(slice[0])?;
-        let code = u8::try_from(slice[1])?;
+        let kind = slice[0];
+        let code = slice[1];
         let rest = &slice[4..];
 
         Ok(match (kind, code) {

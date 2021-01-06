@@ -1,3 +1,5 @@
+#![allow(clippy::module_inception, clippy::redundant_field_names)]
+
 pub use bind::Bind;
 
 pub use knock::Knock;

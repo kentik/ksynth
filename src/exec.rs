@@ -80,7 +80,8 @@ impl Executor {
 
     async fn reset(&mut self) -> Result<()> {
         debug!("resetting task state");
-        Ok(self.tasks.clear())
+        self.tasks.clear();
+        Ok(())
     }
 
     async fn tasks(&mut self, Tasks { agent, tasks }: Tasks) -> Result<()> {

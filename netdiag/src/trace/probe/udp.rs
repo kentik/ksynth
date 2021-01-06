@@ -29,9 +29,7 @@ impl UDPv4 {
         let src = SocketAddrV4::new(src, pkt.source_port());
         let dst = SocketAddrV4::new(dst, pkt.destination_port());
 
-        let probe = Probe::from(UDPv4 { src, dst });
-
-        Ok(probe)
+        Ok(Probe::from(UDPv4 { src, dst }))
     }
 
     pub fn encode<'a>(&self, buf: &'a mut [u8], ttl: u8) -> Result<&'a [u8]> {
@@ -67,9 +65,7 @@ impl UDPv6 {
         let src = SocketAddrV6::new(src, pkt.source_port(), 0, 0);
         let dst = SocketAddrV6::new(dst, pkt.destination_port(), 0, 0);
 
-        let probe = Probe::from(UDPv6 { src, dst });
-
-        return Ok(probe)
+        Ok(Probe::from(UDPv6 { src, dst }))
     }
 
     pub fn encode<'a>(&self, buf: &'a mut [u8]) -> Result<&'a [u8]> {

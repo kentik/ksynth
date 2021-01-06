@@ -52,7 +52,7 @@ impl<'a, 'y> Args<'a, 'y> {
 
     fn is_set(&self, name: &str) -> bool {
         self.vars.get(name).map(|value| {
-            value == "" || value.eq_ignore_ascii_case("true")
+            value.is_empty() || value.eq_ignore_ascii_case("true")
         }).unwrap_or(false)
     }
 
@@ -60,7 +60,7 @@ impl<'a, 'y> Args<'a, 'y> {
         let mut vars = HashMap::new();
 
         for arg in yaml["args"].as_vec()? {
-            let (name, args) = arg.as_hash()?.into_iter().next()?;
+            let (name, args) = arg.as_hash()?.iter().next()?;
             if let Some(var) = args["env"].as_str() {
                 if let Some(value) = env::var_os(var) {
                     let name  = name.as_str()?.to_owned();
@@ -71,9 +71,9 @@ impl<'a, 'y> Args<'a, 'y> {
         }
 
         for cmd in yaml["subcommands"].as_vec()? {
-            let (_, cmd) = cmd.as_hash()?.into_iter().next()?;
+            let (_, cmd) = cmd.as_hash()?.iter().next()?;
             for arg in cmd["args"].as_vec()? {
-                let (name, args) = arg.as_hash()?.into_iter().next()?;
+                let (name, args) = arg.as_hash()?.iter().next()?;
                 if let Some(var) = args["env"].as_str() {
                     if let Some(value) = env::var_os(var) {
                         let name  = name.as_str()?.to_owned();

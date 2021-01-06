@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_field_names)]
+
 pub use client::Client;
 pub use config::Config;
 pub use config::Region;

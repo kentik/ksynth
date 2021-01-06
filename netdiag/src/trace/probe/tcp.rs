@@ -37,9 +37,7 @@ impl TCPv4 {
         let dst = SocketAddrV4::new(dst, pkt.destination_port());
         let seq = pkt.sequence_number();
 
-        let probe = Probe::from(TCPv4 { src, dst, seq });
-
-        return Ok(probe)
+        Ok(Probe::from(TCPv4 { src, dst, seq }))
     }
 
     pub fn encode<'a>(&self, buf: &'a mut [u8], ttl: u8) -> Result<&'a [u8]> {
@@ -81,9 +79,7 @@ impl TCPv6 {
         let dst = SocketAddrV6::new(dst, pkt.destination_port(), 0, 0);
         let seq = pkt.sequence_number();
 
-        let probe = Probe::from(TCPv6 { src, dst, seq });
-
-        return Ok(probe)
+        Ok(Probe::from(TCPv6 { src, dst, seq }))
     }
 
     pub fn encode<'a>(&self, buf: &'a mut [u8]) -> Result<&'a [u8]> {

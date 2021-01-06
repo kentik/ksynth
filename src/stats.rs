@@ -37,7 +37,7 @@ pub fn summarize(ds: &[Duration]) -> Option<Summary> {
     let stdev = stdev.round() as i32;
     let mut jit = 0;
     if count > 1 {
-        jit = f64::from(dif/f64::from(count-1)).round() as i32;
+        jit = (dif/f64::from(count-1)).round() as i32;
     }
 
     Some(Summary {

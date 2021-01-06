@@ -66,7 +66,7 @@ impl Tracer {
         }).take(limit).try_collect().await?)
     }
 
-    pub async fn probe<'a>(&self, probe: &'a Probe, ttl: u8, expiry: Duration) -> Result<Node> {
+    pub async fn probe(&self, probe: &Probe, ttl: u8, expiry: Duration) -> Result<Node> {
         let state = self.state.clone();
 
         let (tx, rx) = channel();

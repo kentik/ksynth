@@ -71,7 +71,7 @@ impl Agent {
     }
 }
 
-fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, mut tx: Sender<Error>) {
+fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, tx: Sender<Error>) {
     tokio::spawn(async move {
         match task.await {
             Ok(()) => Ok(()),
@@ -212,7 +212,7 @@ async fn resolver() -> Result<Resolver> {
         let options = ResolverOpts::default();
         (config, options)
     });
-    Ok(Resolver::new(TokioAsyncResolver::tokio(config, options).await?))
+    Ok(Resolver::new(TokioAsyncResolver::tokio(config, options)?))
 }
 
 fn trust_roots() -> RootCertStore {

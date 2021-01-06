@@ -7,7 +7,6 @@ use etherparse::TcpHeader;
 use libc::c_int;
 use log::{debug, error};
 use raw_socket::tokio::prelude::*;
-use raw_socket::tokio::{RawRecv, RawSend};
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use crate::Bind;
@@ -16,8 +15,8 @@ use super::reply::Echo;
 use super::state::State;
 
 pub struct Sock6 {
-    tcp:   Mutex<RawSend>,
-    udp:   Mutex<RawSend>,
+    tcp:   Mutex<Arc<RawSocket>>,
+    udp:   Mutex<Arc<RawSocket>>,
     route: Mutex<UdpSocket>,
 }
 
@@ -27,8 +26,8 @@ impl Sock6 {
         let tcp   = Protocol::tcp();
         let udp   = Protocol::udp();
 
-        let tcp   = RawSocket::new(ipv6, Type::raw(), Some(tcp))?;
-        let udp   = RawSocket::new(ipv6, Type::raw(), Some(udp))?;
+        let tcp   = Arc::new(RawSocket::new(ipv6, Type::raw(), Some(tcp))?);
+        let udp   = Arc::new(RawSocket::new(ipv6, Type::raw(), Some(udp))?);
         let route = UdpSocket::bind(bind.sa6()).await?;
 
         let offset: c_int = 16;
@@ -40,8 +39,7 @@ impl Sock6 {
         udp.set_sockopt(Level::IPV6, Name::IPV6_CHECKSUM, &offset)?;
         udp.bind(bind.sa6()).await?;
 
-        let (rx, tcp) = tcp.split();
-        let ( _, udp) = udp.split();
+        let rx = tcp.clone();
 
         tokio::spawn(async move {
             match recv(rx, state).await {
@@ -84,7 +82,7 @@ impl Sock6 {
     }
 }
 
-async fn recv(sock: RawRecv, state: Arc<State>) -> Result<()> {
+async fn recv(sock: Arc<RawSocket>, state: Arc<State>) -> Result<()> {
     let mut pkt = [0u8; 64];
     let mut ctl = [0u8; 64];
 

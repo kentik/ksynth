@@ -83,7 +83,7 @@ mod test {
     #[test]
     fn resolve_dual() -> Result<()> {
         test(async {
-            let resolver = resolver().await?;
+            let resolver = resolver()?;
             assert!(resolver.lookup("8.8.8.8",    Dual).await.is_ok());
             assert!(resolver.lookup("fd00::1",    Dual).await.is_ok());
             assert!(resolver.lookup("google.com", Dual).await.is_ok());
@@ -94,7 +94,7 @@ mod test {
     #[test]
     fn resolve_ipv4() -> Result<()> {
         test(async {
-            let resolver = resolver().await?;
+            let resolver = resolver()?;
             assert!(resolver.lookup("8.8.8.8",    IPv4).await.is_ok());
             assert!(resolver.lookup("google.com", IPv4).await.is_ok());
             Ok(())
@@ -104,7 +104,7 @@ mod test {
     #[test]
     fn resolve_ipv6() -> Result<()> {
         test(async {
-            let resolver = resolver().await?;
+            let resolver = resolver()?;
             assert!(resolver.lookup("fd00::1",    IPv6).await.is_ok());
             assert!(resolver.lookup("google.com", IPv6).await.is_ok());
             Ok(())
@@ -114,7 +114,7 @@ mod test {
     #[test]
     fn resolve_error() -> Result<()> {
         test(async {
-            let resolver = resolver().await?;
+            let resolver = resolver()?;
             assert!(resolver.lookup("fd00::1", IPv4).await.is_err());
             assert!(resolver.lookup("8.8.8.8", IPv6).await.is_err());
             Ok(())
@@ -122,12 +122,12 @@ mod test {
     }
 
     fn test(future: impl Future<Output = Result<()>>) -> Result<()> {
-        Builder::new().basic_scheduler().enable_all().build()?.block_on(future)
+        Builder::new_current_thread().enable_all().build()?.block_on(future)
     }
 
-    async fn resolver() -> Result<Resolver> {
+    fn resolver() -> Result<Resolver> {
         let (config, options) = read_system_conf()?;
-        let resolver = TokioAsyncResolver::tokio(config, options).await?;
+        let resolver = TokioAsyncResolver::tokio(config, options)?;
         Ok(Resolver::new(resolver))
     }
 }

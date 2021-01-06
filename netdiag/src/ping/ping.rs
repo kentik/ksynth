@@ -1,6 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::future::Future;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::Result;
 use etherparse::{Ipv4Header, IpTrafficClass};
@@ -8,7 +9,7 @@ use log::{debug, error};
 use tokio::sync::{Mutex, oneshot::channel};
 use rand::prelude::*;
 use raw_socket::{Domain, Type, Protocol};
-use raw_socket::tokio::{RawSocket, RawSend, RawRecv};
+use raw_socket::tokio::RawSocket;
 use crate::Bind;
 use crate::icmp::{ping4, ping6, IcmpV4Packet, IcmpV6Packet};
 use super::pong::Pong;
@@ -30,8 +31,8 @@ impl Ping {
 }
 
 pub struct Pinger {
-    sock4: Mutex<RawSend>,
-    sock6: Mutex<RawSend>,
+    sock4: Mutex<Arc<RawSocket>>,
+    sock6: Mutex<Arc<RawSocket>>,
     state: State,
 }
 
@@ -46,21 +47,20 @@ impl Pinger {
         let icmp4 = Protocol::icmpv4();
         let icmp6 = Protocol::icmpv6();
 
-        let sock4 = RawSocket::new(Domain::ipv4(), raw, Some(icmp4))?;
-        let sock6 = RawSocket::new(Domain::ipv6(), raw, Some(icmp6))?;
+        let sock4 = Arc::new(RawSocket::new(Domain::ipv4(), raw, Some(icmp4))?);
+        let sock6 = Arc::new(RawSocket::new(Domain::ipv6(), raw, Some(icmp6))?);
 
         sock4.bind(bind.sa4()).await?;
         sock6.bind(bind.sa6()).await?;
 
-        let (rx, tx) = sock4.split();
-        let sock4 = Mutex::new(tx);
-        spawn("recv4", recv4(rx, state.clone()));
+        spawn("recv4", recv4(sock4.clone(), state.clone()));
+        spawn("recv6", recv6(sock6.clone(), state.clone()));
 
-        let (rx, tx) = sock6.split();
-        let sock6 = Mutex::new(tx);
-        spawn("recv6", recv6(rx, state.clone()));
-
-        Ok(Self { sock4, sock6, state })
+        Ok(Self {
+            sock4: Mutex::new(sock4),
+            sock6: Mutex::new(sock6),
+            state,
+        })
     }
 
     pub async fn ping(&self, ping: &Ping) -> Result<Duration> {
@@ -75,7 +75,7 @@ impl Pinger {
     }
 }
 
-async fn send(sock4: &Mutex<RawSend>, sock6: &Mutex<RawSend>, ping: &Ping) -> Result<Instant> {
+async fn send(sock4: &Mutex<Arc<RawSocket>>, sock6: &Mutex<Arc<RawSocket>>, ping: &Ping) -> Result<Instant> {
     let Ping { addr, id, seq, token } = *ping;
 
     let mut pkt = [0u8; 64];
@@ -85,13 +85,13 @@ async fn send(sock4: &Mutex<RawSend>, sock6: &Mutex<RawSend>, ping: &Ping) -> Re
     };
 
     let addr = SocketAddr::new(addr, 0);
-    let mut sock = sock.lock().await;
+    let sock = sock.lock().await;
     sock.send_to(&pkt, &addr).await?;
 
     Ok(Instant::now())
 }
 
-async fn recv4(mut sock: RawRecv, state: State) -> Result<()> {
+async fn recv4(sock: Arc<RawSocket>, state: State) -> Result<()> {
     let mut pkt = [0u8; 128];
     loop {
         let (n, _) = sock.recv_from(&mut pkt).await?;
@@ -111,7 +111,7 @@ async fn recv4(mut sock: RawRecv, state: State) -> Result<()> {
     }
 }
 
-async fn recv6(mut sock: RawRecv, state: State) -> Result<()> {
+async fn recv6(sock: Arc<RawSocket>, state: State) -> Result<()> {
     let mut pkt = [0u8; 64];
     loop {
         let (n, _) = sock.recv_from(&mut pkt).await?;

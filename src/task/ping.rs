@@ -7,7 +7,7 @@ use futures::{Stream, StreamExt, TryStreamExt};
 use futures::stream::unfold;
 use log::{debug, warn};
 use rand::random;
-use tokio::time::{delay_for, timeout};
+use tokio::time::{sleep, timeout};
 use netdiag::{self, Pinger};
 use synapi::tasks::PingConfig;
 use crate::export::{record, Envoy};
@@ -55,7 +55,7 @@ impl Ping {
                 Err(_)      => self.timeout().await,
             };
 
-            delay_for(self.period).await;
+            sleep(self.period).await;
         }
     }
 

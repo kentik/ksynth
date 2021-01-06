@@ -2,8 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use anyhow::Result;
 use rustls::ClientConfig;
-use socket2::{Domain, Protocol, Socket, Type};
-use tokio::net::TcpStream;
+use tokio::net::{TcpSocket, TcpStream};
 use tokio_rustls::{TlsConnector, client::TlsStream};
 use webpki::DNSNameRef;
 use netdiag::Bind;
@@ -33,17 +32,14 @@ impl Shaker {
     }
 
     async fn connect(&self, name: DNSNameRef<'_>, addr: SocketAddr) -> Result<TlsStream<TcpStream>> {
-        let (domain, bind) = match addr {
-            SocketAddr::V4(_) => (Domain::ipv4(), self.bind.sa4().into()),
-            SocketAddr::V6(_) => (Domain::ipv6(), self.bind.sa6().into()),
+        let (socket, bind) = match addr {
+            SocketAddr::V4(_) => (TcpSocket::new_v4()?, self.bind.sa4()),
+            SocketAddr::V6(_) => (TcpSocket::new_v6()?, self.bind.sa6()),
         };
 
-        let socket = Socket::new(domain, Type::stream(), Some(Protocol::tcp()))?;
-        socket.bind(&bind)?;
+        socket.bind(bind)?;
 
-        let stream = socket.into_tcp_stream();
-        let stream = TcpStream::connect_std(stream, &addr).await?;
-
+        let stream = socket.connect(addr).await?;
         Ok(self.connect.connect(name, stream).await?)
     }
 }

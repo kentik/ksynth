@@ -7,7 +7,7 @@ use hyper::{Body, Method, Request, StatusCode, Uri};
 use hyper::body::HttpBody;
 use hyper::client::connect::HttpInfo;
 use log::{debug, warn};
-use tokio::time::{delay_for, timeout};
+use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
 use super::{Config, Task, http::{Expiry, HttpClient}};
@@ -48,7 +48,7 @@ impl Fetch {
                 Err(_)        => self.timeout().await,
             }
 
-            delay_for(self.period).await;
+            sleep(self.period).await;
         }
     }
 

@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::{value_t, values_t};
 use tokio::net::UdpSocket;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::system_conf::read_system_conf;
 use netdiag::{Bind, Node, Probe, Protocol, Tracer};
@@ -35,7 +35,7 @@ pub async fn trace(args: Args<'_, '_>) -> Result<()> {
     };
 
     let (config, options) = read_system_conf()?;
-    let resolver = TokioAsyncResolver::tokio(config, options).await?;
+    let resolver = TokioAsyncResolver::tokio(config, options)?;
     let resolver = Resolver::new(resolver.clone());
 
     let delay  = Duration::from_millis(delay);
@@ -79,7 +79,7 @@ pub async fn trace(args: Args<'_, '_>) -> Result<()> {
 
                 probe.increment();
 
-                delay_for(delay).await;
+                sleep(delay).await;
             }
 
             print(&nodes, ttl, probes);

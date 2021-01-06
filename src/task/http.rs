@@ -10,8 +10,7 @@ use hyper::{Body, Client, Request, Response};
 use hyper::service::Service;
 use hyper_rustls::HttpsConnector;
 use rustls::ClientConfig;
-use socket2::{Domain, Protocol, Socket, Type};
-use tokio::net::TcpStream;
+use tokio::net::{TcpSocket, TcpStream};
 use tokio::time::timeout;
 use netdiag::Bind;
 use super::{Config, Network, Resolver};
@@ -116,14 +115,12 @@ impl Connect {
 }
 
 async fn socket(bind: &Bind, addr: SocketAddr) -> Result<TcpStream> {
-    let (domain, bind) = match addr {
-        SocketAddr::V4(_) => (Domain::ipv4(), bind.sa4().into()),
-        SocketAddr::V6(_) => (Domain::ipv6(), bind.sa6().into()),
+    let (socket, bind) = match addr {
+        SocketAddr::V4(_) => (TcpSocket::new_v4()?, bind.sa4()),
+        SocketAddr::V6(_) => (TcpSocket::new_v6()?, bind.sa6()),
     };
 
-    let socket = Socket::new(domain, Type::stream(), Some(Protocol::tcp()))?;
-    socket.bind(&bind)?;
-    let stream = socket.into_tcp_stream();
+    socket.bind(bind)?;
 
-    Ok(TcpStream::connect_std(stream, &addr).await?)
+    Ok(socket.connect(addr).await?)
 }

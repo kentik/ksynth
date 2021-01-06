@@ -6,7 +6,6 @@ use etherparse::{Ipv4Header, IpTrafficClass, TcpHeaderSlice};
 use libc::{IPPROTO_TCP, IPPROTO_UDP, c_int};
 use log::{debug, error};
 use raw_socket::tokio::prelude::*;
-use raw_socket::tokio::{RawRecv, RawSend};
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use crate::Bind;
@@ -15,8 +14,8 @@ use super::reply::Echo;
 use super::state::State;
 
 pub struct Sock4 {
-    tcp:   Mutex<RawSend>,
-    udp:   Mutex<RawSend>,
+    tcp:   Mutex<Arc<RawSocket>>,
+    udp:   Mutex<Arc<RawSocket>>,
     route: Mutex<UdpSocket>,
 }
 
@@ -26,8 +25,8 @@ impl Sock4 {
         let tcp   = Protocol::from(IPPROTO_TCP);
         let udp   = Protocol::from(IPPROTO_UDP);
 
-        let tcp   = RawSocket::new(ipv4, Type::raw(), Some(tcp))?;
-        let udp   = RawSocket::new(ipv4, Type::raw(), Some(udp))?;
+        let tcp   = Arc::new(RawSocket::new(ipv4, Type::raw(), Some(tcp))?);
+        let udp   = Arc::new(RawSocket::new(ipv4, Type::raw(), Some(udp))?);
         let route = UdpSocket::bind(bind.sa4()).await?;
 
         tcp.bind(bind.sa4()).await?;
@@ -36,8 +35,8 @@ impl Sock4 {
         let enable: c_int = 6;
         tcp.set_sockopt(Level::IPV4, Name::IPV4_HDRINCL, &enable)?;
         udp.set_sockopt(Level::IPV4, Name::IPV4_HDRINCL, &enable)?;
-        let (rx, tcp) = tcp.split();
-        let (_,  udp) = udp.split();
+
+        let rx = tcp.clone();
 
         tokio::spawn(async move {
             match recv(rx, state).await {
@@ -74,7 +73,7 @@ impl Sock4 {
     }
 }
 
-async fn recv(mut sock: RawRecv, state: Arc<State>) -> Result<()> {
+async fn recv(sock: Arc<RawSocket>, state: Arc<State>) -> Result<()> {
     let mut pkt = [0u8; 128];
     loop {
         let (n, from) = sock.recv_from(&mut pkt).await?;

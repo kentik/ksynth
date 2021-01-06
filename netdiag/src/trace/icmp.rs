@@ -24,7 +24,7 @@ pub async fn recv(state: Arc<State>) -> Result<()> {
     Ok(())
 }
 
-async fn recv4(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
+async fn recv4(sock: RawSocket, state: Arc<State>) -> Result<()> {
     let mut pkt = [0u8; 128];
     loop {
         let (n, from) = sock.recv_from(&mut pkt).await?;
@@ -60,7 +60,7 @@ async fn recv4(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
     }
 }
 
-async fn recv6(mut sock: RawSocket, state: Arc<State>) -> Result<()> {
+async fn recv6(sock: RawSocket, state: Arc<State>) -> Result<()> {
     let mut pkt = [0u8; 64];
     loop {
         let (n, from) = sock.recv_from(&mut pkt).await?;

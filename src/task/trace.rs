@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use log::{debug, warn};
-use tokio::time::{delay_for, timeout};
+use tokio::time::{sleep, timeout};
 use netdiag::{self, Node, Protocol, Tracer};
 use synapi::tasks::TraceConfig;
 use crate::export::{record, Hop, Envoy};
@@ -62,7 +62,7 @@ impl Trace {
                 Err(_)        => self.timeout().await,
             }
 
-            delay_for(self.period).await;
+            sleep(self.period).await;
         }
     }
 

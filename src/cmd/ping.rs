@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::{value_t, values_t};
 use rand::prelude::*;
-use tokio::time::{delay_for, timeout};
+use tokio::time::{sleep, timeout};
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::system_conf::read_system_conf;
 use netdiag::{Bind, Pinger, Ping};
@@ -33,7 +33,7 @@ pub async fn ping(args: Args<'_, '_>) -> Result<()> {
     };
 
     let (config, options) = read_system_conf()?;
-    let resolver = TokioAsyncResolver::tokio(config, options).await?;
+    let resolver = TokioAsyncResolver::tokio(config, options)?;
     let resolver = Resolver::new(resolver.clone());
 
     let pinger = Arc::new(Pinger::new(&bind).await?);
@@ -55,7 +55,7 @@ pub async fn ping(args: Args<'_, '_>) -> Result<()> {
                 Err(_)     => println!("seq {} timeout", n),
             };
 
-            delay_for(delay).await;
+            sleep(delay).await;
         }
     }
 

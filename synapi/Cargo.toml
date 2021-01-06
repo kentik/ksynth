@@ -1,19 +1,19 @@
 [package]
 name    = "synapi"
-version = "0.0.6"
+version = "0.0.7"
 authors = ["Will <will@kentik.com>"]
 edition = "2018"
 
 [dependencies]
 hex           = "0.4.2"
 log           = "0.4.11"
-rand          = "0.7.3"
-rustls        = "0.18.0"
+rand          = "0.8.1"
+rustls        = "0.19.0"
 serde_json    = "1.0.58"
 time          = "0.1.42"
 
 [dependencies.async-compression]
-version  = "0.3.5"
+version  = "0.3.7"
 features = ["futures-write", "gzip"]
 default-features = false
 
@@ -26,7 +26,7 @@ features = ["std"]
 default-features = false
 
 [dependencies.reqwest]
-version  = "0.10.8"
+version  = "0.11.0"
 features = ["gzip", "json", "rustls-tls"]
 default-features = false
 
@@ -35,7 +35,7 @@ version  = "1.0.116"
 features = ["derive"]
 
 [dependencies.tokio]
-version  = "0.2.22"
+version  = "1.0.1"
 features = ["sync"]
 
 [dev-dependencies]
@@ -45,5 +45,5 @@ env_logger   = "0.7.1"
 webpki-roots = "0.20.0"
 
 [dev-dependencies.tokio]
-version  = "0.2.22"
+version  = "1.0.1"
 features = ["full"]

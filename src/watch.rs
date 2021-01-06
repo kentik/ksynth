@@ -4,7 +4,7 @@ use anyhow::Result;
 use ed25519_compact::KeyPair;
 use log::{debug, info, warn};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use synapi::{self, Client, Error, Retry};
 use synapi::agent::Agent;
 use synapi::auth::Auth;
@@ -53,7 +53,7 @@ impl Watcher {
 
                 warn!("{:?}", err);
 
-                delay_for(delay).await;
+                sleep(delay).await;
             }
         }
     }
@@ -77,7 +77,7 @@ impl Watcher {
     async fn wait(&mut self, challenge: String, delay: Duration) {
         info!("auth challenge: {}", challenge);
         debug!("waiting for authorization");
-        delay_for(delay).await;
+        sleep(delay).await;
     }
 
     async fn tasks(&mut self, agent: Agent) -> Result<()> {
@@ -99,7 +99,7 @@ impl Watcher {
             })).await?;
 
             since = tasks.timestamp;
-            delay_for(delay).await;
+            sleep(delay).await;
         }
 
         Ok(output.send(Event::Reset).await?)

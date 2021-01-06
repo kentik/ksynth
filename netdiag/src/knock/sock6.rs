@@ -7,7 +7,6 @@ use etherparse::TcpHeader;
 use libc::{IPPROTO_TCP, c_int};
 use log::{debug, error};
 use raw_socket::tokio::prelude::*;
-use raw_socket::tokio::{RawRecv, RawSend};
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use crate::Bind;
@@ -15,7 +14,7 @@ use super::{probe::ProbeV6, reply::Reply};
 use super::state::State;
 
 pub struct Sock6 {
-    sock:  Mutex<RawSend>,
+    sock:  Mutex<Arc<RawSocket>>,
     route: Mutex<UdpSocket>,
 }
 
@@ -24,7 +23,7 @@ impl Sock6 {
         let ipv6 = Domain::ipv6();
         let tcp  = Protocol::from(IPPROTO_TCP);
 
-        let sock  = RawSocket::new(ipv6, Type::raw(), Some(tcp))?;
+        let sock  = Arc::new(RawSocket::new(ipv6, Type::raw(), Some(tcp))?);
         let route = UdpSocket::bind(bind.sa6()).await?;
 
         sock.bind(bind.sa6()).await?;
@@ -33,7 +32,7 @@ impl Sock6 {
         let enable: c_int = 1;
         sock.set_sockopt(Level::IPV6, Name::IPV6_CHECKSUM, &offset)?;
         sock.set_sockopt(Level::IPV6, Name::IPV6_RECVPKTINFO, &enable)?;
-        let (rx, tx) = sock.split();
+        let rx = sock.clone();
 
         tokio::spawn(async move {
             match recv(rx, state).await {
@@ -43,7 +42,7 @@ impl Sock6 {
         });
 
         Ok(Self {
-            sock:  Mutex::new(tx),
+            sock:  Mutex::new(sock),
             route: Mutex::new(route),
         })
     }
@@ -56,7 +55,7 @@ impl Sock6 {
         dst.set_port(0);
         let dst = SocketAddr::V6(dst);
 
-        let mut sock = self.sock.lock().await;
+        let sock = self.sock.lock().await;
         sock.send_to(&pkt, &dst).await?;
 
         Ok(Instant::now())
@@ -69,7 +68,7 @@ impl Sock6 {
     }
 }
 
-async fn recv(sock: RawRecv, state: Arc<State>) -> Result<()> {
+async fn recv(sock: Arc<RawSocket>, state: Arc<State>) -> Result<()> {
     let mut pkt = [0u8; 64];
     let mut ctl = [0u8; 64];
 
@@ -90,7 +89,7 @@ async fn recv(sock: RawRecv, state: Arc<State>) -> Result<()> {
             let src = SocketAddr::new(src.ip(), head.source_port);
             let dst = SocketAddr::new(dst, head.destination_port);
 
-            if let Some(mut tx) = state.sender(dst, src) {
+            if let Some(tx) = state.sender(dst, src) {
                 match tx.send(Reply::new(head, now)).await {
                     Ok(()) => (),
                     Err(_) => (),

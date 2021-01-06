@@ -5,7 +5,7 @@ use ed25519_compact::{PublicKey, Signature};
 use log::error;
 use reqwest::{Client as HttpClient};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use super::artifact::Artifact;
 use super::error::Error;
 use super::expand::Expand;

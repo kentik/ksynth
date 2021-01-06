@@ -18,7 +18,7 @@ pub enum Node {
 }
 
 pub struct Reply {
-    echo:  Timeout<Receiver<Echo>>,
+    echo:  Pin<Box<Timeout<Receiver<Echo>>>>,
     sent:  Instant,
     state: Arc<State>,
     key:   Key,
@@ -30,6 +30,7 @@ pub struct Echo(pub IpAddr, pub Instant, pub bool);
 
 impl Reply {
     pub fn new(echo: Timeout<Receiver<Echo>>, sent: Instant, state: Arc<State>, key: Key, ttl: u8) -> Reply {
+        let echo = Box::pin(echo);
         Self { echo, sent, key, state, ttl }
     }
 

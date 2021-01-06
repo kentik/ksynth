@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use log::{debug, warn};
-use tokio::time::{delay_for, timeout};
+use tokio::time::{sleep, timeout};
 use webpki::DNSNameRef;
 use synapi::tasks::ShakeConfig;
 use crate::export::{record, Envoy};
@@ -51,7 +51,7 @@ impl Shake {
                 Err(_)      => self.timeout().await,
             }
 
-            delay_for(self.period).await;
+            sleep(self.period).await;
         }
     }
 

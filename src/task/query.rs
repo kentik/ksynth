@@ -4,12 +4,11 @@ use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use log::{debug, warn};
 use tokio::net::UdpSocket;
-use tokio::time::{delay_for, timeout};
+use tokio::time::{sleep, timeout};
 use trust_dns_client::client::{AsyncClient, ClientHandle};
 use trust_dns_client::op::{DnsResponse, ResponseCode};
 use trust_dns_client::rr::{DNSClass, Name, RecordType, RData};
 use trust_dns_client::udp::UdpClientStream;
-use trust_dns_proto::udp::UdpResponse;
 use synapi::tasks::QueryConfig;
 use crate::export::{record, Envoy};
 use super::Task;
@@ -22,7 +21,7 @@ pub struct Query {
     expiry: Duration,
     record: RecordType,
     envoy:  Envoy,
-    client: AsyncClient<UdpResponse>,
+    client: AsyncClient,
 }
 
 impl Query {
@@ -58,7 +57,7 @@ impl Query {
                 Err(_)      => self.timeout().await,
             };
 
-            delay_for(self.period).await;
+            sleep(self.period).await;
         }
     }
 

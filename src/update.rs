@@ -25,7 +25,7 @@ impl Updater {
         let public  = PublicKey::from_slice(&NOTARY_PUBLIC_KEY)?;
         let client  = Client::new(NOTARY_ENDPOINT.to_owned(), public)?;
         let updates = Updates::new(client, query);
-        let runtime = Builder::new().basic_scheduler().enable_all().build()?;
+        let runtime = Builder::new_current_thread().enable_all().build()?;
 
         Ok(Self { primary, runtime, updates })
     }
@@ -42,9 +42,9 @@ impl Updater {
     }
 
     fn watch(self, enable: bool, registration: AbortRegistration) -> Result<()> {
-        let Self { primary, mut runtime, updates } = self;
+        let Self { primary, runtime, updates } = self;
 
-        let delay  = thread_rng().gen_range(60 * 2, 60 * 10);
+        let delay  = thread_rng().gen_range(60 * 2..60 * 10);
         let start  = Instant::now() + Duration::from_secs(delay);
         let period = Duration::from_secs(60 * 60 * 24);
 

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Error,Result}  ;
 use log::{debug, warn};
-use tokio::time::{delay_for, timeout};
+use tokio::time::{sleep, timeout};
 use netdiag::{self, Knocker};
 use synapi::tasks::KnockConfig;
 use crate::export::{record, Envoy};
@@ -56,7 +56,7 @@ impl Knock {
                 Err(_)      => self.timeout().await,
             };
 
-            delay_for(self.period).await;
+            sleep(self.period).await;
         }
     }
 

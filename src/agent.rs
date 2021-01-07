@@ -10,7 +10,7 @@ use log::{debug, error, info, warn};
 use nix::{unistd::gethostname, sys::utsname::uname};
 use rustls::RootCertStore;
 use rustls_native_certs::load_native_certs;
-use signal_hook::{iterator::Signals, SIGINT, SIGTERM};
+use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM}}};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Sender};
 use trust_dns_resolver::TokioAsyncResolver;
@@ -153,7 +153,7 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     let updater = Updater::new(version, release, runtime)?;
     let (abort, guard) = updater.exec(update);
 
-    let signals = Signals::new(&[SIGINT, SIGTERM])?;
+    let mut signals = Signals::new(&[SIGINT, SIGTERM])?;
     for signal in signals.forever() {
         match signal {
             SIGINT | SIGTERM => break,

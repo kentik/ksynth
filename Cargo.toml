@@ -8,25 +8,25 @@ edition = "2018"
 experimental = []
 
 [dependencies]
-anyhow        = "1.0.33"
+anyhow        = "1.0.37"
 bytes         = "1.0.0"
-capnp         = "0.13.4"
-env_logger    = "0.7.1"
-futures       = "0.3.6"
+capnp         = "0.14.0"
+env_logger    = "0.8.2"
+futures       = "0.3.8"
 hex           = "0.4.2"
 http          = "0.2.2"
 hyper-rustls  = "0.22.1"
-libc          = "0.2.79"
+libc          = "0.2.81"
 log           = "0.4.11"
-nix           = "0.18.0"
-parking_lot   = "0.11.0"
+nix           = "0.19.1"
+parking_lot   = "0.11.1"
 rand          = "0.8.1"
 rustls        = "0.19.0"
-serde_json    = "1.0.58"
-signal-hook   = "0.1.16"
+serde_json    = "1.0.61"
+signal-hook   = "0.3.2"
 tokio-rustls  = "0.22.0"
 tower-service = "0.3.0"
-webpki        = "0.21.3"
+webpki        = "0.21.4"
 webpki-roots  = "0.21.0"
 yaml-rust     = "0.3.5"
 
@@ -38,7 +38,7 @@ version  = "2.33.3"
 features = ["yaml"]
 
 [dependencies.ed25519-compact]
-version  = "0.1.8"
+version  = "0.1.9"
 
 [dependencies.hyper]
 version  = "0.14.2"
@@ -48,7 +48,7 @@ features = ["client"]
 version  = "0.5.0"
 
 [dependencies.serde]
-version  = "1.0.116"
+version  = "1.0.118"
 features = ["derive"]
 
 [dependencies.tokio]
@@ -74,11 +74,11 @@ path = "notary"
 path = "synapi"
 
 [build-dependencies]
-capnpc = "0.13.1"
-anyhow = "1.0.33"
+capnpc = "0.14.2"
+anyhow = "1.0.37"
 
 [build-dependencies.git2]
-version  = "0.13.11"
+version  = "0.13.15"
 features = []
 default-features = false
 

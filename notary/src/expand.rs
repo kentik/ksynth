@@ -2,13 +2,13 @@ use std::io::{Error, Write};
 use hmac_sha512::Hash;
 use zstd::stream::write::Decoder;
 
-pub struct Expand<W: Sized> {
-    dec:  Decoder<Vec<u8>>,
+pub struct Expand<'a, W: Sized> {
+    dec:  Decoder<'a, Vec<u8>>,
     sink: W,
     hash: Hash,
 }
 
-impl<W: Write + Sized> Expand<W> {
+impl<'a, W: Write + Sized> Expand<'a, W> {
     pub fn new(sink: W) -> Result<Self, Error> {
         Ok(Self {
             dec:  Decoder::new(Vec::new())?,

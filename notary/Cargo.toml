@@ -5,15 +5,15 @@ authors = ["Will <will@kentik.com>"]
 edition = "2018"
 
 [dependencies]
-anyhow          = "1.0.31"
+anyhow          = "1.0.37"
 ed25519-compact = "0.1.6"
 hmac-sha512     = "0.1.6"
 log             = "0.4.8"
-nix             = "0.18.0"
-serde_json      = "1.0.56"
+nix             = "0.19.1"
+serde_json      = "1.0.61"
 tokio           = "1.0.1"
 tokio-stream    = "0.1.1"
-zstd            = "0.5.3"
+zstd            = "0.6.0"
 
 [dependencies.bytes]
 version  = "1.0.0"
@@ -25,7 +25,7 @@ features = ["gzip", "json", "rustls-tls", "stream"]
 default-features = false
 
 [dependencies.serde]
-version  = "1.0.114"
+version  = "1.0.118"
 features = ["derive"]
 
 [profile.release]

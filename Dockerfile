@@ -1,12 +1,16 @@
 FROM debian:stable
 
+ARG TARGETARCH
+ARG TARGETPLATFORM
+ARG TARGETVARIANT
+ARG BINARY=binary/${TARGETARCH}${TARGETVARIANT}/ksynth
+
 RUN apt-get update && apt-get install -y busybox-static
 
 RUN mkdir -p /var/lib/ksynth
 RUN mkdir -p /opt/kentik/ksynth
 
-COPY ksynth /opt/kentik/ksynth/
-
+ADD $BINARY                /opt/kentik/ksynth/
 RUN setcap cap_net_raw=eip /opt/kentik/ksynth/ksynth
 RUN chmod  a+x             /opt/kentik/ksynth/ksynth
 

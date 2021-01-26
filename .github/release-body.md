@@ -1,8 +1,9 @@
 ## Release Management
 
-- [x] Publish Artifacts
-- [x] Publish Packages
-- [x] Notarize Update
+- [ ] Publish Artifacts
+- [ ] Publish Images
+- [ ] Publish Packages
+- [ ] Notarize Update
 - [ ] Release Update
 
 ### Activity

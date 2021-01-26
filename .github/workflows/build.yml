@@ -52,29 +52,9 @@ jobs:
           args: --release --target ${{ matrix.target }} ${{ steps.cargo-args.outputs.args }}
       - uses: actions/upload-artifact@v2
         with:
-          name: ksynth-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/ksynth
-
-  artifacts:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-musl
-          - armv7-unknown-linux-musleabihf
-    steps:
-      - uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-      - uses: actions/download-artifact@v2
-        with:
-          name: ksynth-${{ matrix.target }}
-      - run: |
-          aws s3 cp ksynth $BUCKET/ksynth-${{ matrix.target }}
-    needs: build
+          name: ${{ env.BINARY }}-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/${{ env.BINARY }}
+          retention-days: 2
 
   docker:
     runs-on: ubuntu-latest
@@ -90,15 +70,15 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - uses: actions/download-artifact@v2
         with:
-          name: ksynth-aarch64-unknown-linux-musl
+          name: ${{ env.BINARY }}-aarch64-unknown-linux-musl
           path: binary/arm64
       - uses: actions/download-artifact@v2
         with:
-          name: ksynth-armv7-unknown-linux-musleabihf
+          name: ${{ env.BINARY }}-armv7-unknown-linux-musleabihf
           path: binary/armv7
       - uses: actions/download-artifact@v2
         with:
-          name: ksynth-x86_64-unknown-linux-musl
+          name: ${{ env.BINARY }}-x86_64-unknown-linux-musl
           path: binary/amd64
       - uses: docker/build-push-action@v2
         with:
@@ -107,6 +87,83 @@ jobs:
           tags: ${{ github.repository }}:${{ github.sha }}
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
+    needs: build
+
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - id: version
+        run: |
+          VERSION=$(git describe --always --tags)
+          echo ::set-output name=version::$VERSION
+
+  package:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        format: [deb, rpm]
+        target:
+          - name: aarch64-unknown-linux-musl
+            arch: aarch64
+          - name: armv7-unknown-linux-musleabihf
+            arch: armv7
+          - name: x86_64-unknown-linux-musl
+            arch: x86_64
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.BINARY }}-${{ matrix.target.name }}
+      - id: package
+        uses: kentik/pkg@master
+        with:
+          name: ${{ github.event.repository.name }}
+          version: ${{ needs.version.outputs.version }}
+          arch: ${{ matrix.target.arch }}
+          format: ${{ matrix.format }}
+          package: package.yml
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.package.outputs.package }}
+          path: ${{ steps.package.outputs.package }}
+          retention-days: 2
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - run: |
+          PACKAGE=${{ steps.package.outputs.package }}
+          VERSION=${{ needs.version.outputs.version }}
+          aws s3 cp $PACKAGE $BUCKET/$VERSION/
+    needs: [build, version]
+
+  binaries:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-musl
+          - armv7-unknown-linux-musleabihf
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.BINARY }}-${{ matrix.target }}
+      - run: |
+          aws s3 cp $BINARY $BUCKET/$BINARY-${{ matrix.target }}
     needs: build
 
   release:
@@ -127,31 +184,9 @@ jobs:
           body_path: .github/release-body.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    needs: build
+    needs: [binaries, package]
     if: startsWith(github.ref, 'refs/tags')
 
-  assets:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-musl
-          - armv7-unknown-linux-musleabihf
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: ksynth-${{ matrix.target }}
-      - run: "file *"
-      - uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: ksynth
-          asset_name: ksynth-${{ matrix.target }}
-          asset_content_type: application/binary
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    needs: release
-
 env:
+  BINARY: ${{ github.event.repository.name }}
   BUCKET: s3://kentik-github-actions/${{ github.repository }}/${{ github.sha }}

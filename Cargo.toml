@@ -55,6 +55,10 @@ features = ["derive"]
 version  = "1.0.1"
 features = ["net", "rt-multi-thread", "sync", "time"]
 
+[dependencies.tracing]
+version  = "0.1.22"
+features = ["log"]
+
 [dependencies.trust-dns-client]
 version  = "0.20.0"
 default-features = false

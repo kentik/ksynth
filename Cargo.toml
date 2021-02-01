@@ -72,7 +72,9 @@ default-features = false
 path = "netdiag"
 
 [dependencies.notary]
-path = "notary"
+git      = "ssh://git@github.com/kentik/notary.git"
+features = ["client"]
+default-features = false
 
 [dependencies.synapi]
 path = "synapi"

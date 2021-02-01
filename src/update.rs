@@ -7,7 +7,7 @@ use futures::future::{Abortable, Aborted, AbortHandle, AbortRegistration};
 use rand::prelude::*;
 use tokio::runtime::{Builder, Runtime};
 use tokio::time::{interval_at, Instant};
-use notary::{Artifact, Client, Query, Updates};
+use notary::{Artifact, client::{Client, Query, Updates}};
 use crate::version::Version;
 
 pub struct Updater {

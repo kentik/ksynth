@@ -43,6 +43,14 @@ jobs:
         if: ${{ matrix.cross }}
       - run: brew install capnp
         if: ${{ startsWith(matrix.builder, 'macos') }}
+      - uses: webfactory/ssh-agent@v0.4.1
+        with:
+          ssh-private-key: |
+            ${{ secrets.KENTIK_NOTARY_DEPLOY_KEY }}
+      - name: export SSH agent to docker
+        run: |
+          DOCKER_OPTS="-v $SSH_AUTH_SOCK:/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent"
+          echo DOCKER_OPTS="$DOCKER_OPTS" >> $GITHUB_ENV
       - id: cargo-args
         run: .github/scripts/cargo-args
       - uses: actions-rs/cargo@v1

@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 use std::str::FromStr;
 use rustls::RootCertStore;
 
@@ -11,7 +12,7 @@ pub struct Config {
     pub company: Option<u64>,
     pub site:    Option<u64>,
     pub proxy:   Option<String>,
-    pub bind:    Option<String>,
+    pub bind:    Option<IpAddr>,
     pub roots:   RootCertStore,
 }
 

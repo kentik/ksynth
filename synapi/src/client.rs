@@ -1,4 +1,5 @@
 use std::mem;
+use std::net::IpAddr;
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
@@ -49,7 +50,7 @@ pub struct Failure {
 
 impl Client {
     pub fn new(mut config: Config) -> Result<Self, Error> {
-        let Config { region, proxy, roots, .. } = &mut config;
+        let Config { region, proxy, bind, roots, .. } = &mut config;
 
         let mut cfg = ClientConfig::new();
         cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
@@ -58,6 +59,10 @@ impl Client {
         let mut client = HttpClient::builder();
         client = client.timeout(Duration::from_secs(30));
         client = client.use_preconfigured_tls(cfg);
+
+        if let Some(addr) = bind {
+            client = client.local_address(*addr);
+        }
 
         if let Some(proxy) = proxy.as_ref().map(Proxy::all) {
             client = client.proxy(proxy?);
@@ -91,7 +96,7 @@ impl Client {
             name:       &'a str,
             global:     bool,
             os:         &'a str,
-            bind:       Option<&'a String>,
+            bind:       Option<&'a IpAddr>,
         }
 
         let key = &keys.pk;

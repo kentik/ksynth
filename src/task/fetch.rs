@@ -16,7 +16,7 @@ use super::{Config, Task, http::{Expiry, HttpClient}};
 pub struct Fetch {
     task:   u64,
     test:   u64,
-    target: String,
+    target: Arc<String>,
     method: Method,
     body:   Option<Bytes>,
     period: Duration,
@@ -33,7 +33,7 @@ impl Fetch {
         Self {
             task:   task.task,
             test:   task.test,
-            target: cfg.target,
+            target: Arc::new(cfg.target),
             method: method,
             body:   body,
             period: Duration::from_secs(cfg.period),
@@ -75,6 +75,7 @@ impl Fetch {
         self.envoy.export(record::Fetch {
             task:    self.task,
             test:    self.test,
+            target:  self.target.clone(),
             addr:    out.addr,
             status:  out.status.as_u16(),
             rtt:     out.rtt,

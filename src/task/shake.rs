@@ -13,7 +13,7 @@ use super::{Network, Resolver, Shaker, Task};
 pub struct Shake {
     task:     u64,
     test:     u64,
-    target:   String,
+    target:   Arc<String>,
     network:  Network,
     port:     u16,
     period:   Duration,
@@ -29,7 +29,7 @@ impl Shake {
             task:     task.task,
             test:     task.test,
             network:  task.network,
-            target:   cfg.target,
+            target:   Arc::new(cfg.target),
             port:     cfg.port,
             period:   Duration::from_secs(cfg.period),
             expiry:   Duration::from_millis(cfg.expiry),
@@ -75,11 +75,12 @@ impl Shake {
         debug!("{}: {}", self.task, out);
 
         self.envoy.export(record::Shake {
-            task: self.task,
-            test: self.test,
-            addr: out.addr,
-            port: out.port,
-            time: out.time,
+            task:   self.task,
+            test:   self.test,
+            target: self.target.clone(),
+            addr:   out.addr,
+            port:   out.port,
+            time:   out.time,
         }).await;
 
         Ok(())

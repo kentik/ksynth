@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::sync::Arc;
 use std::time::Duration;
 use anyhow::Result;
 use capnp::message::ReaderOptions;
@@ -338,6 +339,7 @@ impl Random for Fetch  {
         Self {
             task:   random(rng),
             test:   random(rng),
+            target: Arc::new(random(rng)),
             addr:   random(rng),
             status: random(rng),
             rtt:    random(rng),
@@ -349,13 +351,15 @@ impl Random for Fetch  {
 impl Random for Knock  {
     fn gen<R: Rng>(rng: &mut R) -> Self {
         Self {
-            task: random(rng),
-            test: random(rng),
-            addr: random(rng),
-            port: random(rng),
-            sent: random(rng),
-            lost: random(rng),
-            rtt:  random(rng),
+            task:   random(rng),
+            test:   random(rng),
+            target: Arc::new(random(rng)),
+            addr:   random(rng),
+            port:   random(rng),
+            sent:   random(rng),
+            lost:   random(rng),
+            rtt:    random(rng),
+            result: random(rng),
         }
     }
 }
@@ -363,12 +367,14 @@ impl Random for Knock  {
 impl Random for Ping  {
     fn gen<R: Rng>(rng: &mut R) -> Self {
         Self {
-            task: random(rng),
-            test: random(rng),
-            addr: random(rng),
-            sent: random(rng),
-            lost: random(rng),
-            rtt:  random(rng),
+            task:   random(rng),
+            test:   random(rng),
+            target: Arc::new(random(rng)),
+            addr:   random(rng),
+            sent:   random(rng),
+            lost:   random(rng),
+            rtt:    random(rng),
+            result: random(rng),
         }
     }
 }
@@ -389,11 +395,12 @@ impl Random for Query  {
 impl Random for Shake  {
     fn gen<R: Rng>(rng: &mut R) -> Self {
         Self {
-            task: random(rng),
-            test: random(rng),
-            addr: random(rng),
-            port: random(rng),
-            time: random(rng),
+            task:   random(rng),
+            test:   random(rng),
+            target: Arc::new(random(rng)),
+            addr:   random(rng),
+            port:   random(rng),
+            time:   random(rng),
         }
     }
 }
@@ -401,11 +408,13 @@ impl Random for Shake  {
 impl Random for Trace  {
     fn gen<R: Rng>(rng: &mut R) -> Self {
         Self {
-            task:  random(rng),
-            test:  random(rng),
-            addr:  random(rng),
-            route: random(rng),
-            time:  random(rng),
+            task:   random(rng),
+            test:   random(rng),
+            target: Arc::new(random(rng)),
+            addr:   random(rng),
+            hops:   random(rng),
+            route:  random(rng),
+            time:   random(rng),
         }
     }
 }
@@ -425,6 +434,15 @@ impl Random for Timeout  {
         Self {
             task: random(rng),
             test: random(rng),
+        }
+    }
+}
+
+impl Random for Hop {
+    fn gen<R: Rng>(_rng: &mut R) -> Self {
+        Self {
+            hop:   0,
+            nodes: HashMap::new(),
         }
     }
 }
@@ -488,5 +506,13 @@ impl Random for String {
                 _                              => None,
             }
         }).take(8).collect()
+    }
+}
+
+impl<T: Random> Random for Vec<T> {
+    fn gen<R: Rng>(rng: &mut R) -> Self {
+        (0..8).map(|_| {
+            T::gen(rng)
+        }).collect()
     }
 }

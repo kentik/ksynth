@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
+use std::sync::Arc;
 use std::time::Duration;
 use serde::Serialize;
 use synapi::tasks::Device;
@@ -30,6 +31,7 @@ pub enum Record {
 pub struct Fetch {
     pub task:    u64,
     pub test:    u64,
+    pub target:  Arc<String>,
     pub addr:    IpAddr,
     pub status:  u16,
     pub rtt:     Duration,
@@ -40,21 +42,25 @@ pub struct Fetch {
 pub struct Knock {
     pub task:    u64,
     pub test:    u64,
+    pub target:  Arc<String>,
     pub addr:    IpAddr,
     pub port:    u16,
     pub sent:    u32,
     pub lost:    u32,
     pub rtt:     Summary,
+    pub result:  Vec<Duration>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Ping {
     pub task:    u64,
     pub test:    u64,
+    pub target:  Arc<String>,
     pub addr:    IpAddr,
     pub sent:    u32,
     pub lost:    u32,
     pub rtt:     Summary,
+    pub result:  Vec<Duration>,
 }
 
 #[derive(Clone, Debug)]
@@ -71,6 +77,7 @@ pub struct Query {
 pub struct Shake {
     pub task:    u64,
     pub test:    u64,
+    pub target:  Arc<String>,
     pub addr:    IpAddr,
     pub port:    u16,
     pub time:    Duration,
@@ -80,12 +87,14 @@ pub struct Shake {
 pub struct Trace {
     pub task:    u64,
     pub test:    u64,
+    pub target:  Arc<String>,
     pub addr:    IpAddr,
+    pub hops:    Vec<Hop>,
     pub route:   String,
     pub time:    Duration,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Hop {
     pub hop:   usize,
     pub nodes: HashMap<IpAddr, Vec<u64>>,

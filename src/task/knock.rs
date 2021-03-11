@@ -15,7 +15,7 @@ pub struct Knock {
     task:     u64,
     test:     u64,
     network:  Network,
-    target:   String,
+    target:   Arc<String>,
     port:     u16,
     period:   Duration,
     count:    usize,
@@ -31,7 +31,7 @@ impl Knock {
             task:     task.task,
             test:     task.test,
             network:  task.network,
-            target:   cfg.target,
+            target:   Arc::new(cfg.target),
             port:     cfg.port,
             period:   Duration::from_secs(cfg.period),
             count:    cfg.count as usize,
@@ -79,24 +79,27 @@ impl Knock {
         let lost = sent - rtt.len() as u32;
 
         Ok(Output {
-            addr: addr,
-            port: port,
-            sent: sent,
-            lost: lost,
-            rtt:  summarize(&rtt).unwrap_or_default(),
+            addr:   addr,
+            port:   port,
+            sent:   sent,
+            lost:   lost,
+            rtt:    summarize(&rtt).unwrap_or_default(),
+            result: rtt,
         })
     }
 
     async fn success(&self, out: Output) {
         debug!("{}: {}", self.task, out);
         self.envoy.export(record::Knock {
-            task: self.task,
-            test: self.test,
-            addr: out.addr,
-            port: out.port,
-            sent: out.sent,
-            lost: out.lost,
-            rtt:  out.rtt,
+            target: self.target.clone(),
+            task:   self.task,
+            test:   self.test,
+            addr:   out.addr,
+            port:   out.port,
+            sent:   out.sent,
+            lost:   out.lost,
+            rtt:    out.rtt,
+            result: out.result,
         }).await;
     }
 
@@ -120,11 +123,12 @@ impl Knock {
 
 #[derive(Debug)]
 struct Output {
-    addr: IpAddr,
-    port: u16,
-    sent: u32,
-    lost: u32,
-    rtt:  Summary,
+    addr:   IpAddr,
+    port:   u16,
+    sent:   u32,
+    lost:   u32,
+    rtt:    Summary,
+    result: Vec<Duration>,
 }
 
 impl fmt::Display for Output {

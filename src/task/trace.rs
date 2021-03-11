@@ -15,7 +15,7 @@ pub struct Trace {
     task:     u64,
     test:     u64,
     protocol: Protocol,
-    target:   String,
+    target:   Arc<String>,
     network:  Network,
     period:   Duration,
     limit:    usize,
@@ -40,7 +40,7 @@ impl Trace {
             test:     task.test,
             network:  task.network,
             protocol: protocol,
-            target:   cfg.target,
+            target:   Arc::new(cfg.target),
             period:   Duration::from_secs(cfg.period),
             limit:    cfg.limit as usize,
             expiry:   Duration::from_millis(cfg.expiry),
@@ -88,7 +88,7 @@ impl Trace {
     async fn success(&self, out: Output) -> Result<()> {
         debug!("{}: {}", self.task, out);
 
-        let route = out.route.into_iter().enumerate().map(|(hop, nodes)| {
+        let hops = out.route.into_iter().enumerate().map(|(hop, nodes)| {
             let mut map = HashMap::<IpAddr, Vec<u64>>::new();
 
             for node in nodes {
@@ -101,14 +101,16 @@ impl Trace {
             Hop { hop: hop + 1, nodes: map }
         }).collect::<Vec<_>>();
 
-        let route = serde_json::to_string(&route)?;
+        let route = serde_json::to_string(&hops)?;
 
         self.envoy.export(record::Trace {
-            task:  self.task,
-            test:  self.test,
-            addr:  out.addr,
-            route: route,
-            time:  out.time,
+            task:   self.task,
+            test:   self.test,
+            target: self.target.clone(),
+            addr:   out.addr,
+            hops:   hops,
+            route:  route,
+            time:   out.time,
         }).await;
 
         Ok(())

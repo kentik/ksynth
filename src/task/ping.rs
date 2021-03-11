@@ -15,7 +15,7 @@ pub struct Ping {
     task:     u64,
     test:     u64,
     network:  Network,
-    target:   String,
+    target:   Arc<String>,
     period:   Duration,
     count:    usize,
     expiry:   Duration,
@@ -30,7 +30,7 @@ impl Ping {
             task:     task.task,
             test:     task.test,
             network:  task.network,
-            target:   cfg.target,
+            target:   Arc::new(cfg.target),
             period:   Duration::from_secs(cfg.period),
             count:    cfg.count as usize,
             expiry:   Duration::from_millis(cfg.expiry),
@@ -71,22 +71,25 @@ impl Ping {
         let lost = sent - rtt.len() as u32;
 
         Ok(Output {
-            addr: addr,
-            sent: sent,
-            lost: lost,
-            rtt:  summarize(&rtt).unwrap_or_default(),
+            addr:   addr,
+            sent:   sent,
+            lost:   lost,
+            rtt:    summarize(&rtt).unwrap_or_default(),
+            result: rtt,
         })
     }
 
     async fn success(&self, out: Output) {
         debug!("{}: {}", self.task, out);
         self.envoy.export(record::Ping {
-            task: self.task,
-            test: self.test,
-            addr: out.addr,
-            sent: out.sent,
-            lost: out.lost,
-            rtt:  out.rtt,
+            task:   self.task,
+            test:   self.test,
+            target: self.target.clone(),
+            addr:   out.addr,
+            sent:   out.sent,
+            lost:   out.lost,
+            rtt:    out.rtt,
+            result: out.result,
         }).await;
     }
 
@@ -110,10 +113,11 @@ impl Ping {
 
 #[derive(Debug)]
 struct Output {
-    addr: IpAddr,
-    sent: u32,
-    lost: u32,
-    rtt:  Summary,
+    addr:   IpAddr,
+    sent:   u32,
+    lost:   u32,
+    rtt:    Summary,
+    result: Vec<Duration>,
 }
 
 impl fmt::Display for Output {

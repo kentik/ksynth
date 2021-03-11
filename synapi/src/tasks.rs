@@ -95,6 +95,8 @@ pub struct TraceConfig {
     pub port:     u16,
     pub target:   String,
     pub period:   u64,
+    #[serde(default = "default_trace_count")]
+    pub count:    u64,
     pub limit:    u64,
     pub expiry:   u64,
 }
@@ -185,4 +187,8 @@ impl<'d> Deserialize<'d> for Task {
 
         Ok(Task { task, test, config, family, state })
     }
+}
+
+fn default_trace_count() -> u64 {
+    3
 }

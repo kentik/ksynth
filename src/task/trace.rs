@@ -18,6 +18,7 @@ pub struct Trace {
     target:   Arc<String>,
     network:  Network,
     period:   Duration,
+    count:    usize,
     limit:    usize,
     expiry:   Duration,
     envoy:    Envoy,
@@ -42,6 +43,7 @@ impl Trace {
             protocol: protocol,
             target:   Arc::new(cfg.target),
             period:   Duration::from_secs(cfg.period),
+            count:    cfg.count as usize,
             limit:    cfg.limit as usize,
             expiry:   Duration::from_millis(cfg.expiry),
             envoy:    task.envoy,
@@ -73,7 +75,7 @@ impl Trace {
         let route = self.tracer.route(netdiag::Trace {
             proto:  self.protocol,
             addr:   addr,
-            probes: 3,
+            probes: self.count,
             limit:  self.limit,
             expiry: Duration::from_millis(250),
         }).await?;

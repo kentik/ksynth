@@ -44,6 +44,10 @@ pub struct FetchConfig {
     pub target:  String,
     pub period:  u64,
     pub expiry:  u64,
+    #[serde(default)]
+    pub method:  String,
+    #[serde(default)]
+    pub body:    Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

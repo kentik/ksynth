@@ -2,6 +2,7 @@ use std::fmt;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use bytes::Bytes;
 use anyhow::{Error, Result};
 use hyper::{Body, Method, Request, StatusCode, Uri};
 use hyper::body::HttpBody;
@@ -16,6 +17,8 @@ pub struct Fetch {
     task:   u64,
     test:   u64,
     target: String,
+    method: Method,
+    body:   Option<Bytes>,
     period: Duration,
     expiry: Duration,
     envoy:  Envoy,
@@ -24,10 +27,15 @@ pub struct Fetch {
 
 impl Fetch {
     pub fn new(task: Task, cfg: FetchConfig, client: Arc<Fetcher>) -> Self {
+        let method = cfg.method.parse().unwrap_or(Method::GET);
+        let body   = cfg.body.map(Bytes::from);
+
         Self {
             task:   task.task,
             test:   task.test,
             target: cfg.target,
+            method: method,
+            body:   body,
             period: Duration::from_secs(cfg.period),
             expiry: Duration::from_millis(cfg.expiry),
             envoy:  task.envoy,
@@ -53,10 +61,12 @@ impl Fetch {
     }
 
     async fn fetch(&self, target: Uri) -> Result<Output> {
-        let method   = Method::GET;
-        let start    = Instant::now();
+        let method = self.method.clone();
+        let body   = self.body.clone().map(Body::from).unwrap_or_else(Body::empty);
+        let start  = Instant::now();
 
-        let req = self.client.request(method, target)?;
+        let req = self.client.request(method, target, body)?;
+
         self.client.execute(start, req).await
     }
 
@@ -105,8 +115,8 @@ impl Fetcher {
         Ok(Self { client })
     }
 
-    pub fn request(&self, method: Method, url: Uri) -> Result<Request<Body>> {
-        Ok(Request::builder().method(method).uri(url).body(Body::empty())?)
+    pub fn request(&self, method: Method, url: Uri, body: Body) -> Result<Request<Body>> {
+        Ok(Request::builder().method(method).uri(url).body(body)?)
     }
 
     pub async fn execute(&self, start: Instant, req: Request<Body>) -> Result<Output> {

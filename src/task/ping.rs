@@ -9,7 +9,7 @@ use netdiag::{self, Pinger};
 use synapi::tasks::PingConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::{Network, Resolver, Task};
+use super::{Expiry, Network, Resolver, Task};
 
 pub struct Ping {
     task:     u64,
@@ -18,7 +18,7 @@ pub struct Ping {
     target:   Arc<String>,
     period:   Duration,
     count:    usize,
-    expiry:   Duration,
+    expiry:   Expiry,
     envoy:    Envoy,
     pinger:   Arc<Pinger>,
     resolver: Resolver,
@@ -26,6 +26,8 @@ pub struct Ping {
 
 impl Ping {
     pub fn new(task: Task, cfg: PingConfig, pinger: Arc<Pinger>) -> Self {
+        let expiry = Expiry::new(cfg.expiry, cfg.count, None);
+
         Self {
             task:     task.task,
             test:     task.test,
@@ -33,7 +35,7 @@ impl Ping {
             target:   Arc::new(cfg.target),
             period:   Duration::from_secs(cfg.period),
             count:    cfg.count as usize,
-            expiry:   Duration::from_millis(cfg.expiry),
+            expiry:   expiry,
             envoy:    task.envoy,
             pinger:   pinger,
             resolver: task.resolver,
@@ -46,7 +48,7 @@ impl Ping {
 
             let result = self.ping(self.count);
 
-            match timeout(self.expiry, result).await {
+            match timeout(self.expiry.task, result).await {
                 Ok(Ok(rtt)) => self.success(rtt).await,
                 Ok(Err(e))  => self.failure(e).await,
                 Err(_)      => self.timeout().await,
@@ -62,7 +64,7 @@ impl Ping {
         let ping = netdiag::Ping {
             addr:   addr,
             count:  count,
-            expiry: Duration::from_millis(250),
+            expiry: self.expiry.probe,
         };
 
         let rtt  = self.pinger.ping(ping).await?;

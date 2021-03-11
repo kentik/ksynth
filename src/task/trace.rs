@@ -9,7 +9,7 @@ use tokio::time::{sleep, timeout};
 use netdiag::{self, Node, Protocol, Tracer};
 use synapi::tasks::TraceConfig;
 use crate::export::{record, Hop, Envoy};
-use super::{Network, Resolver, Task};
+use super::{Expiry, Network, Resolver, Task};
 
 pub struct Trace {
     task:     u64,
@@ -20,7 +20,7 @@ pub struct Trace {
     period:   Duration,
     count:    usize,
     limit:    usize,
-    expiry:   Duration,
+    expiry:   Expiry,
     envoy:    Envoy,
     tracer:   Arc<Tracer>,
     resolver: Resolver,
@@ -36,6 +36,8 @@ impl Trace {
             _                 => Protocol::default(),
         };
 
+        let expiry = Expiry::new(cfg.expiry, cfg.count, Some(cfg.limit));
+
         Self {
             task:     task.task,
             test:     task.test,
@@ -45,7 +47,7 @@ impl Trace {
             period:   Duration::from_secs(cfg.period),
             count:    cfg.count as usize,
             limit:    cfg.limit as usize,
-            expiry:   Duration::from_millis(cfg.expiry),
+            expiry:   expiry,
             envoy:    task.envoy,
             tracer:   tracer,
             resolver: task.resolver,
@@ -58,7 +60,7 @@ impl Trace {
 
             let result = self.trace();
 
-            match timeout(self.expiry, result).await {
+            match timeout(self.expiry.task, result).await {
                 Ok(Ok(stats)) => self.success(stats).await?,
                 Ok(Err(e))    => self.failure(e).await,
                 Err(_)        => self.timeout().await,
@@ -77,7 +79,7 @@ impl Trace {
             addr:   addr,
             probes: self.count,
             limit:  self.limit,
-            expiry: Duration::from_millis(250),
+            expiry: self.expiry.probe,
         }).await?;
 
         Ok(Output {

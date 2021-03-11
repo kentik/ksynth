@@ -1,3 +1,4 @@
+pub use expiry::Expiry;
 pub use resolve::Resolver;
 pub use task::Config;
 pub use task::Network;
@@ -11,6 +12,7 @@ pub use query::Query;
 pub use shake::Shake;
 pub use trace::Trace;
 
+mod expiry;
 mod http;
 mod resolve;
 mod task;

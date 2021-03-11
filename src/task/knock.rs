@@ -9,7 +9,7 @@ use netdiag::{self, Knocker};
 use synapi::tasks::KnockConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::{Network, Resolver, Task};
+use super::{Expiry, Network, Resolver, Task};
 
 pub struct Knock {
     task:     u64,
@@ -19,7 +19,7 @@ pub struct Knock {
     port:     u16,
     period:   Duration,
     count:    usize,
-    expiry:   Duration,
+    expiry:   Expiry,
     envoy:    Envoy,
     knocker:  Arc<Knocker>,
     resolver: Resolver,
@@ -27,6 +27,8 @@ pub struct Knock {
 
 impl Knock {
     pub fn new(task: Task, cfg: KnockConfig, knocker: Arc<Knocker>) -> Self {
+        let expiry = Expiry::new(cfg.expiry, cfg.count, None);
+
         Self {
             task:     task.task,
             test:     task.test,
@@ -35,7 +37,7 @@ impl Knock {
             port:     cfg.port,
             period:   Duration::from_secs(cfg.period),
             count:    cfg.count as usize,
-            expiry:   Duration::from_millis(cfg.expiry),
+            expiry:   expiry,
             envoy:    task.envoy,
             knocker:  knocker,
             resolver: task.resolver,
@@ -50,7 +52,7 @@ impl Knock {
 
             let result = self.knock(self.count);
 
-            match timeout(self.expiry, result).await {
+            match timeout(self.expiry.task, result).await {
                 Ok(Ok(rtt)) => self.success(rtt).await,
                 Ok(Err(e))  => self.failure(e).await,
                 Err(_)      => self.timeout().await,
@@ -70,7 +72,7 @@ impl Knock {
             addr:   addr,
             port:   port,
             count:  count,
-            expiry: Duration::from_millis(500),
+            expiry: self.expiry.probe,
         };
 
         let rtt  = knocker.knock(knock).await?;

@@ -79,19 +79,3 @@ impl<'a> TryFrom<(u8, &'a [u8])> for Unreachable<'a> {
         })
     }
 }
-
-pub fn ping6<'a>(buf: &'a mut [u8], id: u16, seq: u16, payload: &[u8]) -> Result<&'a [u8], Error> {
-    let n = HEADER_SIZE + payload.len();
-
-    if buf.len() < n {
-        return Err(anyhow!("invalid slice"))
-    }
-
-    buf[0..2].copy_from_slice(&[ECHO_REQUEST, 0]);
-    buf[2..4].copy_from_slice(&0u16.to_be_bytes());
-    buf[4..6].copy_from_slice(&id.to_be_bytes());
-    buf[6..8].copy_from_slice(&seq.to_be_bytes());
-    buf[8..n].copy_from_slice(payload);
-
-    Ok(&buf[0..n])
-}

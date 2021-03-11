@@ -3,10 +3,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Error, Result};
-use futures::{Stream, StreamExt, TryStreamExt};
-use futures::stream::unfold;
 use log::{debug, warn};
-use rand::random;
 use tokio::time::{sleep, timeout};
 use netdiag::{self, Pinger};
 use synapi::tasks::PingConfig;
@@ -60,11 +57,15 @@ impl Ping {
     }
 
     async fn ping(&self, count: usize) -> Result<Output> {
-        let pinger = self.pinger.clone();
-
         let addr = self.resolver.lookup(&self.target, self.network).await?;
 
-        let rtt  = ping(pinger, addr).take(count).try_collect::<Vec<_>>().await?;
+        let ping = netdiag::Ping {
+            addr:   addr,
+            count:  count,
+            expiry: Duration::from_millis(250),
+        };
+
+        let rtt  = self.pinger.ping(ping).await?;
         let sent = rtt.len() as u32;
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();
         let lost = sent - rtt.len() as u32;
@@ -105,22 +106,6 @@ impl Ping {
             test: self.test,
         }).await;
     }
-}
-
-fn ping(pinger: Arc<Pinger>, addr: IpAddr) -> impl Stream<Item = Result<Option<Duration>>> {
-    unfold((pinger, addr, 0), |(pinger, addr, seq)| async move {
-        let expiry = Duration::from_millis(250);
-        let ident  = random();
-        let ping   = netdiag::Ping::new(addr, ident, seq);
-
-        let rtt = match timeout(expiry, pinger.ping(&ping)).await {
-            Ok(Ok(rtt)) => Ok(Some(rtt)),
-            Ok(Err(e))  => Err(e),
-            Err(_)      => Ok(None),
-        };
-
-        Some((rtt, (pinger, addr, seq.wrapping_add(1))))
-    })
 }
 
 #[derive(Debug)]

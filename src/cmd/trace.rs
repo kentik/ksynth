@@ -7,7 +7,7 @@ use tokio::net::UdpSocket;
 use tokio::time::sleep;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::system_conf::read_system_conf;
-use netdiag::{Bind, Node, Probe, Protocol, Tracer};
+use netdiag::{Bind, Node, trace::Probe, Protocol, Tracer};
 use crate::args::Args;
 use crate::task::{Network, Resolver};
 use super::resolve;

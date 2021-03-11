@@ -1,8 +1,12 @@
 name: vacuum
 
 on:
-  schedule:
-    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      expire:
+        description: 'max age'
+        required: true
+        default: '2d'
 
 jobs:
   artifacts:
@@ -11,4 +15,4 @@ jobs:
       - uses: kolpav/purge-artifacts-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          expire-in: 1 hour
+          expire-in: ${{ github.event.inputs.expire }}

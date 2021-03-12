@@ -22,7 +22,6 @@ pub enum UDP {
     V6(UDPv6),
 }
 
-
 #[derive(Copy, Clone, Debug)]
 pub enum Protocol {
     TCP(u16),

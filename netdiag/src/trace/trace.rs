@@ -36,11 +36,7 @@ impl Tracer {
         let sock4 = Sock4::new(bind, state.clone()).await?;
         let sock6 = Sock6::new(bind, state.clone()).await?;
 
-        Ok(Self {
-            sock4: sock4,
-            sock6: sock6,
-            state: state,
-        })
+        Ok(Self { sock4, sock6, state })
     }
 
     pub async fn route(&self, trace: Trace) -> Result<Vec<Vec<Node>>> {

@@ -3,6 +3,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Error,Result}  ;
+use futures::TryStreamExt;
 use log::{debug, warn};
 use tokio::time::{sleep, timeout};
 use netdiag::{self, Knocker};
@@ -63,8 +64,6 @@ impl Knock {
     }
 
     async fn knock(&self, count: usize) -> Result<Output> {
-        let knocker = &self.knocker;
-
         let addr = self.resolver.lookup(&self.target, self.network).await?;
         let port = self.port;
 
@@ -75,7 +74,8 @@ impl Knock {
             expiry: self.expiry.probe,
         };
 
-        let rtt  = knocker.knock(knock).await?;
+        let rtt  = self.knocker.knock(&knock).await?;
+        let rtt  = rtt.try_collect::<Vec<_>>().await?;
         let sent = rtt.len() as u32;
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();
         let lost = sent - rtt.len() as u32;

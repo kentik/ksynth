@@ -3,6 +3,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Error, Result};
+use futures::TryStreamExt;
 use log::{debug, warn};
 use tokio::time::{sleep, timeout};
 use netdiag::{self, Pinger};
@@ -67,7 +68,8 @@ impl Ping {
             expiry: self.expiry.probe,
         };
 
-        let rtt  = self.pinger.ping(ping).await?;
+        let rtt  = self.pinger.ping(&ping);
+        let rtt  = rtt.try_collect::<Vec<_>>().await?;
         let sent = rtt.len() as u32;
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();
         let lost = sent - rtt.len() as u32;

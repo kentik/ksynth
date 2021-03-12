@@ -2,8 +2,8 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::Result;
-use futures::{StreamExt, TryStreamExt};
-use futures::stream::unfold;
+use futures::{Stream, StreamExt};
+use futures::stream::try_unfold;
 use rand::random;
 use tokio::time::timeout;
 use crate::Bind;
@@ -34,18 +34,18 @@ impl Pinger {
         Ok(Self { sock4, sock6, state })
     }
 
-    pub async fn ping(&self, ping: Ping) -> Result<Vec<Option<Duration>>> {
-        let Ping { addr, count, expiry } = ping;
+    pub fn ping(&self, ping: &Ping) -> impl Stream<Item = Result<Option<Duration>>> + '_ {
+        let Ping { addr, count, expiry } = *ping;
 
-        unfold((addr, 0), |(addr, seq)| async move {
+        try_unfold(0, move |seq| async move {
             let ident = random();
             let probe = Probe::new(addr, ident, seq);
-            let rtt   = self.probe(&probe, expiry).await;
-            Some((rtt, (addr, seq.wrapping_add(1))))
-        }).take(count).try_collect::<Vec<_>>().await
+            let rtt   = self.probe(&probe, expiry).await?;
+            Ok(Some((rtt, (seq.wrapping_add(1)))))
+        }).take(count)
     }
 
-    pub async fn probe(&self, probe: &Probe, expiry: Duration) -> Result<Option<Duration>> {
+    async fn probe(&self, probe: &Probe, expiry: Duration) -> Result<Option<Duration>> {
         let rx   = self.state.insert(probe.token);
         let sent = self.send(probe).await?;
 
@@ -55,7 +55,7 @@ impl Pinger {
         })
     }
 
-    pub async fn send(&self, probe: &Probe) -> Result<Instant> {
+    async fn send(&self, probe: &Probe) -> Result<Instant> {
         match probe.addr {
             IpAddr::V4(_) => self.sock4.send(probe).await,
             IpAddr::V6(_) => self.sock6.send(probe).await,

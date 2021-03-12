@@ -1,17 +1,17 @@
 use std::time::Duration;
 use anyhow::Result;
 use clap::{value_t, values_t};
-use rand::prelude::*;
+use futures::{pin_mut, StreamExt};
 use tokio::time::sleep;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::system_conf::read_system_conf;
-use netdiag::{Bind, Pinger, ping::Probe};
+use netdiag::{Bind, Ping, Pinger};
 use crate::args::Args;
 use crate::task::{Network, Resolver};
 use super::resolve;
 
 pub async fn ping(args: Args<'_, '_>) -> Result<()> {
-    let count  = value_t!(args, "count",  u16)?;
+    let count  = value_t!(args, "count",  usize)?;
     let delay  = value_t!(args, "delay",  u64)?;
     let expiry = value_t!(args, "expiry", u64)?;
     let ip4    = !args.is_present("ip6");
@@ -43,17 +43,15 @@ pub async fn ping(args: Args<'_, '_>) -> Result<()> {
     for (host, addr) in resolve(&resolver, hosts, net).await {
         println!("ping {} ({})", host, addr);
 
-        let ident = random();
+        let ping   = Ping { addr, count, expiry };
+        let stream = pinger.ping(&ping).enumerate();
+        pin_mut!(stream);
 
-        for n in 0..count {
-            let probe = Probe::new(addr, ident, n);
-
-            match pinger.probe(&probe, expiry).await {
-                Ok(Some(d)) => println!("seq {} RTT {:0.2?} ", n, d),
-                Ok(None)    => println!("seq {} timeout", n),
-                Err(e)      => println!("seq {} error: {:?} ", n, e),
-            };
-
+        while let Some((n, item)) = stream.next().await {
+            match item? {
+                Some(d) => println!("seq {} RTT {:0.2?} ", n, d),
+                None    => println!("seq {} timeout", n),
+            }
             sleep(delay).await;
         }
     }

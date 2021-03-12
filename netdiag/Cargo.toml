@@ -22,6 +22,7 @@ features    = ["net"]
 default-features = false
 
 [dev-dependencies]
+gumdrop     = "0.8.0"
 
 [dev-dependencies.tokio]
 version     = "1.0.1"

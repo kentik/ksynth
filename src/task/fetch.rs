@@ -11,7 +11,7 @@ use log::{debug, warn};
 use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
-use super::{Config, Task, http::{Expiry, HttpClient}};
+use super::{Config, Task, http::{Expiry, HttpClient, Times}};
 
 pub struct Fetch {
     task:   u64,
@@ -78,6 +78,9 @@ impl Fetch {
             target:  self.target.clone(),
             addr:    out.addr,
             status:  out.status.as_u16(),
+            dns:     out.dns,
+            tcp:     out.tcp,
+            tls:     out.tls,
             rtt:     out.rtt,
             size:    out.bytes,
         }).await;
@@ -137,7 +140,12 @@ impl Fetcher {
         let time   = Instant::now();
         let rtt    = time.saturating_duration_since(start);
 
-        Ok(Output { addr, status, rtt, bytes })
+        let times  = res.extensions().get::<Times>().cloned().unwrap_or_default();
+        let dns    = times.dns;
+        let tcp    = times.tcp;
+        let tls    = times.tls.unwrap_or_default();
+
+        Ok(Output { addr, status, dns, tcp, tls, rtt, bytes })
     }
 }
 
@@ -145,6 +153,9 @@ impl Fetcher {
 pub struct Output {
     addr:   IpAddr,
     status: StatusCode,
+    dns:    Duration,
+    tcp:    Duration,
+    tls:    Duration,
     rtt:    Duration,
     bytes:  usize,
 }

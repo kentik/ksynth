@@ -53,7 +53,6 @@ struct Columns {
     test:   u32,
     cause:  u32,
     status: u32,
-    ttlb:   u32,
     size:   u32,
     sent:   u32,
     lost:   u32,
@@ -64,6 +63,7 @@ struct Columns {
     data:   u32,
     record: u32,
     code:   u32,
+    times:  Times,
 }
 
 struct Stats {
@@ -72,6 +72,13 @@ struct Stats {
     avg: u32,
     std: u32,
     jit: u32,
+}
+
+struct Times {
+    dns:  u32,
+    tcp:  u32,
+    tls:  u32,
+    ttlb: u32,
 }
 
 impl Columns {
@@ -92,7 +99,6 @@ impl Columns {
             test:    lookup("INT64_02")?,
             cause:   lookup("STR00")?,
             status:  lookup("INT01")?,
-            ttlb:    lookup("INT02")?,
             size:    lookup("INT03")?,
             sent:    lookup("INT01")?,
             lost:    lookup("INT02")?,
@@ -109,28 +115,38 @@ impl Columns {
             data:    lookup("STR00")?,
             record:  lookup("STR01")?,
             code:    lookup("INT02")?,
+            times: Times {
+                dns:  lookup("INT04")?,
+                tcp:  lookup("INT05")?,
+                tls:  lookup("INT06")?,
+                ttlb: lookup("INT02")?,
+            },
         })
     }
 
     fn fetch(&self, mut msg: Builder, agent: u64, data: &Fetch) {
-        let Fetch { task, test, addr, status, rtt, size, .. } = *data;
+        let Fetch { task, test, addr, status, dns, tcp, tls, rtt, size, .. } = *data;
 
-        let size = u32::try_from(size).unwrap_or(0);
+        let times = &self.times;
+        let size  = u32::try_from(size).unwrap_or(0);
 
         match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new("fetch", msg, 8);
+        let mut customs = Customs::new("fetch", msg, 11);
         customs.next(self.app,    |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,  |v| v.set_uint64_val(agent));
         customs.next(self.kind,   |v| v.set_uint32_val(FETCH));
         customs.next(self.task,   |v| v.set_uint64_val(task));
         customs.next(self.test,   |v| v.set_uint64_val(test));
         customs.next(self.status, |v| v.set_uint32_val(status.into()));
-        customs.next(self.ttlb,   |v| v.set_uint32_val(as_micros(rtt)));
         customs.next(self.size,   |v| v.set_uint32_val(size));
+        customs.next(times.ttlb,  |v| v.set_uint32_val(as_micros(rtt)));
+        customs.next(times.dns,   |v| v.set_uint32_val(as_micros(dns)));
+        customs.next(times.tcp,   |v| v.set_uint32_val(as_micros(tcp)));
+        customs.next(times.tls,   |v| v.set_uint32_val(as_micros(tls)));
     }
 
     fn knock(&self, mut msg: Builder, agent: u64, data: &Knock) {

@@ -34,6 +34,9 @@ pub struct Fetch {
     pub target:  Arc<String>,
     pub addr:    IpAddr,
     pub status:  u16,
+    pub dns:     Duration,
+    pub tcp:     Duration,
+    pub tls:     Duration,
     pub rtt:     Duration,
     pub size:    usize,
 }

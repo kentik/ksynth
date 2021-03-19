@@ -155,7 +155,7 @@ impl Executor {
     }
 
     fn fetch(&self, id: u64, task: Task, cfg: FetchConfig) -> Result<Handle> {
-        let fetch = Fetch::new(task, cfg, self.fetcher.clone());
+        let fetch = Fetch::new(task, cfg, self.fetcher.clone())?;
         Ok(self.spawner.spawn(id, fetch.exec()))
     }
 

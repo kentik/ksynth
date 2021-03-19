@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, de::Deserializer};
 use crate::serde::id;
 use super::agent::Net;
@@ -48,6 +49,8 @@ pub struct FetchConfig {
     pub method:  String,
     #[serde(default)]
     pub body:    Option<String>,
+    #[serde(default)]
+    pub headers: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -7,6 +7,7 @@ use anyhow::{Error, Result};
 use hyper::{Body, Method, Request, StatusCode, Uri};
 use hyper::body::HttpBody;
 use hyper::client::connect::HttpInfo;
+use hyper::header::HeaderMap;
 use log::{debug, warn};
 use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
@@ -14,33 +15,42 @@ use crate::export::{record, Envoy};
 use super::{Config, Task, http::{Expiry, HttpClient, Times}};
 
 pub struct Fetch {
-    task:   u64,
-    test:   u64,
-    target: Arc<String>,
-    method: Method,
-    body:   Option<Bytes>,
-    period: Duration,
-    expiry: Duration,
-    envoy:  Envoy,
-    client: Arc<Fetcher>,
+    task:    u64,
+    test:    u64,
+    target:  Arc<String>,
+    method:  Method,
+    headers: Option<HeaderMap>,
+    body:    Option<Bytes>,
+    period:  Duration,
+    expiry:  Duration,
+    envoy:   Envoy,
+    client:  Arc<Fetcher>,
 }
 
 impl Fetch {
-    pub fn new(task: Task, cfg: FetchConfig, client: Arc<Fetcher>) -> Self {
-        let method = cfg.method.parse().unwrap_or(Method::GET);
-        let body   = cfg.body.map(Bytes::from);
+    pub fn new(task: Task, cfg: FetchConfig, client: Arc<Fetcher>) -> Result<Self> {
+        let method  = cfg.method.parse().unwrap_or(Method::GET);
+        let headers = cfg.headers.map(|map| {
+            let map = map.iter().map(|(name, value)| {
+                let name  = name.parse()?;
+                let value = value.parse()?;
+                Ok((name, value))
+            }).collect::<Result<_>>()?;
+            Result::<_, Error>::Ok(map)
+        }).transpose()?;
 
-        Self {
-            task:   task.task,
-            test:   task.test,
-            target: Arc::new(cfg.target),
-            method: method,
-            body:   body,
-            period: Duration::from_secs(cfg.period),
-            expiry: Duration::from_millis(cfg.expiry),
-            envoy:  task.envoy,
-            client: client,
-        }
+        Ok(Self {
+            task:    task.task,
+            test:    task.test,
+            target:  Arc::new(cfg.target),
+            method:  method,
+            headers: headers,
+            body:    cfg.body.map(Bytes::from),
+            period:  Duration::from_secs(cfg.period),
+            expiry:  Duration::from_millis(cfg.expiry),
+            envoy:   task.envoy,
+            client:  client,
+        })
     }
 
     pub async fn exec(self) -> Result<()> {
@@ -65,7 +75,11 @@ impl Fetch {
         let body   = self.body.clone().map(Body::from).unwrap_or_else(Body::empty);
         let start  = Instant::now();
 
-        let req = self.client.request(method, target, body)?;
+        let mut req = self.client.request(method, target, body)?;
+
+        if let Some(headers) = self.headers.as_ref().cloned() {
+            req.headers_mut().extend(headers);
+        }
 
         self.client.execute(start, req).await
     }

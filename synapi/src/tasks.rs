@@ -1,5 +1,9 @@
+use std::cmp::max;
 use std::collections::HashMap;
-use serde::{Deserialize, de::Deserializer};
+use std::convert::TryFrom;
+use std::fmt;
+use std::time::Duration;
+use serde::{Deserialize, de::{Deserializer, Error, Visitor}};
 use crate::serde::id;
 use super::agent::Net;
 
@@ -43,8 +47,8 @@ pub enum TaskConfig {
 #[derive(Debug, Deserialize)]
 pub struct FetchConfig {
     pub target:  String,
-    pub period:  u64,
-    pub expiry:  u64,
+    pub period:  Period,
+    pub expiry:  Expiry,
     #[serde(default)]
     pub method:  String,
     #[serde(default)]
@@ -56,25 +60,25 @@ pub struct FetchConfig {
 #[derive(Debug, Deserialize)]
 pub struct KnockConfig {
     pub target:  String,
-    pub period:  u64,
-    pub count:   u64,
-    pub expiry:  u64,
+    pub period:  Period,
+    pub count:   Count,
+    pub expiry:  Expiry,
     pub port:    u16,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PingConfig {
     pub target:  String,
-    pub period:  u64,
-    pub count:   u64,
-    pub expiry:  u64,
+    pub period:  Period,
+    pub count:   Count,
+    pub expiry:  Expiry,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct QueryConfig {
     pub target:  String,
-    pub period:  u64,
-    pub expiry:  u64,
+    pub period:  Period,
+    pub expiry:  Expiry,
     #[serde(rename = "resolver")]
     pub server:  String,
     pub port:    u16,
@@ -86,8 +90,8 @@ pub struct QueryConfig {
 pub struct ShakeConfig {
     pub target:   String,
     pub port:     u16,
-    pub period:   u64,
-    pub expiry:   u64,
+    pub period:   Period,
+    pub expiry:   Expiry,
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,11 +101,11 @@ pub struct TraceConfig {
     #[serde(default)]
     pub port:     u16,
     pub target:   String,
-    pub period:   u64,
+    pub period:   Period,
     #[serde(default = "default_trace_count")]
-    pub count:    u64,
-    pub limit:    u64,
-    pub expiry:   u64,
+    pub count:    Count,
+    pub limit:    Limit,
+    pub expiry:   Expiry,
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,6 +147,18 @@ pub enum Kind {
     String,
     Addr,
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct Count(usize);
+
+#[derive(Copy, Clone, Debug)]
+pub struct Limit(usize);
+
+#[derive(Copy, Clone, Debug)]
+pub struct Expiry(Duration);
+
+#[derive(Copy, Clone, Debug)]
+pub struct Period(Duration);
 
 impl<'d> Deserialize<'d> for Task {
     fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
@@ -192,6 +208,80 @@ impl<'d> Deserialize<'d> for Task {
     }
 }
 
-fn default_trace_count() -> u64 {
-    3
+struct U64Visitor;
+
+impl<'de> Visitor<'de> for U64Visitor {
+    type Value = u64;
+
+    fn expecting(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.write_str("an unsigned 64-bit integer")
+    }
+
+    fn visit_u64<E: Error>(self, value: u64) -> Result<Self::Value, E> {
+        Ok(value)
+    }
+}
+
+impl<'de> Deserialize<'de> for Count {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        let n = de.deserialize_u64(U64Visitor)?;
+        match usize::try_from(n) {
+            Ok(0)  => Ok(Self(1)),
+            Ok(n)  => Ok(Self(n)),
+            Err(_) => Err(D::Error::custom(format!("count out of range: {}", n))),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Limit {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        let n = de.deserialize_u64(U64Visitor)?;
+        match usize::try_from(n) {
+            Ok(0)  => Ok(Self(1)),
+            Ok(n)  => Ok(Self(n)),
+            Err(_) => Err(D::Error::custom(format!("limit out of range: {}", n))),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Expiry {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        let millis = max(de.deserialize_u64(U64Visitor)?, 1);
+        Ok(Self(Duration::from_millis(millis)))
+    }
+}
+
+impl<'de> Deserialize<'de> for Period {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        let secs = max(de.deserialize_u64(U64Visitor)?, 1);
+        Ok(Self(Duration::from_secs(secs)))
+    }
+}
+
+impl From<Count> for usize {
+    fn from(count: Count) -> Self {
+        count.0
+    }
+}
+
+impl From<Limit> for usize {
+    fn from(limit: Limit) -> Self {
+        limit.0
+    }
+}
+
+impl From<Expiry> for Duration  {
+    fn from(expiry: Expiry) -> Self {
+        expiry.0
+    }
+}
+
+impl From<Period> for Duration  {
+    fn from(period: Period) -> Self {
+        period.0
+    }
+}
+
+fn default_trace_count() -> Count {
+    Count(3)
 }

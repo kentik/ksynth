@@ -46,8 +46,8 @@ impl Fetch {
             method:  method,
             headers: headers,
             body:    cfg.body.map(Bytes::from),
-            period:  Duration::from_secs(cfg.period),
-            expiry:  Duration::from_millis(cfg.expiry),
+            period:  cfg.period.into(),
+            expiry:  cfg.expiry.into(),
             envoy:   task.envoy,
             client:  client,
         })

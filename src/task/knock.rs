@@ -28,7 +28,8 @@ pub struct Knock {
 
 impl Knock {
     pub fn new(task: Task, cfg: KnockConfig, knocker: Arc<Knocker>) -> Self {
-        let expiry = Expiry::new(cfg.expiry, cfg.count, None);
+        let count  = cfg.count.into();
+        let expiry = Expiry::new(cfg.expiry.into(), count);
 
         Self {
             task:     task.task,
@@ -36,8 +37,8 @@ impl Knock {
             network:  task.network,
             target:   Arc::new(cfg.target),
             port:     cfg.port,
-            period:   Duration::from_secs(cfg.period),
-            count:    cfg.count as usize,
+            period:   cfg.period.into(),
+            count:    count,
             expiry:   expiry,
             envoy:    task.envoy,
             knocker:  knocker,

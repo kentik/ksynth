@@ -130,7 +130,7 @@ impl Client {
         struct Request<'a> {
             session: &'a str,
             since:   u64,
-        };
+        }
 
         let session = self.session().await?;
 
@@ -145,7 +145,7 @@ impl Client {
         struct Request<'a> {
             session: &'a str,
             report:  &'a Report,
-        };
+        }
 
         let session = self.session().await?;
 

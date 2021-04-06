@@ -342,6 +342,9 @@ impl Random for Fetch  {
             target: Arc::new(random(rng)),
             addr:   random(rng),
             status: random(rng),
+            dns:    random(rng),
+            tcp:    random(rng),
+            tls:    random(rng),
             rtt:    random(rng),
             size:   random(rng),
         }

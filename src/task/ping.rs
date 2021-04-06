@@ -27,15 +27,16 @@ pub struct Ping {
 
 impl Ping {
     pub fn new(task: Task, cfg: PingConfig, pinger: Arc<Pinger>) -> Self {
-        let expiry = Expiry::new(cfg.expiry, cfg.count, None);
+        let count  = cfg.count.into();
+        let expiry = Expiry::new(cfg.expiry.into(), count);
 
         Self {
             task:     task.task,
             test:     task.test,
             network:  task.network,
             target:   Arc::new(cfg.target),
-            period:   Duration::from_secs(cfg.period),
-            count:    cfg.count as usize,
+            period:   cfg.period.into(),
+            count:    count,
             expiry:   expiry,
             envoy:    task.envoy,
             pinger:   pinger,

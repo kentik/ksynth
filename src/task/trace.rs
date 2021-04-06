@@ -36,7 +36,9 @@ impl Trace {
             _                 => Protocol::default(),
         };
 
-        let expiry = Expiry::new(cfg.expiry, cfg.count, Some(cfg.limit));
+        let count  = usize::from(cfg.count);
+        let limit  = usize::from(cfg.limit);
+        let expiry = Expiry::new(cfg.expiry.into(), count * limit);
 
         Self {
             task:     task.task,
@@ -44,9 +46,9 @@ impl Trace {
             network:  task.network,
             protocol: protocol,
             target:   Arc::new(cfg.target),
-            period:   Duration::from_secs(cfg.period),
-            count:    cfg.count as usize,
-            limit:    cfg.limit as usize,
+            period:   cfg.period.into(),
+            count:    count,
+            limit:    limit,
             expiry:   expiry,
             envoy:    task.envoy,
             tracer:   tracer,

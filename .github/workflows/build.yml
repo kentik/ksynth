@@ -24,6 +24,9 @@ jobs:
           - target: armv7-unknown-linux-musleabihf
             builder: ubuntu-latest
             cross: true
+          - target: x86_64-unknown-freebsd
+            builder: ubuntu-latest
+            cross: true
     continue-on-error: ${{ startsWith(matrix.builder, 'macos') }}
     steps:
       - uses: actions-rs/toolchain@v1

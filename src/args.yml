@@ -92,8 +92,14 @@ subcommands:
         - rc:
             long: rc
             help: accept RCs
-            hidden: true
             takes_value: false
+            hidden: true
+        - output:
+            short: o
+            long: output
+            help: output format
+            takes_value: true
+            hidden: true
   - ping:
       about: execute ping
       help_message: print help

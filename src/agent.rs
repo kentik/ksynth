@@ -2,8 +2,9 @@ use std::fs::{self, File};
 use std::future::Future;
 use std::io::Read;
 use std::process;
+use std::str::FromStr;
 use std::sync::Arc;
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use clap::value_t;
 use ed25519_compact::{KeyPair, Seed};
 use log::{debug, error, info, warn};
@@ -30,20 +31,24 @@ use crate::version::Version;
 use crate::watch::Watcher;
 
 pub struct Agent {
-    client: Client,
+    bind:   Bind,
+    client: Arc<Client>,
     keys:   KeyPair,
     roots:  RootCertStore,
 }
 
+enum Output {
+    Influx(String),
+    Kentik,
+}
+
 impl Agent {
-    pub fn new(client: Client, keys: KeyPair, roots: RootCertStore) -> Self {
-        Self { client, keys, roots }
+    pub fn new(bind: Bind, client: Arc<Client>, keys: KeyPair, roots: RootCertStore) -> Self {
+        Self { bind, client, keys, roots }
     }
 
-    pub async fn exec(self, bind: Bind, net: Option<Network>) -> Result<()> {
-        let client = Arc::new(self.client);
-        let keys   = self.keys;
-        let roots  = self.roots;
+    pub async fn exec(self, exporter: Exporter, net: Option<Network>) -> Result<()> {
+        let Self { bind, client, keys, roots, .. } = self;
 
         let config = Config {
             bind:     bind,
@@ -55,7 +60,6 @@ impl Agent {
         let (tx, mut rx) = channel(16);
 
         let (watcher, tasks) = Watcher::new(client.clone(), keys);
-        let exporter = Arc::new(Exporter::new(client.clone()));
         let executor = Executor::new(tasks, exporter.clone(), config).await?;
         let monitor  = Monitor::new(client, executor.status());
 
@@ -127,8 +131,8 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     }
 
     let roots  = trust_roots();
-    let client = Client::new(ClientConfig {
-        name:    name,
+    let client = Arc::new(Client::new(ClientConfig {
+        name:    name.clone(),
         global:  global,
         region:  region,
         version: version.version.clone(),
@@ -138,13 +142,18 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         proxy:   proxy,
         bind:    args.opt("bind")?,
         roots:   roots.clone(),
-    })?;
+    })?);
+
+    let exporter = match args.opt("output")? {
+        Some(Output::Influx(url))   => Exporter::influx(name, &url)?,
+        Some(Output::Kentik) | None => Exporter::kentik(client.clone())?,
+    };
 
     let runtime = Runtime::new()?;
-    let agent   = Agent::new(client, keys, roots);
+    let agent   = Agent::new(bind, client, keys, roots);
 
     runtime.spawn(async move {
-        if let Err(e) = agent.exec(bind, net).await {
+        if let Err(e) = agent.exec(exporter, net).await {
             error!("agent failed: {:?}", e);
             process::exit(1);
         }
@@ -229,4 +238,19 @@ fn trust_roots() -> RootCertStore {
     }
 
     store
+}
+
+impl FromStr for Output {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.splitn(2, '=');
+        let format = split.next().unwrap_or("kentik");
+        let args   = split.next();
+        match (format, args) {
+            ("influx", Some(url)) => Ok(Output::Influx(url.to_owned())),
+            ("kentik", None)      => Ok(Output::Kentik),
+            _                     => Err(anyhow!("{}", s)),
+        }
+    }
 }

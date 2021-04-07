@@ -4,7 +4,8 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use capnp::{message, serialize_packed};
 use crate::chf_capnp::{c_h_f::Builder, packed_c_h_f};
-use super::{Customs, Record, Target, record::*};
+use crate::export::{Record, Target, record::*};
+use super::Customs;
 
 pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
     let cs = Columns::new(target)?;

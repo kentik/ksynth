@@ -1,17 +1,14 @@
 use std::collections::HashMap;
-use std::mem;
 use std::sync::Arc;
-use std::time::Duration;
 use anyhow::Result;
-use log::warn;
 use tokio::sync::Mutex;
-use tokio::time::interval;
 use synapi::Client;
-use super::{encode, Record, Target};
+use super::{Record, Target, influx, kentik};
 
-pub struct Exporter {
-    export: Arc<Mutex<HashMap<Key, Output>>>,
-    client: Arc<Client>,
+#[derive(Clone)]
+pub enum Exporter {
+    Influx(Arc<influx::Exporter>),
+    Kentik(Arc<kentik::Exporter>),
 }
 
 pub struct Envoy {
@@ -20,68 +17,48 @@ pub struct Envoy {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
-struct Key {
+pub struct Key {
     company: u64,
     device:  u64,
 }
 
 #[derive(Debug)]
-struct Output {
-    target: Arc<Target>,
-    values: Vec<Record>,
+pub struct Output {
+    pub target: Arc<Target>,
+    pub values: Vec<Record>,
 }
 
 impl Exporter {
-    pub fn new(client: Arc<Client>) -> Self {
-        Self {
-            export: Arc::new(Mutex::new(HashMap::new())),
-            client: client,
-        }
+    pub fn influx(agent: String, endpoint: &str) -> Result<Self> {
+        let export = influx::Exporter::new(agent, endpoint)?;
+        Ok(Self::Influx(Arc::new(export)))
+    }
+
+    pub fn kentik(client: Arc<Client>) -> Result<Self> {
+        let export = kentik::Exporter::new(client)?;
+        Ok(Self::Kentik(Arc::new(export)))
     }
 
     pub fn envoy(&self, target: Arc<Target>) -> Envoy {
-        Envoy {
-            export: self.export.clone(),
-            target: target,
+        match self {
+            Self::Influx(export) => export.envoy(target),
+            Self::Kentik(export) => export.envoy(target),
         }
     }
 
-    pub async fn exec(self: Arc<Self>) -> Result<()> {
-        let mut ticker = interval(Duration::from_secs(10));
-        loop {
-            ticker.tick().await;
-
-            for o in self.drain().await.values() {
-                match self.send(&o.target, &o.values).await {
-                    Ok(()) => (),
-                    Err(e) => warn!("export failed: {:?}", e),
-                }
-            }
+    pub async fn exec(self) -> Result<()> {
+        match self {
+            Self::Influx(export) => export.exec().await,
+            Self::Kentik(export) => export.exec().await,
         }
-    }
-
-    async fn send(&self, target: &Target, records: &[Record]) -> Result<()> {
-        let cid  = target.company;
-        let did  = target.device.id;
-        let name = "foo";
-
-        let sid  = format!("{}:{}:{}", cid, name, did);
-        let flow = encode(&target, &records)?;
-
-        let email = &target.email;
-        let token = &target.token;
-
-        Ok(self.client.export(&sid, email, token, &flow).await?)
-    }
-
-    async fn drain(&self) -> HashMap<Key, Output> {
-        let mut export = self.export.lock().await;
-        let empty = HashMap::with_capacity(export.len());
-        mem::replace(&mut export, empty)
     }
 }
 
 impl Envoy {
+    pub fn new(export: Arc<Mutex<HashMap<Key, Output>>>, target: Arc<Target>) -> Self {
+        Self { export, target }
+    }
+
     pub async fn export<T: Into<Record>>(&self, record: T) {
         let key = Key {
             company: self.target.company,

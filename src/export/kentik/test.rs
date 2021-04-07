@@ -11,8 +11,8 @@ use rand::{thread_rng, Rng};
 use synapi::tasks::{Column, Device, Kind};
 use crate::chf_capnp::{custom::value::Which, packed_c_h_f};
 use crate::stats::Summary;
-use super::{Record, Target, encode, record::*};
-use super::encode::*;
+use crate::export::{Record, Target, record::*};
+use super::{encode, encode::*};
 
 #[test]
 fn encode_fetch() -> Result<()> {

@@ -17,7 +17,7 @@ use crate::watch::{Event, Tasks};
 pub struct Executor {
     tasks:    HashMap<u64, Handle>,
     rx:       Receiver<Event>,
-    ex:       Arc<Exporter>,
+    ex:       Exporter,
     bind:     Bind,
     network:  Option<Network>,
     resolver: Resolver,
@@ -31,7 +31,7 @@ pub struct Executor {
 }
 
 impl Executor {
-    pub async fn new(rx: Receiver<Event>, ex: Arc<Exporter>, cfg: Config) -> Result<Self> {
+    pub async fn new(rx: Receiver<Event>, ex: Exporter, cfg: Config) -> Result<Self> {
         let Config { bind, network, resolver, .. } = cfg.clone();
 
         let status   = Arc::new(Status::default());
@@ -111,8 +111,8 @@ impl Executor {
                     }
                 });
 
-                let envoy  = self.ex.envoy(target.clone());
-                let task   = Task::new(id, test, network, envoy, resolver.clone());
+                let envoy = self.ex.envoy(target.clone());
+                let task  = Task::new(id, test, network, envoy, resolver.clone());
 
                 let result = match state {
                     State::Created => self.insert(task, config).await,

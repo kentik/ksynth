@@ -15,12 +15,14 @@ env_logger    = "0.8.3"
 futures       = "0.3.13"
 hex           = "0.4.3"
 http          = "0.2.3"
+hyper-rustls  = "0.22.1"
 libc          = "0.2.90"
 log           = "0.4.14"
 nix           = "0.19.1"
 parking_lot   = "0.11.1"
 rand          = "0.8.3"
 rustls        = "0.19.0"
+ryu           = "1.0.5"
 serde_json    = "1.0.64"
 signal-hook   = "0.3.7"
 tokio-rustls  = "0.22.0"
@@ -42,6 +44,10 @@ version  = "0.1.9"
 [dependencies.hyper]
 version  = "0.14.4"
 features = ["client"]
+
+[dependencies.itoa]
+version  = "0.4.7"
+features = ["i128"]
 
 [dependencies.rustls-native-certs]
 version  = "0.5.0"

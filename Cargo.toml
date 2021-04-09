@@ -8,7 +8,6 @@ edition = "2018"
 experimental = []
 
 [dependencies]
-anyhow        = "1.0.40"
 bytes         = "1.0.1"
 capnp         = "0.14.0"
 env_logger    = "0.8.3"
@@ -33,6 +32,10 @@ yaml-rust     = "0.3.5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 capo          = "0.0.1"
+
+[dependencies.anyhow]
+version  = "1.0.40"
+features = ["backtrace"]
 
 [dependencies.clap]
 version  = "2.33.3"

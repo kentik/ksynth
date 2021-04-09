@@ -28,8 +28,9 @@ impl Monitor {
             ticker.tick().await;
 
             let snapshot = self.status.snapshot();
+            let active   = snapshot.tasks.active.len();
 
-            debug!("active tasks: {:?}", snapshot.tasks.active);
+            debug!("active tasks: {:?}", active);
 
             let report = Report {
                 tasks: Tasks {

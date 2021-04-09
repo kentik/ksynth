@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use ed25519_compact::KeyPair;
 use log::{debug, info, warn};
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
 use synapi::{self, Client, Error, Retry};
 use synapi::agent::Agent;
@@ -21,6 +21,7 @@ pub struct Watcher {
 pub enum Event {
     Tasks(Tasks),
     Reset,
+    Report,
 }
 
 #[derive(Debug)]
@@ -30,13 +31,8 @@ pub struct Tasks {
 }
 
 impl Watcher {
-    pub fn new(client: Arc<Client>, keys: KeyPair) -> (Self, Receiver<Event>) {
-        let (tx, rx) = channel(128);
-        (Self {
-            client: client,
-            keys:   keys,
-            output: tx,
-        }, rx)
+    pub fn new(client: Arc<Client>, keys: KeyPair, output: Sender<Event>) -> Self {
+        Self { client, keys, output }
     }
 
     pub async fn exec(mut self) -> Result<()> {

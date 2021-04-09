@@ -26,6 +26,10 @@ impl Exporter {
         Envoy::new(self.export.clone(), target)
     }
 
+    pub async fn queue(&self) -> HashMap<Key, Output> {
+        self.export.lock().await.clone()
+    }
+
     pub async fn exec(self: Arc<Self>) -> Result<()> {
         let mut ticker = interval(Duration::from_secs(10));
         let mut buffer = Vec::new();

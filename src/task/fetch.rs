@@ -12,7 +12,7 @@ use log::{debug, warn};
 use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
-use super::{Config, Task, http::{Expiry, HttpClient, Times}};
+use super::{Active, Config, Task, http::{Expiry, HttpClient, Times}};
 
 pub struct Fetch {
     task:    u64,
@@ -25,6 +25,7 @@ pub struct Fetch {
     expiry:  Duration,
     envoy:   Envoy,
     client:  Arc<Fetcher>,
+    active:  Arc<Active>,
 }
 
 impl Fetch {
@@ -50,6 +51,7 @@ impl Fetch {
             expiry:  cfg.expiry.into(),
             envoy:   task.envoy,
             client:  client,
+            active:  task.active,
         })
     }
 
@@ -71,6 +73,8 @@ impl Fetch {
     }
 
     async fn fetch(&self, target: Uri) -> Result<Output> {
+        let _guard = self.active.fetch();
+
         let method = self.method.clone();
         let body   = self.body.clone().map(Body::from).unwrap_or_else(Body::empty);
         let start  = Instant::now();

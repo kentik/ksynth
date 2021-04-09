@@ -116,13 +116,13 @@ pub enum State {
     Deleted,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Kentik {
     pub email: String,
     pub token: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Device {
     #[serde(deserialize_with = "id")]
     pub id:      u64,
@@ -130,7 +130,7 @@ pub struct Device {
     pub columns: Vec<Column>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Column {
     #[serde(deserialize_with = "id")]
     pub id:   u64,

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::Result;
+use log::info;
 use tokio::sync::Mutex;
 use synapi::Client;
 use super::{Record, Target, influx, kentik};
@@ -16,13 +17,13 @@ pub struct Envoy {
     target: Arc<Target>,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Key {
     company: u64,
     device:  u64,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Output {
     pub target: Arc<Target>,
     pub values: Vec<Record>,
@@ -44,6 +45,18 @@ impl Exporter {
             Self::Influx(export) => export.envoy(target),
             Self::Kentik(export) => export.envoy(target),
         }
+    }
+
+    pub async fn report(&self) {
+        let queue = match self {
+            Exporter::Influx(export) => export.queue().await,
+            Exporter::Kentik(export) => export.queue().await,
+        };
+
+        let count = queue.len();
+        let sum   = queue.values().map(|o| o.values.len()).sum::<usize>();
+
+        info!("queue count {}, entries: {}", count, sum);
     }
 
     pub async fn exec(self) -> Result<()> {

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::{anyhow, Result};
-use log::{debug, error};
+use log::{debug, error, info};
 use tokio::sync::mpsc::Receiver;
 use synapi::agent::Net;
 use synapi::tasks::{State, TaskConfig};
@@ -10,7 +10,7 @@ use netdiag::{Bind, Knocker, Pinger, Tracer};
 use crate::export::{Exporter, Target};
 use crate::spawn::{Spawner, Handle};
 use crate::status::Status;
-use crate::task::{Config, Network, Task, Resolver, Fetcher, Shaker};
+use crate::task::{Active, Config, Network, Task, Resolver, Fetcher, Shaker};
 use crate::task::{Fetch, Knock, Ping, Query, Shake, Trace};
 use crate::watch::{Event, Tasks};
 
@@ -21,6 +21,7 @@ pub struct Executor {
     bind:     Bind,
     network:  Option<Network>,
     resolver: Resolver,
+    active:   Arc<Active>,
     status:   Arc<Status>,
     spawner:  Arc<Spawner>,
     fetcher:  Arc<Fetcher>,
@@ -34,14 +35,15 @@ impl Executor {
     pub async fn new(rx: Receiver<Event>, ex: Exporter, cfg: Config) -> Result<Self> {
         let Config { bind, network, resolver, .. } = cfg.clone();
 
-        let status   = Arc::new(Status::default());
-        let spawner  = Spawner::new(status.clone());
+        let active  = Arc::new(Active::new());
+        let status  = Arc::new(Status::default());
+        let spawner = Spawner::new(status.clone());
 
-        let fetcher  = Fetcher::new(&cfg)?;
-        let knocker  = Knocker::new(&bind).await?;
-        let pinger   = Pinger::new(&bind).await?;
-        let shaker   = Shaker::new(&cfg)?;
-        let tracer   = Tracer::new(&bind).await?;
+        let fetcher = Fetcher::new(&cfg)?;
+        let knocker = Knocker::new(&bind).await?;
+        let pinger  = Pinger::new(&bind).await?;
+        let shaker  = Shaker::new(&cfg)?;
+        let tracer  = Tracer::new(&bind).await?;
 
         Ok(Self {
             tasks:    HashMap::new(),
@@ -49,6 +51,7 @@ impl Executor {
             ex:       ex,
             bind:     bind,
             network:  network,
+            active:   active,
             resolver: resolver,
             status:   status,
             spawner:  Arc::new(spawner),
@@ -71,7 +74,8 @@ impl Executor {
         while let Some(event) = self.rx.recv().await {
             match event {
                 Event::Tasks(tasks) => self.tasks(tasks).await?,
-                Event::Reset        => self.reset().await?
+                Event::Reset        => self.reset().await?,
+                Event::Report       => self.report().await,
             }
         }
 
@@ -111,8 +115,11 @@ impl Executor {
                     }
                 });
 
-                let envoy = self.ex.envoy(target.clone());
-                let task  = Task::new(id, test, network, envoy, resolver.clone());
+                let active   = self.active.clone();
+                let envoy    = self.ex.envoy(target.clone());
+                let resolver = resolver.clone();
+
+                let task = Task::new(active, id, test, network, envoy, resolver);
 
                 let result = match state {
                     State::Created => self.insert(task, config).await,
@@ -183,5 +190,28 @@ impl Executor {
     fn trace(&self, id: u64, task: Task, cfg: TraceConfig) -> Result<Handle> {
         let trace = Trace::new(task, cfg, self.tracer.clone());
         Ok(self.spawner.spawn(id, trace.exec()))
+    }
+
+    async fn report(&mut self) {
+        let mut tasks = self.tasks.keys().collect::<Vec<_>>();
+        tasks.sort_unstable();
+
+        let report = self.active.report();
+        let active = [
+            report.fetch,
+            report.knock,
+            report.ping,
+            report.query,
+            report.shake,
+            report.trace,
+        ];
+
+        let pending = active.iter().sum::<u64>();
+        let active  = active.iter().map(u64::to_string).collect::<Vec<_>>();
+
+        info!("running {} tasks: {:?}", tasks.len(), tasks);
+        info!("pending {} count: {}", pending, active.join(" / "));
+
+        self.ex.report().await;
     }
 }

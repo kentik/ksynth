@@ -8,7 +8,7 @@ use tokio::time::{sleep, timeout};
 use webpki::DNSNameRef;
 use synapi::tasks::ShakeConfig;
 use crate::export::{record, Envoy};
-use super::{Network, Resolver, Shaker, Task};
+use super::{Active, Network, Resolver, Shaker, Task};
 
 pub struct Shake {
     task:     u64,
@@ -21,6 +21,7 @@ pub struct Shake {
     envoy:    Envoy,
     shaker:   Arc<Shaker>,
     resolver: Resolver,
+    active:   Arc<Active>,
 }
 
 impl Shake {
@@ -36,6 +37,7 @@ impl Shake {
             envoy:    task.envoy,
             shaker:   shaker,
             resolver: task.resolver,
+            active:   task.active,
         }
     }
 
@@ -56,6 +58,8 @@ impl Shake {
     }
 
     async fn shake(&self) -> Result<Output> {
+        let _guard = self.active.shake();
+
         let time = Instant::now();
         let addr = self.resolver.lookup(&self.target, self.network).await?;
 

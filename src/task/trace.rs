@@ -9,7 +9,7 @@ use tokio::time::{sleep, timeout};
 use netdiag::{self, Node, Protocol, Tracer};
 use synapi::tasks::TraceConfig;
 use crate::export::{record, Hop, Envoy};
-use super::{Expiry, Network, Resolver, Task};
+use super::{Active, Expiry, Network, Resolver, Task};
 
 pub struct Trace {
     task:     u64,
@@ -24,6 +24,7 @@ pub struct Trace {
     envoy:    Envoy,
     tracer:   Arc<Tracer>,
     resolver: Resolver,
+    active:   Arc<Active>,
 }
 
 impl Trace {
@@ -53,6 +54,7 @@ impl Trace {
             envoy:    task.envoy,
             tracer:   tracer,
             resolver: task.resolver,
+            active:   task.active,
         }
     }
 
@@ -73,6 +75,8 @@ impl Trace {
     }
 
     async fn trace(&self) -> Result<Output> {
+        let _guard = self.active.trace();
+
         let time = Instant::now();
         let addr = self.resolver.lookup(&self.target, self.network).await?;
 

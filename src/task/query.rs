@@ -1,5 +1,6 @@
 use std::fmt;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use log::{debug, warn};
@@ -11,7 +12,7 @@ use trust_dns_client::rr::{DNSClass, Name, RecordType, RData};
 use trust_dns_client::udp::UdpClientStream;
 use synapi::tasks::QueryConfig;
 use crate::export::{record, Envoy};
-use super::Task;
+use super::{Active, Task};
 
 pub struct Query {
     task:   u64,
@@ -22,6 +23,7 @@ pub struct Query {
     record: RecordType,
     envoy:  Envoy,
     client: AsyncClient,
+    active: Arc<Active>,
 }
 
 impl Query {
@@ -41,6 +43,7 @@ impl Query {
             record: cfg.record.parse()?,
             envoy:  task.envoy,
             client: client,
+            active: task.active,
         })
     }
 
@@ -62,6 +65,8 @@ impl Query {
     }
 
     async fn query(&mut self) -> Result<Output> {
+        let _guard = self.active.query();
+
         let target = self.target.clone();
         let class  = DNSClass::IN;
         let record = self.record;

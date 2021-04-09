@@ -6,7 +6,7 @@ use serde::Serialize;
 use synapi::tasks::Device;
 use crate::stats::Summary;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Target {
     pub company: u64,
     pub agent:   u64,
@@ -15,7 +15,7 @@ pub struct Target {
     pub token:   String,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Record {
     Fetch(Fetch),
     Knock(Knock),

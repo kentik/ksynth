@@ -11,9 +11,9 @@ use log::{debug, error, info, warn};
 use nix::{unistd::gethostname, sys::utsname::uname};
 use rustls::RootCertStore;
 use rustls_native_certs::load_native_certs;
-use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM}}};
+use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM, SIGUSR1}}};
 use tokio::runtime::Runtime;
-use tokio::sync::mpsc::{channel, Sender};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use trust_dns_resolver::system_conf::read_system_conf;
@@ -28,13 +28,15 @@ use crate::status::Monitor;
 use crate::task::{Config, Network, Resolver};
 use crate::update::Updater;
 use crate::version::Version;
-use crate::watch::Watcher;
+use crate::watch::{Event, Watcher};
 
 pub struct Agent {
-    bind:   Bind,
-    client: Arc<Client>,
-    keys:   KeyPair,
-    roots:  RootCertStore,
+    bind:    Bind,
+    client:  Arc<Client>,
+    roots:   RootCertStore,
+    events:  Receiver<Event>,
+    report:  Sender<Event>,
+    watcher: Watcher,
 }
 
 enum Output {
@@ -44,11 +46,18 @@ enum Output {
 
 impl Agent {
     pub fn new(bind: Bind, client: Arc<Client>, keys: KeyPair, roots: RootCertStore) -> Self {
-        Self { bind, client, keys, roots }
+        let (tx, events) = channel(128);
+        let report  = tx.clone();
+        let watcher = Watcher::new(client.clone(), keys, tx);
+        Self { bind, client, roots, events, report, watcher }
+    }
+
+    pub fn report(&self) -> Sender<Event> {
+        self.report.clone()
     }
 
     pub async fn exec(self, exporter: Exporter, net: Option<Network>) -> Result<()> {
-        let Self { bind, client, keys, roots, .. } = self;
+        let Self { bind, client, roots, events, watcher, .. } = self;
 
         let config = Config {
             bind:     bind,
@@ -59,8 +68,7 @@ impl Agent {
 
         let (tx, mut rx) = channel(16);
 
-        let (watcher, tasks) = Watcher::new(client.clone(), keys);
-        let executor = Executor::new(tasks, exporter.clone(), config).await?;
+        let executor = Executor::new(events, exporter.clone(), config).await?;
         let monitor  = Monitor::new(client, executor.status());
 
         spawn(monitor.exec(),  tx.clone());
@@ -150,22 +158,35 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     };
 
     let runtime = Runtime::new()?;
+    let handle  = runtime.handle().clone();
     let agent   = Agent::new(bind, client, keys, roots);
+    let report  = agent.report();
 
-    runtime.spawn(async move {
+    handle.spawn(async move {
         if let Err(e) = agent.exec(exporter, net).await {
             error!("agent failed: {:?}", e);
             process::exit(1);
         }
     });
 
+    let report = move || {
+        let report = report.clone();
+        handle.spawn(async move {
+            match report.send(Event::Report).await {
+                Ok(()) => info!("report requested"),
+                Err(e) => info!("report error: {:?}", e),
+            }
+        });
+    };
+
     let updater = Updater::new(version, release, runtime)?;
     let (abort, guard) = updater.exec(update);
 
-    let mut signals = Signals::new(&[SIGINT, SIGTERM])?;
+    let mut signals = Signals::new(&[SIGINT, SIGTERM, SIGUSR1])?;
     for signal in signals.forever() {
         match signal {
             SIGINT | SIGTERM => break,
+            SIGUSR1          => report(),
             _                => unreachable!(),
         }
     }

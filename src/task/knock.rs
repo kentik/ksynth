@@ -10,7 +10,7 @@ use netdiag::{self, Knocker};
 use synapi::tasks::KnockConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::{Expiry, Network, Resolver, Task};
+use super::{Active, Expiry, Network, Resolver, Task};
 
 pub struct Knock {
     task:     u64,
@@ -24,6 +24,7 @@ pub struct Knock {
     envoy:    Envoy,
     knocker:  Arc<Knocker>,
     resolver: Resolver,
+    active:   Arc<Active>,
 }
 
 impl Knock {
@@ -43,6 +44,7 @@ impl Knock {
             envoy:    task.envoy,
             knocker:  knocker,
             resolver: task.resolver,
+            active:   task.active,
         }
     }
 
@@ -65,6 +67,8 @@ impl Knock {
     }
 
     async fn knock(&self, count: usize) -> Result<Output> {
+        let _guard = self.active.knock();
+
         let addr = self.resolver.lookup(&self.target, self.network).await?;
         let port = self.port;
 

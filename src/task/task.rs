@@ -1,11 +1,13 @@
+use std::sync::Arc;
 use rustls::RootCertStore;
 use netdiag::Bind;
 use crate::export::Envoy;
-use super::Resolver;
+use super::{Active, Resolver};
 
 pub struct Task {
     pub task:     u64,
     pub test:     u64,
+    pub active:   Arc<Active>,
     pub network:  Network,
     pub envoy:    Envoy,
     pub resolver: Resolver,
@@ -27,7 +29,14 @@ pub struct Config {
 }
 
 impl Task {
-    pub fn new(task: u64, test: u64, network: Network, envoy: Envoy, resolver: Resolver) -> Self {
-        Self { task, test, network, envoy, resolver }
+    pub fn new(
+        active:   Arc<Active>,
+        task:     u64,
+        test:     u64,
+        network:  Network,
+        envoy:    Envoy,
+        resolver: Resolver,
+    ) -> Self {
+        Self { active, task, test, network, envoy, resolver }
     }
 }

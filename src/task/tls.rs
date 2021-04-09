@@ -6,7 +6,7 @@ use tokio::net::{TcpSocket, TcpStream};
 use tokio_rustls::{TlsConnector, client::TlsStream};
 use webpki::DNSNameRef;
 use netdiag::Bind;
-use crate::task::Config;
+use super::Config;
 
 pub struct Shaker {
     bind:    Bind,

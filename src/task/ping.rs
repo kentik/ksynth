@@ -10,7 +10,7 @@ use netdiag::{self, Pinger};
 use synapi::tasks::PingConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::{Expiry, Network, Resolver, Task};
+use super::{Active, Expiry, Network, Resolver, Task};
 
 pub struct Ping {
     task:     u64,
@@ -23,6 +23,7 @@ pub struct Ping {
     envoy:    Envoy,
     pinger:   Arc<Pinger>,
     resolver: Resolver,
+    active:   Arc<Active>,
 }
 
 impl Ping {
@@ -41,6 +42,7 @@ impl Ping {
             envoy:    task.envoy,
             pinger:   pinger,
             resolver: task.resolver,
+            active:   task.active,
         }
     }
 
@@ -61,6 +63,8 @@ impl Ping {
     }
 
     async fn ping(&self, count: usize) -> Result<Output> {
+        let _guard = self.active.ping();
+
         let addr = self.resolver.lookup(&self.target, self.network).await?;
 
         let ping = netdiag::Ping {

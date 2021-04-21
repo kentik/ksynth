@@ -10,7 +10,8 @@ use netdiag::{self, Knocker};
 use synapi::tasks::KnockConfig;
 use crate::export::{record, Envoy};
 use crate::stats::{summarize, Summary};
-use super::{Active, Expiry, Network, Resolver, Task};
+use crate::status::Active;
+use super::{Expiry, Network, Resolver, Task};
 
 pub struct Knock {
     task:     u64,
@@ -108,6 +109,7 @@ impl Knock {
             rtt:    out.rtt,
             result: out.result,
         }).await;
+        self.active.success();
     }
 
     async fn failure(&self, err: Error) {
@@ -117,6 +119,7 @@ impl Knock {
             test:  self.test,
             cause: err.to_string(),
         }).await;
+        self.active.failure();
     }
 
     async fn timeout(&self) {
@@ -125,6 +128,7 @@ impl Knock {
             task: self.task,
             test: self.test,
         }).await;
+        self.active.timeout();
     }
 }
 

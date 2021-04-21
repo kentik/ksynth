@@ -12,7 +12,8 @@ use trust_dns_client::rr::{DNSClass, Name, RecordType, RData};
 use trust_dns_client::udp::UdpClientStream;
 use synapi::tasks::QueryConfig;
 use crate::export::{record, Envoy};
-use super::{Active, Task};
+use crate::status::Active;
+use super::Task;
 
 pub struct Query {
     task:   u64,
@@ -88,6 +89,7 @@ impl Query {
             answers: out.answers,
             time:    out.time,
         }).await;
+        self.active.success();
     }
 
     async fn failure(&self, err: Error) {
@@ -97,6 +99,7 @@ impl Query {
             test:  self.test,
             cause: err.to_string(),
         }).await;
+        self.active.failure();
     }
 
     async fn timeout(&self) {
@@ -105,6 +108,7 @@ impl Query {
             task: self.task,
             test: self.test,
         }).await;
+        self.active.timeout();
     }
 }
 

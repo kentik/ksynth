@@ -8,7 +8,8 @@ use tokio::time::{sleep, timeout};
 use webpki::DNSNameRef;
 use synapi::tasks::ShakeConfig;
 use crate::export::{record, Envoy};
-use super::{Active, Network, Resolver, Shaker, Task};
+use crate::status::Active;
+use super::{Network, Resolver, Shaker, Task};
 
 pub struct Shake {
     task:     u64,
@@ -87,6 +88,8 @@ impl Shake {
             time:   out.time,
         }).await;
 
+        self.active.success();
+
         Ok(())
     }
 
@@ -97,6 +100,7 @@ impl Shake {
             test:  self.test,
             cause: err.to_string(),
         }).await;
+        self.active.failure();
     }
 
     async fn timeout(&self) {
@@ -105,6 +109,7 @@ impl Shake {
             task: self.task,
             test: self.test,
         }).await;
+        self.active.timeout();
     }
 }
 

@@ -12,7 +12,8 @@ use log::{debug, warn};
 use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
-use super::{Active, Config, Task, http::{Expiry, HttpClient, Times}};
+use crate::status::Active;
+use super::{Config, Task, http::{Expiry, HttpClient, Times}};
 
 pub struct Fetch {
     task:    u64,
@@ -102,6 +103,7 @@ impl Fetch {
             rtt:     out.rtt,
             size:    out.bytes,
         }).await;
+        self.active.success();
     }
 
     async fn failure(&self, err: Error) {
@@ -111,6 +113,7 @@ impl Fetch {
             test:  self.test,
             cause: err.to_string(),
         }).await;
+        self.active.failure();
     }
 
     async fn timeout(&self) {
@@ -119,6 +122,7 @@ impl Fetch {
             task: self.task,
             test: self.test,
         }).await;
+        self.active.timeout();
     }
 }
 

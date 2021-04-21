@@ -9,7 +9,8 @@ use tokio::time::{sleep, timeout};
 use netdiag::{self, Node, Protocol, Tracer};
 use synapi::tasks::TraceConfig;
 use crate::export::{record, Hop, Envoy};
-use super::{Active, Expiry, Network, Resolver, Task};
+use crate::status::Active;
+use super::{Expiry, Network, Resolver, Task};
 
 pub struct Trace {
     task:     u64,
@@ -123,6 +124,8 @@ impl Trace {
             time:   out.time,
         }).await;
 
+        self.active.success();
+
         Ok(())
     }
 
@@ -133,6 +136,7 @@ impl Trace {
             test:  self.test,
             cause: err.to_string(),
         }).await;
+        self.active.failure();
     }
 
     async fn timeout(&self) {
@@ -141,6 +145,7 @@ impl Trace {
             task: self.task,
             test: self.test,
         }).await;
+        self.active.timeout();
     }
 }
 

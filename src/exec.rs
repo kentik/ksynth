@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, atomic::Ordering};
 use anyhow::{anyhow, Result};
 use log::{debug, error, info};
 use tokio::sync::mpsc::Receiver;
@@ -9,8 +9,8 @@ use synapi::tasks::{FetchConfig, KnockConfig, PingConfig, QueryConfig, ShakeConf
 use netdiag::{Bind, Knocker, Pinger, Tracer};
 use crate::export::{Exporter, Target};
 use crate::spawn::{Spawner, Handle};
-use crate::status::Status;
-use crate::task::{Active, Config, Network, Task, Resolver, Fetcher, Shaker};
+use crate::status::{Active, Status};
+use crate::task::{Config, Network, Task, Resolver, Fetcher, Shaker};
 use crate::task::{Fetch, Knock, Ping, Query, Shake, Trace};
 use crate::watch::{Event, Tasks};
 
@@ -196,20 +196,26 @@ impl Executor {
         let mut tasks = self.tasks.keys().collect::<Vec<_>>();
         tasks.sort_unstable();
 
-        let report = self.active.report();
+        let counts = [
+            self.active.count.success.swap(0, Ordering::Relaxed),
+            self.active.count.failure.swap(0, Ordering::Relaxed),
+            self.active.count.timeout.swap(0, Ordering::Relaxed),
+        ].iter().map(u64::to_string).collect::<Vec<_>>();
+
         let active = [
-            report.fetch,
-            report.knock,
-            report.ping,
-            report.query,
-            report.shake,
-            report.trace,
+            self.active.tasks.fetch.load(Ordering::Relaxed),
+            self.active.tasks.knock.load(Ordering::Relaxed),
+            self.active.tasks.ping.load(Ordering::Relaxed),
+            self.active.tasks.query.load(Ordering::Relaxed),
+            self.active.tasks.shake.load(Ordering::Relaxed),
+            self.active.tasks.trace.load(Ordering::Relaxed),
         ];
 
         let pending = active.iter().sum::<u64>();
         let active  = active.iter().map(u64::to_string).collect::<Vec<_>>();
 
         info!("running {} tasks: {:?}", tasks.len(), tasks);
+        info!("execution status: {}", counts.join(" / "));
         info!("pending {} count: {}", pending, active.join(" / "));
 
         self.ex.report().await;

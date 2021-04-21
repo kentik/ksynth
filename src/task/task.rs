@@ -2,7 +2,8 @@ use std::sync::Arc;
 use rustls::RootCertStore;
 use netdiag::Bind;
 use crate::export::Envoy;
-use super::{Active, Resolver};
+use crate::status::Active;
+use super::Resolver;
 
 pub struct Task {
     pub task:     u64,

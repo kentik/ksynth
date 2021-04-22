@@ -3,6 +3,7 @@ use std::net::IpAddr;
 use std::time::Duration;
 use anyhow::{anyhow, Result};
 use capnp::{message, serialize_packed};
+use serde_json::json;
 use crate::chf_capnp::{c_h_f::Builder, packed_c_h_f};
 use crate::export::{Record, Target, record::*};
 use super::Customs;
@@ -28,7 +29,7 @@ pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
         };
 
         match record {
-            Record::Fetch(data)   => cs.fetch(msg, agent, data),
+            Record::Fetch(data)   => cs.fetch(msg, agent, data)?,
             Record::Knock(data)   => cs.knock(msg, agent, data),
             Record::Ping(data)    => cs.ping(msg, agent, data),
             Record::Query(data)   => cs.query(msg, agent, data),
@@ -80,6 +81,7 @@ struct Times {
     tcp:  u32,
     tls:  u32,
     ttlb: u32,
+    json: u32,
 }
 
 impl Columns {
@@ -121,11 +123,12 @@ impl Columns {
                 tcp:  lookup("INT05")?,
                 tls:  lookup("INT06")?,
                 ttlb: lookup("INT02")?,
+                json: lookup("STR00")?,
             },
         })
     }
 
-    fn fetch(&self, mut msg: Builder, agent: u64, data: &Fetch) {
+    fn fetch(&self, mut msg: Builder, agent: u64, data: &Fetch) -> Result<()> {
         let Fetch { task, test, addr, status, dns, tcp, tls, rtt, size, .. } = *data;
 
         let times = &self.times;
@@ -136,7 +139,14 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new("fetch", msg, 11);
+        let timing = serde_json::to_string(&json!([{
+            "domainLookupEnd": as_micros(dns),
+            "connectEnd":      as_micros(dns + tcp),
+            "requestStart":    as_micros(dns + tcp + tls),
+            "duration":        as_micros(rtt),
+        }]))?;
+
+        let mut customs = Customs::new("fetch", msg, 12);
         customs.next(self.app,    |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,  |v| v.set_uint64_val(agent));
         customs.next(self.kind,   |v| v.set_uint32_val(FETCH));
@@ -148,6 +158,9 @@ impl Columns {
         customs.next(times.dns,   |v| v.set_uint32_val(as_micros(dns)));
         customs.next(times.tcp,   |v| v.set_uint32_val(as_micros(tcp)));
         customs.next(times.tls,   |v| v.set_uint32_val(as_micros(tls)));
+        customs.next(times.json,  |v| v.set_str_val(&timing));
+
+        Ok(())
     }
 
     fn knock(&self, mut msg: Builder, agent: u64, data: &Knock) {

@@ -1,13 +1,13 @@
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
 use std::time::Duration;
 use anyhow::Result;
 use clap::{value_t, values_t};
-use tokio::net::UdpSocket;
+use futures::{pin_mut, stream::StreamExt};
 use tokio::time::sleep;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::system_conf::read_system_conf;
-use netdiag::{Bind, Node, trace::Probe, Protocol, Tracer};
+use netdiag::{Bind, Node, Protocol, Tracer};
 use crate::args::Args;
 use crate::task::{Network, Resolver};
 use super::resolve;
@@ -15,7 +15,7 @@ use super::resolve;
 pub async fn trace(args: Args<'_, '_>) -> Result<()> {
     let delay  = value_t!(args, "delay",  u64)?;
     let expiry = value_t!(args, "expiry", u64)?;
-    let limit  = value_t!(args, "limit",  usize)?;
+    let limit  = value_t!(args, "limit",  u8)?;
     let probes = value_t!(args, "probes", usize)?;
     let ip4    = !args.is_present("ip6");
     let ip6    = !args.is_present("ip4");
@@ -42,42 +42,37 @@ pub async fn trace(args: Args<'_, '_>) -> Result<()> {
     let expiry = Duration::from_millis(expiry);
 
     let tracer = Tracer::new(&bind).await?;
-    let route4 = UdpSocket::bind(bind.sa4()).await?;
-    let route6 = UdpSocket::bind(bind.sa6()).await?;
 
     for (host, addr) in resolve(&resolver, hosts, net).await {
         println!("trace {} ({})", host, addr);
 
-        let route = match addr {
-            IpAddr::V4(..) => &route4,
-            IpAddr::V6(..) => &route6,
+        let tcp   = args.opt("tcp")?;
+        let icmp  = args.is_present("icmp");
+        let proto = match (tcp, icmp) {
+            (Some(port), false) => Protocol::TCP(port),
+            (None,       true) => Protocol::ICMP,
+            _                 => Protocol::default(),
         };
 
-        let proto  = match args.opt("tcp")? {
-            Some(port) => Protocol::TCP(port),
-            None       => Protocol::default(),
-        };
+        let source = tracer.reserve(proto, addr).await?;
 
-        route.connect(SocketAddr::new(addr, 1234)).await?;
-        let src = route.local_addr()?;
-
-        let mut done = false;
-        let mut ttl  = 1;
+        let mut done  = false;
+        let mut ttl   = 1;
+        let mut probe = source.probe()?;
 
         while !done && ttl <= limit {
             let mut nodes = HashMap::<IpAddr, Vec<String>>::new();
-            let mut probe = Probe::new(proto, src, addr)?;
 
-            for _ in 0..probes {
-                let node = tracer.probe(&probe, ttl as u8, expiry).await?;
+            let stream = tracer.probe(&mut probe, ttl, expiry);
+            let stream = stream.take(probes);
+            pin_mut!(stream);
 
+            while let Some(Ok(node)) = stream.next().await {
                 if let Node::Node(_, ip, rtt, last) = node {
                     let rtt = format!("{:>0.2?}", rtt);
                     nodes.entry(ip).or_default().push(rtt);
                     done = last || ip == addr;
                 }
-
-                probe.increment();
 
                 sleep(delay).await;
             }
@@ -91,7 +86,7 @@ pub async fn trace(args: Args<'_, '_>) -> Result<()> {
     Ok(())
 }
 
-fn print(nodes: &HashMap<IpAddr, Vec<String>>, ttl: usize, probes: usize) {
+fn print(nodes: &HashMap<IpAddr, Vec<String>>, ttl: u8, probes: usize) {
     let mut count = 0;
 
     let mut output = nodes.iter().map(|(node, rtt)| {

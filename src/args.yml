@@ -147,6 +147,11 @@ subcommands:
             long: tcp
             help: use TCP probes
             value_name: port
+            conflicts_with: icmp
+        - icmp:
+            long: icmp
+            help: use ICMP probes
+            conflicts_with: tcp
         - host:
             index: 1
             help: host

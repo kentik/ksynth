@@ -33,6 +33,7 @@ impl Trace {
         let TraceConfig { protocol, port, .. } = cfg;
 
         let protocol = match &*protocol {
+            "ICMP"            => Protocol::ICMP,
             "TCP" if port > 0 => Protocol::TCP(port),
             "UDP" if port > 0 => Protocol::UDP(port),
             _                 => Protocol::default(),

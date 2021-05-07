@@ -5,7 +5,7 @@ use log::{error, debug};
 use tokio::time::interval_at;
 use synapi::{Client, Error};
 use synapi::status::{Report, Tasks};
-use super::Status;
+use super::{Status, system};
 use Error::Session;
 
 pub struct Monitor {
@@ -33,13 +33,15 @@ impl Monitor {
             debug!("active tasks: {:?}", active);
 
             let report = Report {
-                tasks: Tasks {
+                system: system().unwrap_or_default(),
+                tasks:  Tasks {
                     started: snapshot.tasks.started,
                     running: snapshot.tasks.running,
                     exited:  snapshot.tasks.exited,
                     failed:  snapshot.tasks.failed,
                     active:  snapshot.tasks.active,
                 },
+                ..Default::default()
             };
 
             match self.client.status(&report).await {

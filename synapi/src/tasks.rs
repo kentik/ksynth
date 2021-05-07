@@ -62,6 +62,8 @@ pub struct KnockConfig {
     pub target:  String,
     pub period:  Period,
     pub count:   Count,
+    #[serde(default)]
+    pub delay:   Delay,
     pub expiry:  Expiry,
     pub port:    u16,
 }
@@ -71,6 +73,8 @@ pub struct PingConfig {
     pub target:  String,
     pub period:  Period,
     pub count:   Count,
+    #[serde(default)]
+    pub delay:   Delay,
     pub expiry:  Expiry,
 }
 
@@ -105,6 +109,8 @@ pub struct TraceConfig {
     #[serde(default = "default_trace_count")]
     pub count:    Count,
     pub limit:    Limit,
+    #[serde(default)]
+    pub delay:    Delay,
     pub expiry:   Expiry,
 }
 
@@ -153,6 +159,9 @@ pub struct Count(usize);
 
 #[derive(Copy, Clone, Debug)]
 pub struct Limit(usize);
+
+#[derive(Copy, Clone, Debug)]
+pub struct Delay(Duration);
 
 #[derive(Copy, Clone, Debug)]
 pub struct Expiry(Duration);
@@ -244,6 +253,13 @@ impl<'de> Deserialize<'de> for Limit {
     }
 }
 
+impl<'de> Deserialize<'de> for Delay {
+    fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        let micros = de.deserialize_u64(U64Visitor)?;
+        Ok(Self(Duration::from_micros(micros)))
+    }
+}
+
 impl<'de> Deserialize<'de> for Expiry {
     fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
         let millis = max(de.deserialize_u64(U64Visitor)?, 1);
@@ -270,6 +286,12 @@ impl From<Limit> for usize {
     }
 }
 
+impl From<Delay> for Duration  {
+    fn from(delay: Delay) -> Self {
+        delay.0
+    }
+}
+
 impl From<Expiry> for Duration  {
     fn from(expiry: Expiry) -> Self {
         expiry.0
@@ -279,6 +301,12 @@ impl From<Expiry> for Duration  {
 impl From<Period> for Duration  {
     fn from(period: Period) -> Self {
         period.0
+    }
+}
+
+impl Default for Delay  {
+    fn default() -> Self {
+       Self(Duration::from_millis(0))
     }
 }
 

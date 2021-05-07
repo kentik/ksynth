@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::fmt;
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -21,6 +22,7 @@ pub struct Knock {
     port:     u16,
     period:   Duration,
     count:    usize,
+    delay:    Duration,
     expiry:   Expiry,
     envoy:    Envoy,
     knocker:  Arc<Knocker>,
@@ -41,6 +43,7 @@ impl Knock {
             port:     cfg.port,
             period:   cfg.period.into(),
             count:    count,
+            delay:    cfg.delay.into(),
             expiry:   expiry,
             envoy:    task.envoy,
             knocker:  knocker,
@@ -55,7 +58,7 @@ impl Knock {
 
             debug!("{}: test {}, target {}:{}", task, test, target, port);
 
-            let result = self.knock(self.count);
+            let result = self.knock();
 
             match timeout(self.expiry.task, result).await {
                 Ok(Ok(rtt)) => self.success(rtt).await,
@@ -67,30 +70,22 @@ impl Knock {
         }
     }
 
-    async fn knock(&self, count: usize) -> Result<Output> {
+    async fn knock(&self) -> Result<Output> {
         let _guard = self.active.knock();
 
         let addr = self.resolver.lookup(&self.target, self.network).await?;
         let port = self.port;
+        let rtt  = knock(&self, addr, port).await?;
 
-        let knock = netdiag::Knock {
-            addr:   addr,
-            port:   port,
-            count:  count,
-            expiry: self.expiry.probe,
-        };
-
-        let rtt  = self.knocker.knock(&knock).await?;
-        let rtt  = rtt.try_collect::<Vec<_>>().await?;
-        let sent = rtt.len() as u32;
+        let sent = rtt.len();
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();
-        let lost = sent - rtt.len() as u32;
+        let lost = sent - rtt.len();
 
         Ok(Output {
             addr:   addr,
             port:   port,
-            sent:   sent,
-            lost:   lost,
+            sent:   u32::try_from(sent)?,
+            lost:   u32::try_from(lost)?,
             rtt:    summarize(&rtt).unwrap_or_default(),
             result: rtt,
         })
@@ -130,6 +125,23 @@ impl Knock {
         }).await;
         self.active.timeout();
     }
+}
+
+async fn knock(knock: &Knock, addr: IpAddr, port: u16) -> Result<Vec<Option<Duration>>> {
+    let knocker = &knock.knocker;
+    let delay   = knock.delay;
+
+    let knock = netdiag::Knock {
+        addr:   addr,
+        port:   port,
+        count:  knock.count,
+        expiry: knock.expiry.probe,
+    };
+
+    knocker.knock(&knock).await?.and_then(|rtt| async move {
+        sleep(delay).await;
+        Ok(rtt)
+    }).try_collect().await
 }
 
 #[derive(Debug)]

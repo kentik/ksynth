@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::fmt;
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -20,6 +21,7 @@ pub struct Ping {
     target:   Arc<String>,
     period:   Duration,
     count:    usize,
+    delay:    Duration,
     expiry:   Expiry,
     envoy:    Envoy,
     pinger:   Arc<Pinger>,
@@ -39,6 +41,7 @@ impl Ping {
             target:   Arc::new(cfg.target),
             period:   cfg.period.into(),
             count:    count,
+            delay:    cfg.delay.into(),
             expiry:   expiry,
             envoy:    task.envoy,
             pinger:   pinger,
@@ -51,7 +54,7 @@ impl Ping {
         loop {
             debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
-            let result = self.ping(self.count);
+            let result = self.ping();
 
             match timeout(self.expiry.task, result).await {
                 Ok(Ok(rtt)) => self.success(rtt).await,
@@ -63,27 +66,20 @@ impl Ping {
         }
     }
 
-    async fn ping(&self, count: usize) -> Result<Output> {
+    async fn ping(&self) -> Result<Output> {
         let _guard = self.active.ping();
 
         let addr = self.resolver.lookup(&self.target, self.network).await?;
+        let rtt  = ping(&self, addr).await?;
 
-        let ping = netdiag::Ping {
-            addr:   addr,
-            count:  count,
-            expiry: self.expiry.probe,
-        };
-
-        let rtt  = self.pinger.ping(&ping);
-        let rtt  = rtt.try_collect::<Vec<_>>().await?;
-        let sent = rtt.len() as u32;
+        let sent = rtt.len();
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();
-        let lost = sent - rtt.len() as u32;
+        let lost = sent - rtt.len();
 
         Ok(Output {
             addr:   addr,
-            sent:   sent,
-            lost:   lost,
+            sent:   u32::try_from(sent)?,
+            lost:   u32::try_from(lost)?,
             rtt:    summarize(&rtt).unwrap_or_default(),
             result: rtt,
         })
@@ -122,6 +118,22 @@ impl Ping {
         }).await;
         self.active.timeout();
     }
+}
+
+async fn ping(ping: &Ping, addr: IpAddr) -> Result<Vec<Option<Duration>>> {
+    let pinger = &ping.pinger;
+    let delay  = ping.delay;
+
+    let ping = netdiag::Ping {
+        addr:   addr,
+        count:  ping.count,
+        expiry: ping.expiry.probe,
+    };
+
+    pinger.ping(&ping).and_then(|rtt| async move {
+        sleep(delay).await;
+        Ok(rtt)
+    }).try_collect().await
 }
 
 #[derive(Debug)]

@@ -141,7 +141,7 @@ impl Columns {
 
         let timing = serde_json::to_string(&json!([{
             "domainLookupEnd": as_micros(dns),
-            "connectEnd":      as_micros(dns + tcp),
+            "connectEnd":      as_micros(dns + tcp + tls),
             "requestStart":    as_micros(dns + tcp + tls),
             "duration":        as_micros(rtt),
         }]))?;

@@ -67,6 +67,35 @@ jobs:
           path: target/${{ matrix.target }}/release/${{ env.BINARY }}
           retention-days: 2
 
+  shasum:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: kentik/actions/shasum@master
+        with:
+          channel: '#shasums'
+          message: >
+            {{ &context.payload.repository.full_name }} build {{ context.runId }}
+            generated {{ artifacts.length }} artifacts on {{ context.eventName }}
+            to {{ &context.ref }}, commit
+            <{{ &context.payload.head_commit.url }}|{{ context.payload.head_commit.id }}>
+
+            {{ #artifacts }}
+
+            *{{ name }}*
+            {{ digest }}
+
+            {{ /artifacts }}
+        env:
+          SLACK_TOKEN: ${{ secrets.KENITK_GITHUB_ACTIONS_SLACK_TOKEN }}
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - run: |
+          aws s3 cp sha512.txt $BUCKET/
+    needs: build
+
   docker:
     runs-on: ubuntu-latest
     steps:

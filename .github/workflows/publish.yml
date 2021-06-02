@@ -61,6 +61,27 @@ jobs:
     needs: [control]
     if: contains(needs.control.outputs.actions, 'publish-artifacts')
 
+  shasums:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - run: |
+          aws s3 cp $BUCKET/sha512.txt .
+      - uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: sha512.txt
+          asset_name: sha512.txt
+          asset_content_type: text/plain
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    needs: [control]
+    if: contains(needs.control.outputs.actions, 'publish-artifacts')
+
   docker:
     runs-on: ubuntu-latest
     steps:

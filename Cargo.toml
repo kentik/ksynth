@@ -18,7 +18,7 @@ hyper-rustls  = "0.22.1"
 libc          = "0.2.93"
 log           = "0.4.14"
 netdiag       = "0.2.0"
-nix           = "0.19.1"
+nix           = "0.20.0"
 parking_lot   = "0.11.1"
 rand          = "0.8.3"
 rustls        = "0.19.1"
@@ -81,6 +81,7 @@ default-features = false
 
 [dependencies.notary]
 git      = "ssh://git@github.com/kentik/notary.git"
+tag      = "0.0.3"
 features = ["client"]
 default-features = false
 

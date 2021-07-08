@@ -6,6 +6,7 @@ use capnp::{message, serialize_packed};
 use serde_json::json;
 use crate::chf_capnp::{c_h_f::Builder, packed_c_h_f};
 use crate::export::{Record, Target, record::*};
+use crate::task::Identity;
 use super::Customs;
 
 pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
@@ -33,7 +34,7 @@ pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
             Record::Knock(data)   => cs.knock(msg, agent, data),
             Record::Ping(data)    => cs.ping(msg, agent, data),
             Record::Query(data)   => cs.query(msg, agent, data),
-            Record::Shake(data)   => cs.shake(msg, agent, data),
+            Record::Shake(data)   => cs.shake(msg, agent, data)?,
             Record::Trace(data)   => cs.trace(msg, agent, data),
             Record::Error(data)   => cs.error(msg, agent, data),
             Record::Timeout(data) => cs.timeout(msg, agent, data),
@@ -66,6 +67,8 @@ struct Columns {
     record: u32,
     code:   u32,
     times:  Times,
+    valid:  u32,
+    until:  u32,
 }
 
 struct Stats {
@@ -125,6 +128,8 @@ impl Columns {
                 ttlb: lookup("INT02")?,
                 json: lookup("STR00")?,
             },
+            valid:   lookup("INT07")?,
+            until:   lookup("INT64_03")?,
         })
     }
 
@@ -133,6 +138,11 @@ impl Columns {
 
         let times = &self.times;
         let size  = u32::try_from(size).unwrap_or(0);
+
+        let (valid, until) = match data.server {
+            Identity::Valid(until) => (1, u64::try_from(until.timestamp())?),
+            _                      => (0, 0),
+        };
 
         match addr {
             IpAddr::V4(ip) => msg.set_ipv4_dst_addr(ip.into()),
@@ -146,7 +156,7 @@ impl Columns {
             "duration":        as_micros(rtt),
         }]))?;
 
-        let mut customs = Customs::new("fetch", msg, 12);
+        let mut customs = Customs::new("fetch", msg, 14);
         customs.next(self.app,    |v| v.set_uint32_val(AGENT));
         customs.next(self.agent,  |v| v.set_uint64_val(agent));
         customs.next(self.kind,   |v| v.set_uint32_val(FETCH));
@@ -159,6 +169,8 @@ impl Columns {
         customs.next(times.tcp,   |v| v.set_uint32_val(as_micros(tcp)));
         customs.next(times.tls,   |v| v.set_uint32_val(as_micros(tls)));
         customs.next(times.json,  |v| v.set_str_val(&timing));
+        customs.next(self.valid,  |v| v.set_uint32_val(valid));
+        customs.next(self.until,  |v| v.set_uint64_val(until));
 
         Ok(())
     }
@@ -227,7 +239,7 @@ impl Columns {
         customs.next(self.time,   |v| v.set_uint32_val(as_micros(time)));
     }
 
-    fn shake(&self, mut msg: Builder, agent: u64, data: &Shake) {
+    fn shake(&self, mut msg: Builder, agent: u64, data: &Shake) -> Result<()> {
         let Shake { task, test, addr, port, time, .. } = *data;
 
         match addr {
@@ -235,7 +247,12 @@ impl Columns {
             IpAddr::V6(ip) => msg.set_ipv6_dst_addr(&ip.octets()),
         };
 
-        let mut customs = Customs::new("shake", msg, 7);
+        let (valid, until) = match data.server {
+            Identity::Valid(until) => (1, u64::try_from(until.timestamp())?),
+            _                      => (0, 0),
+        };
+
+        let mut customs = Customs::new("shake", msg, 9);
         customs.next(self.app,   |v| v.set_uint32_val(AGENT));
         customs.next(self.agent, |v| v.set_uint64_val(agent));
         customs.next(self.kind,  |v| v.set_uint32_val(SHAKE));
@@ -243,6 +260,10 @@ impl Columns {
         customs.next(self.test,  |v| v.set_uint64_val(test));
         customs.next(self.port,  |v| v.set_uint32_val(port.into()));
         customs.next(self.time,  |v| v.set_uint32_val(as_micros(time)));
+        customs.next(self.valid, |v| v.set_uint32_val(valid));
+        customs.next(self.until, |v| v.set_uint64_val(until));
+
+        Ok(())
     }
 
     fn trace(&self, mut msg: Builder, agent: u64, data: &Trace) {

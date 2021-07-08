@@ -3,7 +3,7 @@ pub use resolve::Resolver;
 pub use task::Config;
 pub use task::Network;
 pub use task::Task;
-pub use tls::Shaker;
+pub use tls::{Identity, Shaker};
 
 pub use fetch::{Fetch, Fetcher};
 pub use knock::Knock;

@@ -18,6 +18,7 @@ use tokio_rustls::{TlsConnector, client::TlsStream};
 use webpki::DNSNameRef;
 use netdiag::Bind;
 use super::{Config, Network, Resolver};
+use super::tls::{Identity, Verifier};
 
 #[derive(Clone)]
 pub struct HttpClient {
@@ -61,11 +62,13 @@ struct Connect {
     network:  Network,
     resolver: Resolver,
     tls:      TlsConnector,
+    verifier: Arc<Verifier>,
 }
 
 struct Connection {
     stream: Stream,
     times:  Times,
+    server: Identity,
 }
 
 enum Stream {
@@ -84,13 +87,15 @@ impl Connector {
     pub fn new(cfg: &Config, timeout: Duration) -> Self {
         let Config { bind, network, resolver, roots, .. } = cfg.clone();
 
+        let verifier = Arc::new(Verifier::new(roots));
+
         let mut config = ClientConfig::new();
         config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-        config.root_store     = roots;
+        config.dangerous().set_certificate_verifier(verifier.clone());
 
         let network = network.unwrap_or(Network::Dual);
         let tls     = TlsConnector::from(Arc::new(config));
-        let connect = Connect { bind, tls, network, resolver };
+        let connect = Connect { bind, tls, network, resolver, verifier };
 
         Self {
             connect: Arc::new(connect),
@@ -120,7 +125,7 @@ impl Service<Uri> for Connector {
 
 impl Connect {
     async fn connect(self: Arc<Self>, uri: Uri) -> Result<Connection> {
-        let Self { bind, network, resolver, tls } = &*self;
+        let Self { bind, network, resolver, tls, verifier } = &*self;
 
         let port = uri.port().as_ref().map(Port::as_u16);
         let port = match uri.scheme_str() {
@@ -148,7 +153,8 @@ impl Connect {
 
         if uri.scheme_str() != Some("https") {
             let stream = Stream::TCP(stream);
-            return Ok(Connection { stream, times });
+            let server = Identity::Unknown;
+            return Ok(Connection { stream, times, server });
         }
 
         let hostname = uri.host().unwrap_or_default();
@@ -159,8 +165,12 @@ impl Connect {
 
         times.tls = Some(start.elapsed());
 
+        let (_, tls) = stream.get_ref();
+        let certs  = tls.get_peer_certificates().unwrap_or_default();
+        let server = verifier.verify(&certs, dnsname)?;
         let stream = Stream::TLS(stream);
-        Ok(Connection { stream, times })
+
+        Ok(Connection { stream, times, server })
     }
 }
 
@@ -185,7 +195,7 @@ impl connect::Connection for Connection {
                     Some(b"h2") => tcp.connected().negotiated_h2(),
                     _           => tcp.connected(),
                 }
-            }
+            }.extra(self.server.clone())
         }.extra(self.times.clone())
     }
 }

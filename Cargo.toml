@@ -10,6 +10,7 @@ experimental = []
 [dependencies]
 bytes         = "1.0.1"
 capnp         = "0.14.1"
+chrono        = "0.4.19"
 env_logger    = "0.8.3"
 futures       = "0.3.14"
 hex           = "0.4.3"
@@ -78,6 +79,9 @@ default-features = false
 version  = "0.20.2"
 features = ["system-config", "tokio-runtime"]
 default-features = false
+
+[dependencies.x509-certificate]
+version  = "0.2.0"
 
 [dependencies.notary]
 git      = "ssh://git@github.com/kentik/notary.git"

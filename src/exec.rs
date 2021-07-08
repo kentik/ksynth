@@ -144,7 +144,6 @@ impl Executor {
             TaskConfig::Knock(cfg) => self.knock(id, task, cfg)?,
             TaskConfig::Ping(cfg)  => self.ping(id, task, cfg)?,
             TaskConfig::Query(cfg) => self.query(id, task, cfg).await?,
-            #[cfg(feature = "experimental")]
             TaskConfig::Shake(cfg) => self.shake(id, task, cfg)?,
             TaskConfig::Trace(cfg) => self.trace(id, task, cfg)?,
             _                      => Err(anyhow!("unsupported type"))?,

@@ -5,6 +5,7 @@ use std::time::Duration;
 use serde::Serialize;
 use synapi::tasks::Device;
 use crate::stats::Summary;
+use crate::task::Identity;
 
 #[derive(Clone, Debug)]
 pub struct Target {
@@ -33,6 +34,7 @@ pub struct Fetch {
     pub test:    u64,
     pub target:  Arc<String>,
     pub addr:    IpAddr,
+    pub server:  Identity,
     pub status:  u16,
     pub dns:     Duration,
     pub tcp:     Duration,
@@ -83,6 +85,7 @@ pub struct Shake {
     pub target:  Arc<String>,
     pub addr:    IpAddr,
     pub port:    u16,
+    pub server:  Identity,
     pub time:    Duration,
 }
 

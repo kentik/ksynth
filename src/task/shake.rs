@@ -10,6 +10,7 @@ use synapi::tasks::ShakeConfig;
 use crate::export::{record, Envoy};
 use crate::status::Active;
 use super::{Network, Resolver, Shaker, Task};
+use super::tls::Identity;
 
 pub struct Shake {
     task:     u64,
@@ -67,12 +68,13 @@ impl Shake {
         let name = DNSNameRef::try_from_ascii_str(&self.target)?;
         let addr = SocketAddr::new(addr, self.port);
 
-        self.shaker.shake(name, addr).await?;
+        let c = self.shaker.shake(name, addr).await?;
 
         Ok(Output {
-            addr: addr.ip(),
-            port: addr.port(),
-            time: time.elapsed(),
+            addr:   addr.ip(),
+            port:   addr.port(),
+            server: c.server,
+            time:   time.elapsed(),
         })
     }
 
@@ -85,6 +87,7 @@ impl Shake {
             target: self.target.clone(),
             addr:   out.addr,
             port:   out.port,
+            server: out.server,
             time:   out.time,
         }).await;
 
@@ -115,9 +118,10 @@ impl Shake {
 
 #[derive(Debug)]
 struct Output {
-    addr: IpAddr,
-    port: u16,
-    time: Duration,
+    addr:   IpAddr,
+    port:   u16,
+    server: Identity,
+    time:   Duration,
 }
 
 impl fmt::Display for Output {

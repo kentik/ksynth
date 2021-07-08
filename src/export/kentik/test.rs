@@ -11,6 +11,7 @@ use rand::{thread_rng, Rng};
 use synapi::tasks::{Column, Device, Kind};
 use crate::chf_capnp::{custom::value::Which, packed_c_h_f};
 use crate::stats::Summary;
+use crate::task::Identity;
 use crate::export::{Record, Target, record::*};
 use super::{encode, encode::*};
 
@@ -341,6 +342,7 @@ impl Random for Fetch  {
             test:   random(rng),
             target: Arc::new(random(rng)),
             addr:   random(rng),
+            server: Identity::Unknown,
             status: random(rng),
             dns:    random(rng),
             tcp:    random(rng),
@@ -403,6 +405,7 @@ impl Random for Shake  {
             target: Arc::new(random(rng)),
             addr:   random(rng),
             port:   random(rng),
+            server: Identity::Unknown,
             time:   random(rng),
         }
     }

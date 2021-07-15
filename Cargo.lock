@@ -769,6 +769,7 @@ name = "ksynth"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64",
  "bytes",
  "capnp",
  "capnpc",

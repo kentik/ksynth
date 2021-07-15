@@ -7,6 +7,7 @@ use log::warn;
 use tokio::sync::Mutex;
 use tokio::time::interval;
 use crate::export::{Envoy, Key, Output, Record, Target};
+use crate::output::Auth;
 use super::{Client, encode};
 
 pub struct Exporter {
@@ -16,8 +17,8 @@ pub struct Exporter {
 }
 
 impl Exporter {
-    pub fn new(agent: String, endpoint: &str) -> Result<Self> {
-        let client = Arc::new(Client::new(endpoint)?);
+    pub fn new(agent: String, endpoint: &str, auth: Auth) -> Result<Self> {
+        let client = Arc::new(Client::new(endpoint, auth)?);
         let export = Arc::new(Mutex::new(HashMap::new()));
         Ok(Self { export, client, agent })
     }

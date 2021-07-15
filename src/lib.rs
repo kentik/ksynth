@@ -7,6 +7,7 @@ pub mod version;
 
 mod exec;
 mod export;
+mod output;
 mod spawn;
 mod secure;
 mod status;

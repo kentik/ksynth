@@ -1,18 +1,22 @@
-use std::io::Read;
+use std::io::{Read, Write};
 use std::time::Duration;
 use anyhow::{anyhow, Result};
+use base64::{STANDARD, write::EncoderStringWriter};
 use hyper::{Client as HttpClient, Method, Request};
 use hyper::body::{aggregate, Buf};
 use hyper::client::HttpConnector;
+use hyper::header::{AUTHORIZATION, HeaderValue};
 use hyper_rustls::HttpsConnector;
+use crate::output::Auth;
 
 pub struct Client {
     client:   HttpClient<HttpsConnector<HttpConnector>>,
     endpoint: String,
+    auth:     Auth
 }
 
 impl Client {
-    pub fn new(endpoint: &str) -> Result<Self> {
+    pub fn new(endpoint: &str, auth: Auth) -> Result<Self> {
         let mut builder = HttpClient::builder();
         builder.pool_idle_timeout(Duration::from_secs(60));
 
@@ -21,14 +25,28 @@ impl Client {
         Ok(Self {
             client:   builder.build(https),
             endpoint: endpoint.to_owned(),
+            auth:     auth,
         })
     }
 
     pub async fn send(&self, body: &[u8]) -> Result<()> {
-        let req = Request::builder()
+        let mut req = Request::builder()
             .method(Method::POST)
             .uri(&self.endpoint)
             .body(body.to_vec().into())?;
+
+        if let Auth::Token(token) = &self.auth {
+            let value = format!("Token {}", token);
+            let value = HeaderValue::from_str(&value)?;
+            req.headers_mut().insert(AUTHORIZATION, value);
+        } else if let Auth::Basic(username, password) = &self.auth {
+            let mut buf = "Basic ".to_string();
+            let mut enc = EncoderStringWriter::from(&mut buf, STANDARD);
+            write!(enc, "{}:{}", username, password)?;
+
+            let value = HeaderValue::from_str(&enc.into_inner())?;
+            req.headers_mut().insert(AUTHORIZATION, value);
+        }
 
         let res = self.client.request(req).await?;
         let status = res.status();

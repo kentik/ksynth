@@ -5,6 +5,7 @@ use log::info;
 use tokio::sync::Mutex;
 use synapi::Client;
 use super::{Record, Target, influx, kentik};
+use crate::output::Auth;
 
 #[derive(Clone)]
 pub enum Exporter {
@@ -30,8 +31,8 @@ pub struct Output {
 }
 
 impl Exporter {
-    pub fn influx(agent: String, endpoint: &str) -> Result<Self> {
-        let export = influx::Exporter::new(agent, endpoint)?;
+    pub fn influx(agent: String, endpoint: &str, auth: Auth) -> Result<Self> {
+        let export = influx::Exporter::new(agent, endpoint, auth)?;
         Ok(Self::Influx(Arc::new(export)))
     }
 

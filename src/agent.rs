@@ -2,9 +2,8 @@ use std::fs::{self, File};
 use std::future::Future;
 use std::io::Read;
 use std::process;
-use std::str::FromStr;
 use std::sync::Arc;
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result};
 use clap::value_t;
 use ed25519_compact::{KeyPair, Seed};
 use log::{debug, error, info, warn};
@@ -23,6 +22,7 @@ use netdiag::Bind;
 use crate::args::Args;
 use crate::exec::Executor;
 use crate::export::Exporter;
+use crate::output::Output;
 use crate::secure;
 use crate::status::Monitor;
 use crate::task::{Config, Network, Resolver};
@@ -37,11 +37,6 @@ pub struct Agent {
     events:  Receiver<Event>,
     report:  Sender<Event>,
     watcher: Watcher,
-}
-
-enum Output {
-    Influx(String),
-    Kentik,
 }
 
 impl Agent {
@@ -104,6 +99,7 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     let ip6     = !args.is_present("ip4");
     let user    = args.value_of("user");
     let update  = args.is_present("update");
+    let output  = args.opt("output")?;
     let release = !args.is_present("rc");
 
     let mut bind = Bind::default();
@@ -152,9 +148,9 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         roots:   roots.clone(),
     })?);
 
-    let exporter = match args.opt("output")? {
-        Some(Output::Influx(url))   => Exporter::influx(name, &url)?,
-        Some(Output::Kentik) | None => Exporter::kentik(client.clone())?,
+    let exporter = match output {
+        Some(Output::Influx(url, auth)) => Exporter::influx(name, &url, auth)?,
+        Some(Output::Kentik) | None     => Exporter::kentik(client.clone())?,
     };
 
     let runtime = Runtime::new()?;
@@ -259,19 +255,4 @@ fn trust_roots() -> RootCertStore {
     }
 
     store
-}
-
-impl FromStr for Output {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut split = s.splitn(2, '=');
-        let format = split.next().unwrap_or("kentik");
-        let args   = split.next();
-        match (format, args) {
-            ("influx", Some(url)) => Ok(Output::Influx(url.to_owned())),
-            ("kentik", None)      => Ok(Output::Kentik),
-            _                     => Err(anyhow!("{}", s)),
-        }
-    }
 }

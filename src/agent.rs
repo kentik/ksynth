@@ -14,7 +14,7 @@ use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM, SIGUSR1}
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use trust_dns_resolver::TokioAsyncResolver;
-use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
+use trust_dns_resolver::config::{LookupIpStrategy, ResolverConfig, ResolverOpts};
 use trust_dns_resolver::system_conf::read_system_conf;
 use webpki_roots::TLS_SERVER_ROOTS;
 use synapi::{Client, Config as ClientConfig, Region};
@@ -57,7 +57,7 @@ impl Agent {
         let config = Config {
             bind:     bind,
             network:  net,
-            resolver: resolver().await?,
+            resolver: resolver(net).await?,
             roots:    roots,
         };
 
@@ -231,13 +231,20 @@ fn machine() -> String {
     machine
 }
 
-async fn resolver() -> Result<Resolver> {
-    let (config, options) = read_system_conf().unwrap_or_else(|e| {
+async fn resolver(net: Option<Network>) -> Result<Resolver> {
+    let (config, mut options) = read_system_conf().unwrap_or_else(|e| {
         warn!("resolver configuration error: {}", e);
         let config  = ResolverConfig::google();
         let options = ResolverOpts::default();
         (config, options)
     });
+
+    options.ip_strategy = match net {
+        Some(Network::IPv4)        => LookupIpStrategy::Ipv4Only,
+        Some(Network::IPv6)        => LookupIpStrategy::Ipv6Only,
+        Some(Network::Dual) | None => LookupIpStrategy::Ipv4AndIpv6,
+    };
+
     Ok(Resolver::new(TokioAsyncResolver::tokio(config, options)?))
 }
 

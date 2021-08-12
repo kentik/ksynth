@@ -7,12 +7,18 @@ use hyper::body::{aggregate, Buf};
 use hyper::client::HttpConnector;
 use hyper::header::{AUTHORIZATION, HeaderValue};
 use hyper_rustls::HttpsConnector;
-use crate::output::Auth;
 
 pub struct Client {
     client:   HttpClient<HttpsConnector<HttpConnector>>,
     endpoint: String,
     auth:     Auth
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum Auth {
+    Basic(String, String),
+    Token(String),
+    None,
 }
 
 impl Client {

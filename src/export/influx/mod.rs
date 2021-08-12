@@ -1,4 +1,3 @@
-pub use client::Client;
 pub use encode::encode;
 pub use export::Exporter;
 

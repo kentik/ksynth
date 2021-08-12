@@ -23,6 +23,7 @@ pub struct Fetch {
     method:  Method,
     headers: Option<HeaderMap>,
     body:    Option<Bytes>,
+    verify:  bool,
     period:  Duration,
     expiry:  Duration,
     envoy:   Envoy,
@@ -49,6 +50,7 @@ impl Fetch {
             method:  method,
             headers: headers,
             body:    cfg.body.map(Bytes::from),
+            verify:  !cfg.insecure,
             period:  cfg.period.into(),
             expiry:  cfg.expiry.into(),
             envoy:   task.envoy,
@@ -87,7 +89,15 @@ impl Fetch {
             req.headers_mut().extend(headers);
         }
 
-        self.client.execute(start, req).await
+        let output = self.client.execute(start, req).await?;
+
+        if let Identity::Error(e) = output.server {
+            if self.verify {
+                return Err(e.into());
+            }
+        }
+
+        Ok(output)
     }
 
     async fn success(&self, out: Output) {

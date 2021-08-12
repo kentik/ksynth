@@ -46,15 +46,17 @@ pub enum TaskConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct FetchConfig {
-    pub target:  String,
-    pub period:  Period,
-    pub expiry:  Expiry,
+    pub target:   String,
+    pub period:   Period,
+    pub expiry:   Expiry,
     #[serde(default)]
-    pub method:  String,
+    pub method:   String,
     #[serde(default)]
-    pub body:    Option<String>,
+    pub body:     Option<String>,
     #[serde(default)]
-    pub headers: Option<HashMap<String, String>>,
+    pub headers:  Option<HashMap<String, String>>,
+    #[serde(rename = "ignore_tls_errors", default)]
+    pub insecure: bool,
 }
 
 #[derive(Debug, Deserialize)]

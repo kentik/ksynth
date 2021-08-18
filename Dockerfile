@@ -5,7 +5,7 @@ ARG TARGETPLATFORM
 ARG TARGETVARIANT
 ARG BINARY=binary/${TARGETARCH}${TARGETVARIANT}/ksynth
 
-RUN apt-get update && apt-get install -y busybox-static
+RUN apt-get update && apt-get install -y busybox-static libcap2-bin
 
 RUN mkdir -p /var/lib/ksynth
 RUN mkdir -p /opt/kentik/ksynth

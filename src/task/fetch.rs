@@ -13,12 +13,13 @@ use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
 use crate::status::Active;
-use super::{Config, Task, http::{Expiry, HttpClient, Times}};
+use super::{Config, Network, Task, http::{Expiry, HttpClient, Times}};
 use super::tls::Identity;
 
 pub struct Fetch {
     task:    u64,
     test:    u64,
+    network: Network,
     target:  Arc<String>,
     method:  Method,
     headers: Option<HeaderMap>,
@@ -46,6 +47,7 @@ impl Fetch {
         Ok(Self {
             task:    task.task,
             test:    task.test,
+            network: task.network,
             target:  Arc::new(cfg.target),
             method:  method,
             headers: headers,
@@ -63,7 +65,12 @@ impl Fetch {
         loop {
             debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
-            let target = self.target.parse()?;
+            let target = match self.network {
+                Network::IPv4 => format!("ipv4+{}", self.target),
+                Network::IPv6 => format!("ipv6+{}", self.target),
+                Network::Dual => format!("dual+{}", self.target),
+            }.parse()?;
+
             let result = self.fetch(target);
 
             match timeout(self.expiry, result).await {

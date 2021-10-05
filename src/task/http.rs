@@ -1,7 +1,8 @@
 use std::future::Future;
+use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
-use std::io;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -59,7 +60,6 @@ struct Connector {
 
 struct Connect {
     bind:     Bind,
-    network:  Network,
     resolver: Resolver,
     tls:      TlsConnector,
     verifier: Arc<Verifier>,
@@ -85,7 +85,7 @@ pub struct Times {
 
 impl Connector {
     pub fn new(cfg: &Config, timeout: Duration) -> Self {
-        let Config { bind, network, resolver, roots, .. } = cfg.clone();
+        let Config { bind, resolver, roots, .. } = cfg.clone();
 
         let verifier = Arc::new(Verifier::new(roots));
 
@@ -93,9 +93,8 @@ impl Connector {
         config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
         config.dangerous().set_certificate_verifier(verifier.clone());
 
-        let network = network.unwrap_or(Network::Dual);
         let tls     = TlsConnector::from(Arc::new(config));
-        let connect = Connect { bind, tls, network, resolver, verifier };
+        let connect = Connect { bind, tls, resolver, verifier };
 
         Self {
             connect: Arc::new(connect),
@@ -123,42 +122,47 @@ impl Service<Uri> for Connector {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct Target {
+    scheme:  Scheme,
+    host:    String,
+    port:    u16,
+    network: Network,
+}
+
+#[derive(Debug, PartialEq)]
+enum Scheme {
+    HTTP,
+    HTTPS,
+}
+
 impl Connect {
     async fn connect(self: Arc<Self>, uri: Uri) -> Result<Connection> {
-        let Self { bind, network, resolver, tls, verifier } = &*self;
+        let Self { bind, resolver, tls, verifier } = &*self;
 
-        let port = uri.port().as_ref().map(Port::as_u16);
-        let port = match uri.scheme_str() {
-            Some("http")  => port.unwrap_or(80),
-            Some("https") => port.unwrap_or(443),
-            _             => return Err(anyhow!("{}: invalid scheme", uri)),
-        };
+        let Target { scheme, host, port, network } = Target::new(uri)?;
 
         let mut times = Times::default();
 
         let start = Instant::now();
-        let addr  = match uri.host() {
-            Some(host) => resolver.lookup(host, *network).await?,
-            None       => return Err(anyhow!("{}: missing host", uri)),
-        };
+        let addr  = resolver.lookup(&host, network).await?;
 
         times.dns = start.elapsed();
 
         let start  = Instant::now();
         let addr   = SocketAddr::new(addr, port);
-        let socket = socket(&bind, &addr).await?;
+        let socket = socket(bind, &addr).await?;
         let stream = socket.connect(addr).await?;
 
         times.tcp = start.elapsed();
 
-        if uri.scheme_str() != Some("https") {
+        if scheme == Scheme::HTTP {
             let stream = Stream::TCP(stream);
             let server = Identity::Unknown;
             return Ok(Connection { stream, times, server });
         }
 
-        let hostname = uri.host().unwrap_or_default();
-        let dnsname  = DNSNameRef::try_from_ascii_str(hostname)?;
+        let dnsname = DNSNameRef::try_from_ascii_str(&host)?;
 
         let start  = Instant::now();
         let stream = tls.connect(dnsname, stream).await?;
@@ -229,5 +233,132 @@ impl AsyncWrite for Connection {
             Stream::TCP(tcp) => Pin::new(tcp).poll_shutdown(cx),
             Stream::TLS(tls) => Pin::new(tls).poll_shutdown(cx),
         }
+    }
+}
+
+impl Target {
+    fn new(uri: Uri) -> Result<Self> {
+        let (network, scheme) = match uri.scheme_str().and_then(|s| s.split_once('+')) {
+            Some(("ipv4", scheme)) => (Network::IPv4, scheme.parse()?),
+            Some(("ipv6", scheme)) => (Network::IPv6, scheme.parse()?),
+            Some(("dual", scheme)) => (Network::Dual, scheme.parse()?),
+            _                      => return Err(anyhow!("{}: invalid scheme", uri)),
+        };
+
+        let host = match uri.host() {
+            Some(host) => host.to_owned(),
+            None       => return Err(anyhow!("{}: missing host", uri)),
+        };
+
+        let port = uri.port().as_ref().map(Port::as_u16);
+        let port = match scheme {
+            Scheme::HTTP  => port.unwrap_or(80),
+            Scheme::HTTPS => port.unwrap_or(443),
+        };
+
+        Ok(Self { scheme, host, port, network })
+    }
+}
+
+impl FromStr for Scheme {
+    type Err = Error;
+
+    fn from_str(scheme: &str) -> Result<Self, Self::Err> {
+        match scheme {
+            "http"  => Ok(Self::HTTP),
+            "https" => Ok(Self::HTTPS),
+            _       => Err(anyhow!("{}: unsupported scheme", scheme))
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use anyhow::Result;
+    use crate::task::Network;
+    use super::{Scheme, Target};
+
+    #[test]
+    fn target_scheme() -> Result<()> {
+        assert_eq!(Target {
+            scheme: Scheme::HTTP,
+            host:   "foo.com".into(),
+            port:   80,
+            network: Network::IPv4,
+        }, Target::new("ipv4+http://foo.com".parse()?)?);
+
+        assert_eq!(Target {
+            scheme: Scheme::HTTPS,
+            host:   "foo.com".into(),
+            port:   443,
+            network: Network::IPv4,
+        }, Target::new("ipv4+https://foo.com".parse()?)?);
+
+        assert!(Target::new("//foo.com".parse()?).is_err());
+        assert!(Target::new("ssh://foo.com".parse()?).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn target_port() -> Result<()> {
+        assert_eq!(Target {
+            scheme: Scheme::HTTP,
+            host:   "foo.com".into(),
+            port:   80,
+            network: Network::IPv4,
+        }, Target::new("ipv4+http://foo.com".parse()?)?);
+
+        assert_eq!(Target {
+            scheme: Scheme::HTTP,
+            host:   "foo.com".into(),
+            port:   8888,
+            network: Network::IPv4,
+        }, Target::new("ipv4+http://foo.com:8888".parse()?)?);
+
+        assert_eq!(Target {
+            scheme: Scheme::HTTPS,
+            host:   "foo.com".into(),
+            port:   443,
+            network: Network::IPv4,
+        }, Target::new("ipv4+https://foo.com".parse()?)?);
+
+        assert_eq!(Target {
+            scheme: Scheme::HTTPS,
+            host:   "foo.com".into(),
+            port:   4433,
+            network: Network::IPv4,
+        }, Target::new("ipv4+https://foo.com:4433".parse()?)?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn target_network() -> Result<()> {
+        assert_eq!(Target {
+            scheme: Scheme::HTTP,
+            host:   "foo.com".into(),
+            port:   80,
+            network: Network::IPv4,
+        }, Target::new("ipv4+http://foo.com".parse()?)?);
+
+        assert_eq!(Target {
+            scheme: Scheme::HTTP,
+            host:   "foo.com".into(),
+            port:   80,
+            network: Network::IPv6,
+        }, Target::new("ipv6+http://foo.com".parse()?)?);
+
+        assert_eq!(Target {
+            scheme: Scheme::HTTP,
+            host:   "foo.com".into(),
+            port:   80,
+            network: Network::Dual,
+        }, Target::new("dual+http://foo.com".parse()?)?);
+
+        assert!(Target::new("http://foo.com".parse()?).is_err());
+        assert!(Target::new("ipv5+http://foo.com".parse()?).is_err());
+
+        Ok(())
     }
 }

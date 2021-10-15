@@ -10,9 +10,10 @@ use tokio::time::{sleep, timeout};
 use netdiag::{self, Knocker};
 use synapi::tasks::KnockConfig;
 use crate::export::{record, Envoy};
+use crate::net::{Network, Resolver};
 use crate::stats::{summarize, Summary};
 use crate::status::Active;
-use super::{Expiry, Network, Resolver, Task};
+use super::{Expiry, Task};
 
 pub struct Knock {
     task:     u64,

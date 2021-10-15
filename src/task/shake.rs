@@ -8,9 +8,10 @@ use tokio::time::{sleep, timeout};
 use webpki::DNSNameRef;
 use synapi::tasks::ShakeConfig;
 use crate::export::{record, Envoy};
+use crate::net::{Network, Resolver};
+use crate::net::tls::{Identity, Shaker};
 use crate::status::Active;
-use super::{Network, Resolver, Shaker, Task};
-use super::tls::Identity;
+use super::Task;
 
 pub struct Shake {
     task:     u64,

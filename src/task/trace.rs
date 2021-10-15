@@ -11,8 +11,9 @@ use tokio::time::{sleep, timeout};
 use netdiag::{self, Node, Protocol, Tracer};
 use synapi::tasks::TraceConfig;
 use crate::export::{record, Hop, Envoy};
+use crate::net::{Network, Resolver};
 use crate::status::Active;
-use super::{Expiry, Network, Resolver, Task};
+use super::{Expiry, Task};
 
 pub struct Trace {
     task:     u64,

@@ -3,6 +3,7 @@
 pub mod agent;
 pub mod args;
 pub mod cmd;
+pub mod net;
 pub mod version;
 
 mod exec;

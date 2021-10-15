@@ -2,7 +2,7 @@ use std::net::IpAddr;
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
 use tokio::runtime::Runtime;
-use crate::{args::Args, task::{Network, Resolver}};
+use crate::{args::Args, net::{Network, Resolver}};
 
 pub fn ping(args: Args<'_, '_>) -> Result<()> {
     Runtime::new()?.block_on(ping::ping(args))

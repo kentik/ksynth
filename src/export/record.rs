@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use serde::Serialize;
 use synapi::tasks::Device;
+use crate::net::tls::Identity;
 use crate::stats::Summary;
-use crate::task::Identity;
 
 #[derive(Clone, Debug)]
 pub struct Target {

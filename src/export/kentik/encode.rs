@@ -6,7 +6,7 @@ use capnp::{message, serialize_packed};
 use serde_json::json;
 use crate::chf_capnp::{c_h_f::Builder, packed_c_h_f};
 use crate::export::{Record, Target, record::*};
-use crate::task::Identity;
+use crate::net::tls::Identity;
 use super::Customs;
 
 pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {

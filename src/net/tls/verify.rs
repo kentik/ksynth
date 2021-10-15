@@ -32,11 +32,11 @@ impl Verifier {
 
         let cert  = chain.first().ok_or(TLSError::NoCertificatesPresented)?;
         let until = match X509Certificate::from_der(cert) {
-            Ok(cert) => cert.as_ref().tbs_certificate.validity.not_after.as_ref().clone(),
+            Ok(cert) => *cert.as_ref().tbs_certificate.validity.not_after.as_ref(),
             Err(_)   => Utc.timestamp(0, 0),
         };
 
-        match default.verify_server_cert(&roots, chain, name, &[]) {
+        match default.verify_server_cert(roots, chain, name, &[]) {
             Ok(_)               => Ok(Identity::Valid(until)),
             Err(WebPKIError(e)) => Ok(Identity::Error(e)),
             Err(e)              => Err(e),

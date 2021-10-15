@@ -8,9 +8,11 @@ use synapi::tasks::{State, TaskConfig};
 use synapi::tasks::{FetchConfig, KnockConfig, PingConfig, QueryConfig, ShakeConfig, TraceConfig};
 use netdiag::{Bind, Knocker, Pinger, Tracer};
 use crate::export::{Exporter, Target};
+use crate::net::{Network, Resolver};
+use crate::net::tls::Shaker;
 use crate::spawn::{Spawner, Handle};
 use crate::status::{Active, Status};
-use crate::task::{Config, Network, Task, Resolver, Fetcher, Shaker};
+use crate::task::{Config, Task, Fetcher};
 use crate::task::{Fetch, Knock, Ping, Query, Shake, Trace};
 use crate::watch::{Event, Tasks};
 

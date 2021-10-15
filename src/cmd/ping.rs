@@ -7,7 +7,7 @@ use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::system_conf::read_system_conf;
 use netdiag::{Bind, Ping, Pinger};
 use crate::args::Args;
-use crate::task::{Network, Resolver};
+use crate::net::{Network, Resolver};
 use super::resolve;
 
 pub async fn ping(args: Args<'_, '_>) -> Result<()> {

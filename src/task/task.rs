@@ -2,8 +2,8 @@ use std::sync::Arc;
 use rustls::RootCertStore;
 use netdiag::Bind;
 use crate::export::Envoy;
+use crate::net::{Network, Resolver};
 use crate::status::Active;
-use super::Resolver;
 
 pub struct Task {
     pub task:     u64,
@@ -12,13 +12,6 @@ pub struct Task {
     pub network:  Network,
     pub envoy:    Envoy,
     pub resolver: Resolver,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Network {
-    IPv4,
-    IPv6,
-    Dual,
 }
 
 #[derive(Clone)]

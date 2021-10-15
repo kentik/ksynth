@@ -10,8 +10,8 @@ use capnp::serialize_packed::try_read_message;
 use rand::{thread_rng, Rng};
 use synapi::tasks::{Column, Device, Kind};
 use crate::chf_capnp::{custom::value::Which, packed_c_h_f};
+use crate::net::tls::Identity;
 use crate::stats::Summary;
-use crate::task::Identity;
 use crate::export::{Record, Target, record::*};
 use super::{encode, encode::*};
 

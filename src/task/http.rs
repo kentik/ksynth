@@ -18,8 +18,9 @@ use tokio::time::timeout;
 use tokio_rustls::{TlsConnector, client::TlsStream};
 use webpki::DNSNameRef;
 use netdiag::Bind;
-use super::{Config, Network, Resolver};
-use super::tls::{Identity, Verifier};
+use crate::net::{Network, Resolver};
+use crate::net::tls::{Identity, Verifier};
+use super::Config;
 
 #[derive(Clone)]
 pub struct HttpClient {
@@ -275,7 +276,7 @@ impl FromStr for Scheme {
 #[cfg(test)]
 mod test {
     use anyhow::Result;
-    use crate::task::Network;
+    use crate::net::Network;
     use super::{Scheme, Target};
 
     #[test]

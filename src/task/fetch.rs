@@ -12,9 +12,10 @@ use log::{debug, warn};
 use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
+use crate::net::Network;
+use crate::net::tls::Identity;
 use crate::status::Active;
-use super::{Config, Network, Task, http::{Expiry, HttpClient, Times}};
-use super::tls::Identity;
+use super::{Config, Task, http::{Expiry, HttpClient, Times}};
 
 pub struct Fetch {
     task:    u64,

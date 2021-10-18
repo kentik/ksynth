@@ -4,18 +4,18 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use bytes::Bytes;
 use anyhow::{Error, Result};
-use hyper::{Body, Method, Request, StatusCode, Uri};
+use hyper::{Body, Method, StatusCode};
 use hyper::body::HttpBody;
-use hyper::client::connect::HttpInfo;
 use hyper::header::HeaderMap;
 use log::{debug, warn};
 use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
 use crate::net::Network;
+use crate::net::http::{HttpClient, Request};
 use crate::net::tls::Identity;
 use crate::status::Active;
-use super::{Config, Task, http::{Expiry, HttpClient, Times}};
+use super::{Config, Task};
 
 pub struct Fetch {
     task:    u64,
@@ -66,13 +66,7 @@ impl Fetch {
         loop {
             debug!("{}: test {}, target {}", self.task, self.test, self.target);
 
-            let target = match self.network {
-                Network::IPv4 => format!("ipv4+{}", self.target),
-                Network::IPv6 => format!("ipv6+{}", self.target),
-                Network::Dual => format!("dual+{}", self.target),
-            }.parse()?;
-
-            let result = self.fetch(target);
+            let result = self.fetch(&self.target);
 
             match timeout(self.expiry, result).await {
                 Ok(Ok(stats)) => self.success(stats).await,
@@ -84,17 +78,19 @@ impl Fetch {
         }
     }
 
-    async fn fetch(&self, target: Uri) -> Result<Output> {
+    async fn fetch(&self, target: &str) -> Result<Output> {
         let _guard = self.active.fetch();
 
-        let method = self.method.clone();
-        let body   = self.body.clone().map(Body::from).unwrap_or_else(Body::empty);
-        let start  = Instant::now();
+        let network = self.network;
+        let method  = self.method.clone();
+        let body    = self.body.clone();
+        let start   = Instant::now();
 
-        let mut req = self.client.request(method, target, body)?;
+        let mut req = Request::new(network, method, target.parse()?)?;
+        *req.body() = body.map(Body::from).unwrap_or_else(Body::empty);
 
         if let Some(headers) = self.headers.as_ref().cloned() {
-            req.headers_mut().extend(headers);
+            req.headers().extend(headers);
         }
 
         let output = self.client.execute(start, req).await?;
@@ -149,43 +145,34 @@ impl Fetch {
 #[derive(Clone)]
 pub struct Fetcher {
     client: HttpClient,
+    expiry: Duration,
 }
 
 impl Fetcher {
     pub fn new(cfg: &Config) -> Result<Self> {
-        let expiry = Expiry {
-            connect: Duration::from_secs(10),
-            request: Duration::from_secs(60),
-        };
-        let client = HttpClient::new(cfg, expiry)?;
-        Ok(Self { client })
+        let Config { bind, resolver, roots, .. } = cfg.clone();
+        let client = HttpClient::new(bind, resolver, roots)?;
+        let expiry = Duration::from_secs(60);
+        Ok(Self { client, expiry })
     }
 
-    pub fn request(&self, method: Method, url: Uri, body: Body) -> Result<Request<Body>> {
-        Ok(Request::builder().method(method).uri(url).body(body)?)
-    }
-
-    pub async fn execute(&self, start: Instant, req: Request<Body>) -> Result<Output> {
+    pub async fn execute(&self, start: Instant, req: Request) -> Result<Output> {
         let mut res = self.client.request(req).await?;
 
-        let addr = match res.extensions().get::<HttpInfo>() {
-            Some(info) => info.remote_addr().ip(),
-            None       => IpAddr::V4(0.into()),
-        };
+        let addr = res.peer.addr.ip();
+        let body = &mut res.body;
 
         let mut bytes: usize = 0;
-        while let Some(chunk) = res.data().await {
+        while let Some(chunk) = body.data().await {
             bytes += chunk?.len();
         }
 
-        let status = res.status();
+        let status = res.head.status;
         let time   = Instant::now();
         let rtt    = time.saturating_duration_since(start);
 
-        let exts = res.extensions();
-
-        let times  = exts.get::<Times>().cloned().unwrap_or_default();
-        let server = exts.get::<Identity>().cloned().unwrap_or_default();
+        let server = res.peer.server;
+        let times  = res.times;
         let dns    = times.dns;
         let tcp    = times.tcp;
         let tls    = times.tls.unwrap_or_default();

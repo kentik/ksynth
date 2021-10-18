@@ -10,7 +10,6 @@ pub use shake::Shake;
 pub use trace::Trace;
 
 mod expiry;
-mod http;
 mod task;
 
 mod fetch;

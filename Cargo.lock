@@ -977,9 +977,9 @@ dependencies = [
 
 [[package]]
 name = "netdiag"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aeba823d20e1300d89141bd1a2ff1507fbf5b71df19fc34c139d34db6da1972"
+checksum = "a411adff2b6f405d095c48ca54ee4280fa6d400301627bd6aa8110e24babf6a8"
 dependencies = [
  "anyhow",
  "etherparse",
@@ -989,6 +989,7 @@ dependencies = [
  "parking_lot",
  "rand",
  "raw-socket",
+ "socket2 0.3.19",
  "tokio",
 ]
 

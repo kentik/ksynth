@@ -120,7 +120,7 @@ jobs:
         with:
           name: ${{ env.BINARY }}-x86_64-unknown-linux-musl
           path: binary/amd64
-      - uses: docker/build-push-action@v2
+      - uses: docker/build-push-action@v2.6.1
         with:
           context: .
           file: Dockerfile

@@ -9,25 +9,25 @@ experimental = []
 
 [dependencies]
 base64        = "0.13.0"
-bytes         = "1.0.1"
-capnp         = "0.14.2"
+bytes         = "1.1.0"
+capnp         = "0.14.3"
 chrono        = "0.4.19"
 env_logger    = "0.8.4"
-futures       = "0.3.15"
+futures       = "0.3.17"
 hex           = "0.4.3"
-http          = "0.2.4"
+http          = "0.2.5"
 hyper-rustls  = "0.22.1"
-libc          = "0.2.98"
+libc          = "=0.2.104"
 log           = "0.4.14"
 netdiag       = "0.2.1"
-nix           = "0.21.0"
-parking_lot   = "0.11.1"
+nix           = "0.21.2"
+parking_lot   = "0.11.2"
 rand          = "0.8.4"
 rustls        = "0.19.1"
 ryu           = "1.0.5"
-sha2          = "0.9.5"
-serde_json    = "1.0.64"
-signal-hook   = "0.3.9"
+sha2          = "0.9.8"
+serde_json    = "1.0.71"
+signal-hook   = "0.3.10"
 tokio-rustls  = "0.22.0"
 webpki        = "0.21.4"
 webpki-roots  = "0.21.1"
@@ -35,10 +35,10 @@ yaml-rust     = "0.3.5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 capo          = "0.0.1"
-procfs        = "0.9.1"
+procfs        = "0.11.0"
 
 [dependencies.anyhow]
-version  = "1.0.41"
+version  = "1.0.48"
 features = ["backtrace"]
 
 [dependencies.clap]
@@ -46,15 +46,15 @@ version  = "2.33.3"
 features = ["yaml"]
 
 [dependencies.ed25519-compact]
-version  = "0.1.9"
+version  = "0.1.11"
 features = []
 
 [dependencies.hyper]
-version  = "0.14.13"
+version  = "0.14.15"
 features = ["client"]
 
 [dependencies.itoa]
-version  = "0.4.7"
+version  = "0.4.8"
 features = ["i128"]
 
 [dependencies.rustls-native-certs]
@@ -62,15 +62,15 @@ version  = "0.5.0"
 features = []
 
 [dependencies.serde]
-version  = "1.0.126"
+version  = "1.0.130"
 features = ["derive"]
 
 [dependencies.tokio]
-version  = "1.8.1"
+version  = "1.14.0"
 features = ["net", "rt-multi-thread", "sync", "time"]
 
 [dependencies.tracing]
-version  = "0.1.26"
+version  = "0.1.20"
 features = ["log"]
 
 [dependencies.trust-dns-client]
@@ -84,7 +84,7 @@ features = ["system-config", "tokio-runtime"]
 default-features = false
 
 [dependencies.x509-certificate]
-version  = "0.2.0"
+version  = "0.4.0"
 features = []
 
 [dependencies.notary]
@@ -97,19 +97,19 @@ default-features = false
 path = "synapi"
 
 [dev-dependencies]
-rcgen       = "0.8.3"
+rcgen       = "0.8.14"
 tokio-test  = "0.4.2"
 
 [dev-dependencies.hyper]
-version  = "0.14.13"
+version  = "0.14.15"
 features = ["server"]
 
 [build-dependencies]
 capnpc = "0.14.4"
-anyhow = "1.0.41"
+anyhow = "1.0.48"
 
 [build-dependencies.git2]
-version  = "0.13.20"
+version  = "0.13.24"
 features = []
 default-features = false
 

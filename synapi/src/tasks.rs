@@ -257,8 +257,8 @@ impl<'de> Deserialize<'de> for Limit {
 
 impl<'de> Deserialize<'de> for Delay {
     fn deserialize<D: Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
-        let micros = de.deserialize_u64(U64Visitor)?;
-        Ok(Self(Duration::from_micros(micros)))
+        let millis = de.deserialize_u64(U64Visitor)?;
+        Ok(Self(Duration::from_millis(millis)))
     }
 }
 

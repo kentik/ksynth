@@ -1,11 +1,12 @@
+use std::convert::TryFrom;
 use std::fmt;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use log::{debug, warn};
+use rustls::ServerName;
 use tokio::time::{sleep, timeout};
-use webpki::DNSNameRef;
 use synapi::tasks::ShakeConfig;
 use crate::export::{record, Envoy};
 use crate::net::{Network, Resolver};
@@ -66,10 +67,10 @@ impl Shake {
         let time = Instant::now();
         let addr = self.resolver.lookup(&self.target, self.network).await?;
 
-        let name = DNSNameRef::try_from_ascii_str(&self.target)?;
+        let name = ServerName::try_from(self.target.as_str())?;
         let addr = SocketAddr::new(addr, self.port);
 
-        let c = self.shaker.shake(name, addr).await?;
+        let c = self.shaker.shake(&name, addr).await?;
 
         Ok(Output {
             addr:   addr.ip(),

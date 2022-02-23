@@ -1,10 +1,9 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 use anyhow::Result;
-use rustls::{ClientConfig, Session};
+use rustls::{ClientConfig, RootCertStore, ServerName};
 use tokio::net::{TcpSocket, TcpStream};
 use tokio_rustls::{TlsConnector, client::TlsStream};
-use webpki::DNSNameRef;
 use netdiag::Bind;
 use crate::task::Config;
 use super::{Identity, Verifier};
@@ -26,7 +25,10 @@ impl Shaker {
 
         let verifier = Arc::new(Verifier::new(roots));
 
-        let mut cfg = ClientConfig::new();
+        let mut cfg = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(RootCertStore::empty())
+            .with_no_client_auth();
         cfg.dangerous().set_certificate_verifier(verifier.clone());
 
         Ok(Self {
@@ -36,11 +38,11 @@ impl Shaker {
         })
     }
 
-    pub async fn shake(&self, name: DNSNameRef<'_>, addr: SocketAddr) -> Result<Connection> {
-        self.connect(name, addr).await
+    pub async fn shake(&self, name: &ServerName, addr: SocketAddr) -> Result<Connection> {
+        self.connect(&name, addr).await
     }
 
-    async fn connect(&self, name: DNSNameRef<'_>, addr: SocketAddr) -> Result<Connection> {
+    async fn connect(&self, name: &ServerName, addr: SocketAddr) -> Result<Connection> {
         let Self { bind, connect, verifier } = self;
 
         let (socket, bind) = match addr {
@@ -51,11 +53,11 @@ impl Shaker {
         socket.bind(bind)?;
 
         let stream = socket.connect(addr).await?;
-        let stream = connect.connect(name, stream).await?;
+        let stream = connect.connect(name.clone(), stream).await?;
 
         let (_, tls) = stream.get_ref();
-        let certs  = tls.get_peer_certificates().unwrap_or_default();
-        let server = verifier.verify(&certs, name)?;
+        let certs  = tls.peer_certificates().unwrap_or_default();
+        let server = verifier.verify(&certs, &name)?;
 
         Ok(Connection { server, stream })
     }

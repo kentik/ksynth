@@ -7,8 +7,8 @@ use hyper::server::conn::Http;
 use hyper::service::service_fn;
 use log::{debug, error};
 use rcgen::{generate_simple_self_signed, Certificate};
-use rustls::{NoClientAuth, RootCertStore, ServerConfig};
-use rustls::internal::pemfile::{certs, pkcs8_private_keys};
+use rustls::{self, RootCertStore, ServerConfig};
+use rustls_pemfile::{certs, pkcs8_private_keys};
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
@@ -22,9 +22,9 @@ pub async fn server(bind: SocketAddr, alpn: &[Vec<u8>]) -> Result<Server> {
     let subjects = vec!["localhost".to_string()];
     let cert = generate_simple_self_signed(subjects)?;
 
-    let mut certs = Cursor::new(cert.serialize_pem()?);
+    let bytes     = &[cert.serialize_der()?];
     let mut roots = RootCertStore::empty();
-    roots.add_pem_file(&mut certs).unwrap_or_default();
+    roots.add_parsable_certificates(bytes);
 
     let accept  = TcpListener::bind(bind).await?;
     let http    = accept.local_addr()?;
@@ -59,9 +59,14 @@ async fn tls(tcp: TcpListener, cert: Certificate, alpn: Vec<Vec<u8>>) -> Result<
     let key  = pkcs8_private_keys(&mut keys).unwrap_or_default();
     let cert = certs(&mut cert).unwrap_or_default();
 
-    let mut cfg = ServerConfig::new(NoClientAuth::new());
-    cfg.set_single_cert(cert, key[0].clone())?;
-    cfg.set_protocols(&alpn);
+    let key  = rustls::PrivateKey(key[0].clone());
+    let cert = vec![rustls::Certificate(cert[0].clone())];
+
+    let mut cfg = ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(cert, key)?;
+    cfg.alpn_protocols = alpn;
 
     let tls = TlsAcceptor::from(Arc::new(cfg));
 

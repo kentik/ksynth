@@ -9,20 +9,18 @@ use ed25519_compact::{KeyPair, Seed};
 use log::{debug, error, info, warn};
 use nix::{unistd::gethostname, sys::utsname::uname};
 use rustls::RootCertStore;
-use rustls_native_certs::load_native_certs;
 use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM, SIGUSR1}}};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::config::{LookupIpStrategy, ResolverConfig, ResolverOpts};
 use trust_dns_resolver::system_conf::read_system_conf;
-use webpki_roots::TLS_SERVER_ROOTS;
 use synapi::{Client, Config as ClientConfig, Region};
 use netdiag::Bind;
 use crate::args::Args;
 use crate::exec::Executor;
 use crate::export::Exporter;
-use crate::net::{Network, Resolver};
+use crate::net::{Network, Resolver, tls::TrustAnchors};
 use crate::output::Output;
 use crate::secure;
 use crate::status::Monitor;
@@ -252,14 +250,15 @@ async fn resolver(net: Option<Network>) -> Result<Resolver> {
 fn trust_roots() -> RootCertStore {
     let mut store = RootCertStore::empty();
 
-    match load_native_certs() {
-        Ok(system)  => store.roots.extend_from_slice(&system.roots),
-        Err((_, e)) => warn!("invalid trust store: {}", e),
+    match TrustAnchors::native() {
+        Ok(roots) => store.roots.extend_from_slice(&*roots),
+        Err(e)    => warn!("invalid trust store: {}", e),
     };
 
     if store.roots.is_empty() {
         warn!("using static trust roots");
-        store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
+        let roots = TrustAnchors::webpki();
+        store.roots.extend_from_slice(&*roots);
     }
 
     store

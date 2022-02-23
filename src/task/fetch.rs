@@ -95,9 +95,9 @@ impl Fetch {
 
         let output = self.client.execute(start, req).await?;
 
-        if let Identity::Error(e) = output.server {
+        if let Identity::Error(e) = &output.server {
             if self.verify {
-                return Err(e.into());
+                return Err(e.clone().into());
             }
         }
 

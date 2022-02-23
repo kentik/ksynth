@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -11,9 +11,8 @@ use hyper::{self, body::Body};
 use hyper::client::conn::Builder;
 use log::{error, trace};
 use netdiag::Bind;
-use rustls::{ClientConfig, RootCertStore, Session};
+use rustls::{ClientConfig, RootCertStore, ServerName};
 use tokio_rustls::TlsConnector;
-use webpki::DNSNameRef;
 use crate::net::{Network, Resolver};
 use crate::net::tls::{Identity, Verifier};
 use super::stream::{socket, Connection, Peer};
@@ -63,7 +62,10 @@ impl HttpClient {
     pub fn new(bind: Bind, resolver: Resolver, roots: RootCertStore) -> Result<Self> {
         let verifier = Arc::new(Verifier::new(roots));
 
-        let mut config = ClientConfig::new();
+        let mut config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(RootCertStore::empty())
+            .with_no_client_auth();
         config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
         config.dangerous().set_certificate_verifier(verifier.clone());
 
@@ -120,16 +122,16 @@ impl HttpClient {
             return Ok((conn, times))
         }
 
-        let dnsname = DNSNameRef::try_from_ascii_str(host)?;
+        let dnsname = ServerName::try_from(host.as_str())?;
 
         let start  = Instant::now();
-        let stream = self.tls.connect(dnsname, stream).await?;
+        let stream = self.tls.connect(dnsname.clone(), stream).await?;
 
         times.tls = Some(start.elapsed());
 
         let (_, tls) = stream.get_ref();
-        let certs  = tls.get_peer_certificates().unwrap_or_default();
-        let server = self.verifier.verify(&certs, dnsname)?;
+        let certs  = tls.peer_certificates().unwrap_or_default();
+        let server = self.verifier.verify(&certs, &dnsname)?;
         let conn   = (stream, server).try_into()?;
 
         Ok((conn, times))

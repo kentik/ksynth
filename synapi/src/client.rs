@@ -9,7 +9,7 @@ use futures::io::AsyncWriteExt;
 use log::error;
 use reqwest::{Client as HttpClient, Proxy};
 use reqwest::header::{CONTENT_ENCODING, CONTENT_TYPE};
-use rustls::ClientConfig;
+use rustls::{ClientConfig, RootCertStore};
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use time::get_time;
 use tokio::sync::RwLock;
@@ -50,11 +50,16 @@ pub struct Failure {
 
 impl Client {
     pub fn new(mut config: Config) -> Result<Self, Error> {
-        let Config { region, proxy, bind, roots, .. } = &mut config;
+        let mut roots = RootCertStore::empty();
+        mem::swap(&mut roots, &mut config.roots);
 
-        let mut cfg = ClientConfig::new();
+        let Config { region, proxy, bind, .. } = &config;
+
+        let mut cfg = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
         cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-        mem::swap(&mut cfg.root_store, roots);
 
         let mut client = HttpClient::builder();
         client = client.timeout(Duration::from_secs(30));

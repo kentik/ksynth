@@ -5,7 +5,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use anyhow::{Error, Result};
 use netdiag::Bind;
-use rustls::Session;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::{TcpSocket, TcpStream};
 use tokio_rustls::client::TlsStream;
@@ -31,7 +30,7 @@ impl Connection {
     pub fn http2(&self) -> bool {
         (match &self.stream {
             Stream::TCP(_) => None,
-            Stream::TLS(s) => s.get_ref().1.get_alpn_protocol(),
+            Stream::TLS(s) => s.get_ref().1.alpn_protocol(),
         } == Some(b"h2"))
     }
 

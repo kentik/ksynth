@@ -6,7 +6,7 @@ use hyper::{Client as HttpClient, Method, Request};
 use hyper::body::{aggregate, Buf};
 use hyper::client::HttpConnector;
 use hyper::header::{AUTHORIZATION, HeaderValue};
-use hyper_rustls::HttpsConnector;
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 
 pub struct Client {
     client:   HttpClient<HttpsConnector<HttpConnector>>,
@@ -26,7 +26,12 @@ impl Client {
         let mut builder = HttpClient::builder();
         builder.pool_idle_timeout(Duration::from_secs(60));
 
-        let https = HttpsConnector::with_native_roots();
+        let https = HttpsConnectorBuilder::new()
+            .with_native_roots()
+            .https_or_http()
+            .enable_http1()
+            .enable_http2()
+            .build();
 
         Ok(Self {
             client:   builder.build(https),

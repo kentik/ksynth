@@ -11,7 +11,7 @@ use reqwest::{Client as HttpClient, Proxy};
 use reqwest::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use rustls::{ClientConfig, RootCertStore};
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
-use time::get_time;
+use time::OffsetDateTime;
 use tokio::sync::RwLock;
 use crate::{Error, error::{Application, Backend}};
 use crate::auth::Auth;
@@ -105,7 +105,7 @@ impl Client {
         }
 
         let key = &keys.pk;
-        let now = get_time().sec.to_string();
+        let now = OffsetDateTime::now_utc().unix_timestamp().to_string();
         let sig = keys.sk.sign(now.as_bytes(), None);
 
         let auth = self.send(&self.auth, &Request {

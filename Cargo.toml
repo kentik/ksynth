@@ -10,22 +10,23 @@ experimental = []
 [dependencies]
 base64        = "0.13.0"
 bytes         = "1.1.0"
-capnp         = "0.14.3"
+capnp         = "0.14.5"
 chrono        = "0.4.19"
-env_logger    = "0.8.4"
-futures       = "0.3.17"
+env_logger    = "0.9.0"
+futures       = "0.3.21"
 hex           = "0.4.3"
-http          = "0.2.5"
-libc          = "0.2.114"
+http          = "0.2.6"
+itoa          = "1.0.1"
+libc          = "0.2.119"
 log           = "0.4.14"
 netdiag       = "0.2.1"
-nix           = "0.21.2"
-parking_lot   = "0.11.2"
-rand          = "0.8.4"
-ryu           = "1.0.5"
-sha2          = "0.9.8"
-serde_json    = "1.0.71"
-signal-hook   = "0.3.10"
+nix           = "0.23.1"
+parking_lot   = "0.12.0"
+rand          = "0.8.5"
+ryu           = "1.0.9"
+sha2          = "0.10.2"
+serde_json    = "1.0.79"
+signal-hook   = "0.3.13"
 tokio-rustls  = "0.23.2"
 webpki        = "0.22.0"
 webpki-roots  = "0.22.2"
@@ -33,10 +34,10 @@ yaml-rust     = "0.3.5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 capo          = "0.0.1"
-procfs        = "0.11.0"
+procfs        = "0.12.0"
 
 [dependencies.anyhow]
-version  = "1.0.48"
+version  = "1.0.55"
 features = ["backtrace"]
 
 [dependencies.clap]
@@ -44,23 +45,19 @@ version  = "2.33.3"
 features = ["yaml"]
 
 [dependencies.ed25519-compact]
-version  = "0.1.11"
+version  = "1.0.11"
 features = []
 
 [dependencies.hyper]
-version  = "0.14.15"
+version  = "0.14.17"
 features = ["client"]
 
 [dependencies.hyper-rustls]
 version  = "0.23.0"
 features = ["http1", "http2"]
 
-[dependencies.itoa]
-version  = "0.4.8"
-features = ["i128"]
-
 [dependencies.rustls]
-version  = "0.20.3"
+version  = "0.20.4"
 features = ["dangerous_configuration"]
 
 [dependencies.rustls-native-certs]
@@ -68,34 +65,34 @@ version  = "0.6.1"
 features = []
 
 [dependencies.serde]
-version  = "1.0.130"
+version  = "1.0.136"
 features = ["derive"]
 
 [dependencies.tokio]
-version  = "1.14.0"
+version  = "1.17.0"
 features = ["net", "rt-multi-thread", "sync", "time"]
 
 [dependencies.tracing]
-version  = "0.1.20"
+version  = "0.1.31"
 features = ["log"]
 
 [dependencies.trust-dns-client]
-version  = "0.20.3"
+version  = "0.20.4"
 features = []
 default-features = false
 
 [dependencies.trust-dns-resolver]
-version  = "0.20.3"
+version  = "0.20.4"
 features = ["system-config", "tokio-runtime"]
 default-features = false
 
 [dependencies.x509-certificate]
-version  = "0.4.0"
+version  = "0.6.0"
 features = []
 
 [dependencies.notary]
 git      = "ssh://git@github.com/kentik/notary.git"
-tag      = "0.0.4"
+tag      = "0.0.5"
 features = ["client"]
 default-features = false
 
@@ -103,11 +100,11 @@ default-features = false
 path = "synapi"
 
 [dev-dependencies]
-rcgen       = "0.8.14"
+rcgen       = "0.9.2"
 tokio-test  = "0.4.2"
 
 [dev-dependencies.hyper]
-version  = "0.14.15"
+version  = "0.14.17"
 features = ["server"]
 
 [dev-dependencies.rustls-pemfile]
@@ -115,11 +112,11 @@ version  = "0.3.0"
 features = []
 
 [build-dependencies]
-capnpc = "0.14.4"
-anyhow = "1.0.48"
+capnpc = "0.14.5"
+anyhow = "1.0.55"
 
 [build-dependencies.git2]
-version  = "0.13.24"
+version  = "0.13.25"
 features = []
 default-features = false
 

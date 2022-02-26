@@ -70,7 +70,7 @@ features = ["derive"]
 
 [dependencies.tokio]
 version  = "1.17.0"
-features = ["net", "rt-multi-thread", "sync", "time"]
+features = ["macros", "net", "rt-multi-thread", "sync", "time"]
 
 [dependencies.tracing]
 version  = "0.1.31"

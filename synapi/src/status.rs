@@ -1,8 +1,10 @@
 use std::collections::HashSet;
+use std::net::IpAddr;
 use serde::Serialize;
 
 #[derive(Debug, Default, Serialize)]
 pub struct Report {
+    pub addrs:  Vec<IpAddr>,
     pub system: System,
     pub tasks:  Tasks,
 }

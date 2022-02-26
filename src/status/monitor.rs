@@ -2,23 +2,32 @@ use std::sync::Arc;
 use std::time::{Instant, Duration};
 use anyhow::Result;
 use log::{error, debug};
+use parking_lot::Mutex;
+use tokio::task::spawn;
 use tokio::time::interval_at;
 use synapi::{Client, Error};
 use synapi::status::{Report, Tasks};
-use super::{Status, system};
+use crate::task::Config;
+use super::{Addresses, Status, system};
 use Error::Session;
 
 pub struct Monitor {
     client: Arc<Client>,
+    config: Config,
     status: Arc<Status>,
 }
 
 impl Monitor {
-    pub fn new(client: Arc<Client>, status: Arc<Status>) -> Self {
-        Self { client, status }
+    pub fn new(client: Arc<Client>, status: Arc<Status>, config: Config) -> Result<Self> {
+        Ok(Self { client, config, status })
     }
 
     pub async fn exec(self) -> Result<()> {
+        let addresses = Addresses::new(self.config)?;
+        let addrs     = Arc::new(Mutex::new(Vec::new()));
+
+        spawn(addresses.exec(addrs.clone()));
+
         let delay = Duration::from_secs(30);
         let first = Instant::now() + delay;
 
@@ -33,6 +42,7 @@ impl Monitor {
             debug!("active tasks: {:?}", active);
 
             let report = Report {
+                addrs:  addrs.lock().clone(),
                 system: system().unwrap_or_default(),
                 tasks:  Tasks {
                     started: snapshot.tasks.started,

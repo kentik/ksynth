@@ -30,40 +30,32 @@ use crate::version::Version;
 use crate::watch::{Event, Watcher};
 
 pub struct Agent {
-    bind:    Bind,
     client:  Arc<Client>,
-    roots:   RootCertStore,
+    config:  Config,
     events:  Receiver<Event>,
     report:  Sender<Event>,
     watcher: Watcher,
 }
 
 impl Agent {
-    pub fn new(bind: Bind, client: Arc<Client>, keys: KeyPair, roots: RootCertStore) -> Self {
+    pub fn new(client: Arc<Client>, keys: KeyPair, config: Config) -> Self {
         let (tx, events) = channel(128);
         let report  = tx.clone();
         let watcher = Watcher::new(client.clone(), keys, tx);
-        Self { bind, client, roots, events, report, watcher }
+        Self { client, config, events, report, watcher }
     }
 
     pub fn report(&self) -> Sender<Event> {
         self.report.clone()
     }
 
-    pub async fn exec(self, exporter: Exporter, net: Option<Network>) -> Result<()> {
-        let Self { bind, client, roots, events, watcher, .. } = self;
-
-        let config = Config {
-            bind:     bind,
-            network:  net,
-            resolver: resolver(net).await?,
-            roots:    roots,
-        };
+    pub async fn exec(self, exporter: Exporter) -> Result<()> {
+        let Self { client, config, events, watcher, .. } = self;
 
         let (tx, mut rx) = channel(16);
 
-        let executor = Executor::new(events, exporter.clone(), config).await?;
-        let monitor  = Monitor::new(client, executor.status());
+        let executor = Executor::new(events, exporter.clone(), config.clone()).await?;
+        let monitor  = Monitor::new(client, executor.status(), config)?;
 
         spawn(monitor.exec(),  tx.clone());
         spawn(watcher.exec(),  tx.clone());
@@ -152,13 +144,20 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         Some(Output::Kentik) | None     => Exporter::kentik(client.clone())?,
     };
 
+    let config = Config {
+        bind:     bind,
+        network:  net,
+        resolver: resolver(net)?,
+        roots:    roots,
+    };
+
     let runtime = Runtime::new()?;
     let handle  = runtime.handle().clone();
-    let agent   = Agent::new(bind, client, keys, roots);
+    let agent   = Agent::new(client, keys, config);
     let report  = agent.report();
 
     handle.spawn(async move {
-        if let Err(e) = agent.exec(exporter, net).await {
+        if let Err(e) = agent.exec(exporter).await {
             error!("agent failed: {:?}", e);
             process::exit(1);
         }
@@ -230,7 +229,7 @@ fn machine() -> String {
     machine
 }
 
-async fn resolver(net: Option<Network>) -> Result<Resolver> {
+fn resolver(net: Option<Network>) -> Result<Resolver> {
     let (config, mut options) = read_system_conf().unwrap_or_else(|e| {
         warn!("resolver configuration error: {}", e);
         let config  = ResolverConfig::google();

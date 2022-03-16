@@ -77,12 +77,12 @@ version  = "0.1.31"
 features = ["log"]
 
 [dependencies.trust-dns-client]
-version  = "0.20.4"
+version  = "0.21.1"
 features = []
 default-features = false
 
 [dependencies.trust-dns-resolver]
-version  = "0.20.4"
+version  = "0.21.1"
 features = ["system-config", "tokio-runtime"]
 default-features = false
 

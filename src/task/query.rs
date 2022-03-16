@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use log::{debug, warn};
+use netdiag::Bind;
 use tokio::net::UdpSocket;
 use tokio::time::{sleep, timeout};
 use trust_dns_client::client::{AsyncClient, ClientHandle};
@@ -28,9 +29,16 @@ pub struct Query {
 }
 
 impl Query {
-    pub async fn new(task: Task, cfg: QueryConfig) -> Result<Self> {
+    pub async fn new(task: Task, cfg: QueryConfig, bind: &Bind) -> Result<Self> {
+        let expiry = cfg.expiry.into();
         let server = SocketAddr::from((&cfg.server.parse()?, cfg.port));
-        let stream = UdpClientStream::<UdpSocket>::new(server);
+
+        let bind = Some(match server {
+            SocketAddr::V4(_) => bind.sa4(),
+            SocketAddr::V6(_) => bind.sa6(),
+        });
+
+        let stream = UdpClientStream::<UdpSocket>::with_bind_addr_and_timeout(server, bind, expiry);
 
         let (client, bg) = AsyncClient::connect(stream).await?;
         tokio::spawn(bg);
@@ -40,7 +48,7 @@ impl Query {
             test:   task.test,
             target: cfg.target.parse()?,
             period: cfg.period.into(),
-            expiry: cfg.expiry.into(),
+            expiry: expiry,
             record: cfg.record.parse()?,
             envoy:  task.envoy,
             client: client,
@@ -123,15 +131,16 @@ struct Output {
 impl Output {
     fn new(record: RecordType, time: Duration, res: DnsResponse) -> Result<Self> {
         let mut answers = res.answers().iter().map(|rec| {
-            match rec.rdata() {
-                RData::A(addr)     => addr.to_string(),
-                RData::AAAA(addr)  => addr.to_string(),
-                RData::ANAME(name) => name.to_string(),
-                RData::CNAME(name) => name.to_string(),
-                RData::MX(mx)      => mx.exchange().to_string(),
-                RData::NS(name)    => name.to_string(),
-                RData::PTR(name)   => name.to_string(),
-                other              => format!("{:?}", other),
+            match rec.data() {
+                Some(RData::A(addr))     => addr.to_string(),
+                Some(RData::AAAA(addr))  => addr.to_string(),
+                Some(RData::ANAME(name)) => name.to_string(),
+                Some(RData::CNAME(name)) => name.to_string(),
+                Some(RData::MX(mx))      => mx.exchange().to_string(),
+                Some(RData::NS(name))    => name.to_string(),
+                Some(RData::PTR(name))   => name.to_string(),
+                Some(other)              => format!("{:?}", other),
+                None                     => "none".to_string(),
             }
         }).collect::<Vec<_>>();
         answers.sort_unstable();

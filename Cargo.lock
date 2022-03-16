@@ -987,7 +987,8 @@ dependencies = [
 [[package]]
 name = "notary"
 version = "0.0.5"
-source = "git+ssh://git@github.com/kentik/notary.git?tag=0.0.5#744a8abc2b68f17762c1942c8e2c5c85b7344769"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b75ea821e30b2333f3fcdf1c95c79bc721dd383d57573af0f9dfc81bb11e4b71"
 dependencies = [
  "anyhow",
  "async-trait",

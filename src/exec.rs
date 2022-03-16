@@ -178,7 +178,7 @@ impl Executor {
     }
 
     async fn query(&self, id: u64, task: Task, cfg: QueryConfig) -> Result<Handle> {
-        let query = Query::new(task, cfg).await?;
+        let query = Query::new(task, cfg, &self.bind).await?;
         Ok(self.spawner.spawn(id, query.exec()))
     }
 

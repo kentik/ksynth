@@ -1,6 +1,7 @@
 use std::fs::{self, File};
 use std::future::Future;
 use std::io::Read;
+use std::net::SocketAddr;
 use std::process;
 use std::sync::Arc;
 use anyhow::{Error, Result};
@@ -144,10 +145,12 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         Some(Output::Kentik) | None     => Exporter::kentik(client.clone())?,
     };
 
+    let resolver = resolver(&bind, net)?;
+
     let config = Config {
         bind:     bind,
         network:  net,
-        resolver: resolver(net)?,
+        resolver: resolver,
         roots:    roots,
     };
 
@@ -229,13 +232,28 @@ fn machine() -> String {
     machine
 }
 
-fn resolver(net: Option<Network>) -> Result<Resolver> {
+fn resolver(bind: &Bind, net: Option<Network>) -> Result<Resolver> {
     let (config, mut options) = read_system_conf().unwrap_or_else(|e| {
         warn!("resolver configuration error: {}", e);
         let config  = ResolverConfig::google();
         let options = ResolverOpts::default();
         (config, options)
     });
+
+    let domain  = config.domain().cloned();
+    let search  = config.search().to_vec();
+    let servers = config.name_servers().iter().map(|server| {
+        let mut server = server.clone();
+        let local = server.socket_addr.ip().is_loopback();
+        server.bind_addr = match server.socket_addr {
+            SocketAddr::V4(_) if !local => Some(bind.sa4()),
+            SocketAddr::V6(_) if !local => Some(bind.sa6()),
+            _                           => None,
+        };
+        server
+    }).collect::<Vec<_>>();
+
+    let config = ResolverConfig::from_parts(domain, search, servers);
 
     options.ip_strategy = match net {
         Some(Network::IPv4)        => LookupIpStrategy::Ipv4Only,

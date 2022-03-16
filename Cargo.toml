@@ -91,8 +91,7 @@ version  = "0.6.0"
 features = []
 
 [dependencies.notary]
-git      = "ssh://git@github.com/kentik/notary.git"
-tag      = "0.0.5"
+version  = "0.0.5"
 features = ["client"]
 default-features = false
 

@@ -1,8 +1,10 @@
 [package]
 name    = "ksynth"
 version = "0.0.0"
-authors = ["Will <will@kentik.com>"]
 edition = "2018"
+
+authors = ["Will <will@kentik.com>"]
+license = "GPL-2.0"
 
 [features]
 experimental = []

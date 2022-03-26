@@ -4,7 +4,8 @@ use anyhow::{anyhow, Error, Result};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Output {
-    Influx(String, Args),
+    Influx(Args),
+    NewRelic(Args),
     Kentik,
 }
 
@@ -14,8 +15,15 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn get(&self, key: &str) -> Option<&String> {
-        self.args.get(key)
+    pub fn get(&self, name: &str) -> Result<&str> {
+        match self.args.get(name) {
+            Some(value) => Ok(value.as_str()),
+            None        => Err(anyhow!("missing arg '{}'", name)),
+        }
+    }
+
+    pub fn opt(&self, name: &str) -> Option<&str> {
+        self.args.get(name).map(String::as_str)
     }
 }
 
@@ -23,22 +31,22 @@ impl FromStr for Output {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut split = s.splitn(2, '=');
-        let format = split.next().unwrap_or("kentik");
-        let rest   = split.next().unwrap_or("");
+        let mut split = s.splitn(2, ',');
+        let sink = split.next().unwrap_or("kentik");
+        let rest = split.next().unwrap_or("");
 
-        let mut split = rest.split(',').filter(|s| !s.is_empty());
-        let arg  = split.next().map(str::to_owned);
-        let args = split.flat_map(|str| {
+        let args = rest.split(',').flat_map(|str| {
             let (k, v) = str.split_once('=')?;
             Some((k.to_owned(), v.to_owned()))
         }).collect::<HashMap<_, _>>();
+
         let args = Args { args };
 
-        match (format, arg) {
-            ("influx", Some(url)) => Ok(Output::Influx(url, args)),
-            ("kentik", None)      => Ok(Output::Kentik),
-            _                     => Err(anyhow!("{}", s)),
-        }
+        Ok(match sink {
+            "influx"   => Output::Influx(args),
+            "newrelic" => Output::NewRelic(args),
+            "kentik"   => Output::Kentik,
+            _          => return Err(anyhow!("{}", s)),
+        })
     }
 }

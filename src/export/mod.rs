@@ -12,3 +12,4 @@ pub mod record;
 
 mod influx;
 mod kentik;
+mod newrelic;

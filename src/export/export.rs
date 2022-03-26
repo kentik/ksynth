@@ -4,13 +4,14 @@ use anyhow::Result;
 use log::info;
 use tokio::sync::Mutex;
 use synapi::Client;
-use super::{Record, Target, influx, kentik};
 use crate::output::Args;
+use super::{Record, Target, influx, kentik, newrelic};
 
 #[derive(Clone)]
 pub enum Exporter {
     Influx(Arc<influx::Exporter>),
     Kentik(Arc<kentik::Exporter>),
+    NewRelic(Arc<newrelic::Exporter>),
 }
 
 pub struct Envoy {
@@ -31,8 +32,8 @@ pub struct Output {
 }
 
 impl Exporter {
-    pub fn influx(agent: String, endpoint: &str, args: Args) -> Result<Self> {
-        let export = influx::Exporter::new(agent, endpoint, args)?;
+    pub fn influx(agent: String, args: Args) -> Result<Self> {
+        let export = influx::Exporter::new(agent, args)?;
         Ok(Self::Influx(Arc::new(export)))
     }
 
@@ -41,17 +42,24 @@ impl Exporter {
         Ok(Self::Kentik(Arc::new(export)))
     }
 
+    pub fn newrelic(agent: String, args: Args) -> Result<Self> {
+        let export = newrelic::Exporter::new(agent, args)?;
+        Ok(Self::NewRelic(Arc::new(export)))
+    }
+
     pub fn envoy(&self, target: Arc<Target>) -> Envoy {
         match self {
-            Self::Influx(export) => export.envoy(target),
-            Self::Kentik(export) => export.envoy(target),
+            Self::Influx(export)   => export.envoy(target),
+            Self::Kentik(export)   => export.envoy(target),
+            Self::NewRelic(export) => export.envoy(target),
         }
     }
 
     pub async fn report(&self) {
         let queue = match self {
-            Exporter::Influx(export) => export.queue().await,
-            Exporter::Kentik(export) => export.queue().await,
+            Exporter::Influx(export)   => export.queue().await,
+            Exporter::Kentik(export)   => export.queue().await,
+            Exporter::NewRelic(export) => export.queue().await,
         };
 
         let count = queue.len();
@@ -62,8 +70,9 @@ impl Exporter {
 
     pub async fn exec(self) -> Result<()> {
         match self {
-            Self::Influx(export) => export.exec().await,
-            Self::Kentik(export) => export.exec().await,
+            Self::Influx(export)   => export.exec().await,
+            Self::Kentik(export)   => export.exec().await,
+            Self::NewRelic(export) => export.exec().await,
         }
     }
 }

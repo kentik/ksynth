@@ -6,35 +6,20 @@ use anyhow::Result;
 use log::warn;
 use tokio::sync::Mutex;
 use tokio::time::interval;
-use crate::export::{Envoy, Key, Output, Record, Target};
+use crate::export::{Envoy, Key, Output, Target};
 use crate::output::Args;
-use super::{client::{Auth, Client}, encode};
+use super::event::Client;
 
 pub struct Exporter {
     export: Arc<Mutex<HashMap<Key, Output>>>,
     client: Arc<Client>,
-    agent:  String,
 }
 
 impl Exporter {
     pub fn new(agent: String, args: Args) -> Result<Self> {
-        let endpoint = args.get("endpoint")?;
-        let token    = args.opt("token");
-        let username = args.opt("username");
-        let password = args.opt("password");
-        let basic    = username.zip(password);
-
-        let auth = if let Some(token) = token {
-            Auth::Token(token.to_string())
-        } else if let Some((username, password)) = basic {
-            Auth::Basic(username.to_string(), password.to_string())
-        } else {
-            Auth::None
-        };
-
-        let client = Arc::new(Client::new(endpoint, auth)?);
+        let client = Arc::new(Client::new(agent, args)?);
         let export = Arc::new(Mutex::new(HashMap::new()));
-        Ok(Self { export, client, agent })
+        Ok(Self { export, client })
     }
 
     pub fn envoy(&self, target: Arc<Target>) -> Envoy {
@@ -47,25 +32,17 @@ impl Exporter {
 
     pub async fn exec(self: Arc<Self>) -> Result<()> {
         let mut ticker = interval(Duration::from_secs(10));
-        let mut buffer = Vec::new();
 
         loop {
             ticker.tick().await;
 
             for o in self.drain().await.values() {
-                match self.send(&o.values, &mut buffer).await {
+                match self.client.send(&o.values).await {
                     Ok(()) => (),
                     Err(e) => warn!("export failed: {:?}", e),
                 }
-                buffer.clear();
             }
         }
-    }
-
-    async fn send(&self, records: &[Record], buffer: &mut Vec<u8>) -> Result<()> {
-        encode(&self.agent, records, buffer)?;
-        self.client.send(buffer).await?;
-        Ok(())
     }
 
     async fn drain(&self) -> HashMap<Key, Output> {

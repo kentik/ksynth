@@ -141,8 +141,9 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     })?);
 
     let exporter = match output {
-        Some(Output::Influx(url, auth)) => Exporter::influx(name, &url, auth)?,
-        Some(Output::Kentik) | None     => Exporter::kentik(client.clone())?,
+        Some(Output::Influx(args))   => Exporter::influx(name, args)?,
+        Some(Output::NewRelic(args)) => Exporter::newrelic(name, args)?,
+        Some(Output::Kentik) | None  => Exporter::kentik(client.clone())?,
     };
 
     let resolver = resolver(&bind, net)?;

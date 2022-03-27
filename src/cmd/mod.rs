@@ -4,6 +4,10 @@ use futures::stream::{self, StreamExt};
 use tokio::runtime::Runtime;
 use crate::{args::Args, net::{Network, Resolver}};
 
+pub fn knock(args: Args<'_, '_>) -> Result<()> {
+    Runtime::new()?.block_on(knock::knock(args))
+}
+
 pub fn ping(args: Args<'_, '_>) -> Result<()> {
     Runtime::new()?.block_on(ping::ping(args))
 }
@@ -22,5 +26,6 @@ pub async fn resolve(resolver: &Resolver, hosts: Vec<String>, net: Network) -> V
     }).collect().await
 }
 
+mod knock;
 mod ping;
 mod trace;

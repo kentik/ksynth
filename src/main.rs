@@ -31,6 +31,7 @@ fn main() {
 
     match args.subcommand() {
         Some(("agent", args)) => agent::agent(args, version),
+        Some(("knock", args)) => cmd::knock(args),
         Some(("ping",  args)) => cmd::ping(args),
         Some(("trace", args)) => cmd::trace(args),
         _                     => unreachable!(),

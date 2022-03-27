@@ -100,6 +100,32 @@ subcommands:
             help: output format
             takes_value: true
             hidden: true
+  - knock:
+      about: execute knock
+      help_message: print help
+      args:
+        - count:
+            short: c
+            help: count
+            value_name: count
+            default_value: "4"
+        - delay:
+            short: d
+            help: delay (ms)
+            default_value: "100"
+        - expiry:
+            short: e
+            help: expiry (ms)
+            default_value: "250"
+        - port:
+            short: p
+            help: port
+            takes_value: true
+        - host:
+            index: 1
+            help: host
+            multiple: true
+            required: true
   - ping:
       about: execute ping
       help_message: print help

@@ -1,11 +1,11 @@
 use std::process;
 use anyhow::Error;
 use clap::{load_yaml, App};
-use env_logger::Builder;
-use log::LevelFilter;
-use ksynth::{agent, cmd, args::Args, version::Version};
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::{fmt, registry};
+use ksynth::{agent::agent, cmd::*, args::Args, filter::Filter, version::Version};
 
-fn main() {
+fn main() -> Result<(), Error> {
     let version = Version::new();
     let yaml = load_yaml!("args.yml");
     let app  = App::from_yaml(yaml);
@@ -13,29 +13,20 @@ fn main() {
     let args = app.get_matches();
     let args = Args::new(&args, yaml);
 
-    let mut builder = Builder::from_default_env();
-    let mut filter  = |agent, other| {
-        builder.filter(Some(module_path!()), agent);
-        builder.filter(None,                 other);
-    };
-
-    match args.occurrences_of("verbose") {
-        0 => filter(LevelFilter::Info,  LevelFilter::Warn),
-        1 => filter(LevelFilter::Debug, LevelFilter::Info),
-        2 => filter(LevelFilter::Trace, LevelFilter::Info),
-        3 => filter(LevelFilter::Trace, LevelFilter::Debug),
-        _ => filter(LevelFilter::Trace, LevelFilter::Trace),
-    };
-
-    builder.init();
+    let level = args.occurrences_of("verbose");
+    let (filter, layer) = Filter::new(module_path!(), level)?;
+    let format = fmt::layer().compact();
+    registry().with(layer).with(format).init();
 
     match args.subcommand() {
-        Some(("agent", args)) => agent::agent(args, version),
-        Some(("knock", args)) => cmd::knock(args),
-        Some(("ping",  args)) => cmd::ping(args),
-        Some(("trace", args)) => cmd::trace(args),
+        Some(("agent", args)) => agent(args, version, filter),
+        Some(("knock", args)) => knock(args),
+        Some(("ping",  args)) => ping(args),
+        Some(("trace", args)) => trace(args),
         _                     => unreachable!(),
     }.unwrap_or_else(abort);
+
+    Ok(())
 }
 
 fn abort(e: Error) {

@@ -10,7 +10,8 @@ use ed25519_compact::{KeyPair, Seed};
 use log::{debug, error, info, warn};
 use nix::{unistd::gethostname, sys::utsname::uname};
 use rustls::RootCertStore;
-use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM, SIGUSR1}}};
+use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2}}};
+use tracing::Subscriber;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use trust_dns_resolver::TokioAsyncResolver;
@@ -21,6 +22,7 @@ use netdiag::Bind;
 use crate::args::Args;
 use crate::exec::Executor;
 use crate::export::Exporter;
+use crate::filter::Filter;
 use crate::net::{Network, Resolver, tls::TrustAnchors};
 use crate::output::Output;
 use crate::secure;
@@ -79,7 +81,7 @@ fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, tx: Sender<Er
     });
 }
 
-pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
+pub fn agent<S: Subscriber>(args: Args<'_, '_>, version: Version, mut filter: Filter<S>) -> Result<()> {
     let id      = value_t!(args, "id", String)?;
     let name    = args.opt("name")?;
     let global  = args.is_present("global");
@@ -120,10 +122,10 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
     };
 
     let id = hex::encode(&keys.pk[..6]);
-    debug!("name '{}' identity: {}", name, id);
+    debug!("name '{name}' identity: {id}");
 
     if let Err(e) = secure::apply(user) {
-        error!("agent security failure: {}", e);
+        error!("agent security failure: {e}");
     }
 
     let roots  = trust_roots();
@@ -162,7 +164,7 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
 
     handle.spawn(async move {
         if let Err(e) = agent.exec(exporter).await {
-            error!("agent failed: {:?}", e);
+            error!("agent failed: {e:?}");
             process::exit(1);
         }
     });
@@ -172,19 +174,27 @@ pub fn agent(args: Args<'_, '_>, version: Version) -> Result<()> {
         handle.spawn(async move {
             match report.send(Event::Report).await {
                 Ok(()) => info!("report requested"),
-                Err(e) => info!("report error: {:?}", e),
+                Err(e) => info!("report error: {e:?}"),
             }
         });
+    };
+
+    let mut toggle = move || {
+        match filter.increment() {
+            Ok((old, new)) => info!("log level {old} -> {new}"),
+            Err(e)         => warn!("log level error: {e}"),
+        };
     };
 
     let updater = Updater::new(version, release, runtime)?;
     let (abort, guard) = updater.exec(update);
 
-    let mut signals = Signals::new(&[SIGINT, SIGTERM, SIGUSR1])?;
+    let mut signals = Signals::new(&[SIGINT, SIGTERM, SIGUSR1, SIGUSR2])?;
     for signal in signals.forever() {
         match signal {
             SIGINT | SIGTERM => break,
             SIGUSR1          => report(),
+            SIGUSR2          => toggle(),
             _                => unreachable!(),
         }
     }

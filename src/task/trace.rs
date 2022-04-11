@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
 use futures::stream::{StreamExt, TryStreamExt};
-use log::{debug, warn};
+use tracing::{debug, info_span, warn, Instrument};
 use tokio::time::{sleep, timeout};
 use netdiag::{self, Node, Protocol, Tracer};
 use synapi::tasks::TraceConfig;
@@ -67,25 +67,34 @@ impl Trace {
 
     pub async fn exec(self) -> Result<()> {
         loop {
-            debug!("{}: test {}, target {}", self.task, self.test, self.target);
+            let task = self.task;
+            let test = self.test;
 
-            let result = self.trace();
+            let span = info_span!("trace", task, test);
 
-            match timeout(self.expiry.task, result).await {
-                Ok(Ok(stats)) => self.success(stats).await?,
-                Ok(Err(e))    => self.failure(e).await,
-                Err(_)        => self.timeout().await,
-            }
+            async {
+                let _guard = self.active.trace();
+                let result = self.trace(&self.target);
+
+                match timeout(self.expiry.task, result).await {
+                    Ok(Ok(stats)) => self.success(stats).await?,
+                    Ok(Err(e))    => self.failure(e).await,
+                    Err(_)        => self.timeout().await,
+                }
+
+                Result::<_, Error>::Ok(())
+            }.instrument(span).await?;
 
             sleep(self.period).await;
         }
     }
 
-    async fn trace(&self) -> Result<Output> {
-        let _guard = self.active.trace();
-
+    async fn trace(&self, target: &str) -> Result<Output> {
         let time  = Instant::now();
-        let addr  = self.resolver.lookup(&self.target, self.network).await?;
+        let addr  = self.resolver.lookup(target, self.network).await?;
+
+        debug!("target {target} ({addr})");
+
         let route = trace(self, addr).await?;
 
         Ok(Output {
@@ -96,7 +105,7 @@ impl Trace {
     }
 
     async fn success(&self, out: Output) -> Result<()> {
-        debug!("{}: {}", self.task, out);
+        debug!("{out}");
 
         let hops = out.route.into_iter().enumerate().map(|(hop, nodes)| {
             let mut map = HashMap::<IpAddr, Vec<u64>>::new();
@@ -129,7 +138,7 @@ impl Trace {
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: {}", self.task, err);
+        warn!(error = &*err.to_string());
         self.envoy.export(record::Error {
             task:  self.task,
             test:  self.test,
@@ -139,7 +148,7 @@ impl Trace {
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.task);
+        warn!("timeout");
         self.envoy.export(record::Timeout {
             task: self.task,
             test: self.test,

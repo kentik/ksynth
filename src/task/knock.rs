@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Error,Result}  ;
 use futures::TryStreamExt;
-use log::{debug, warn};
+use tracing::{debug, info_span, warn, Instrument};
 use tokio::time::{sleep, timeout};
 use netdiag::{self, Knocker};
 use synapi::tasks::KnockConfig;
@@ -57,27 +57,29 @@ impl Knock {
         loop {
             let Self { task, test, target, port, .. } = &self;
 
-            debug!("{}: test {}, target {}:{}", task, test, target, port);
+            let span = info_span!("knock", task, test);
 
-            let result = self.knock();
+            async {
+                let _guard = self.active.knock();
+                let result = self.knock(target, *port);
 
-            match timeout(self.expiry.task, result).await {
-                Ok(Ok(rtt)) => self.success(rtt).await,
-                Ok(Err(e))  => self.failure(e).await,
-                Err(_)      => self.timeout().await,
-            };
+                match timeout(self.expiry.task, result).await {
+                    Ok(Ok(rtt)) => self.success(rtt).await,
+                    Ok(Err(e))  => self.failure(e).await,
+                    Err(_)      => self.timeout().await,
+                };
+            }.instrument(span).await;
 
             sleep(self.period).await;
         }
     }
 
-    async fn knock(&self) -> Result<Output> {
-        let _guard = self.active.knock();
+    async fn knock(&self, target: &str, port: u16) -> Result<Output> {
+        let addr = self.resolver.lookup(target, self.network).await?;
 
-        let addr = self.resolver.lookup(&self.target, self.network).await?;
-        let port = self.port;
+        debug!("target {target}:{port} ({addr})");
+
         let rtt  = knock(&self, addr, port).await?;
-
         let sent = rtt.len();
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();
         let lost = sent - rtt.len();
@@ -93,7 +95,7 @@ impl Knock {
     }
 
     async fn success(&self, out: Output) {
-        debug!("{}: {}", self.task, out);
+        debug!("{out}");
         self.envoy.export(record::Knock {
             target: self.target.clone(),
             task:   self.task,
@@ -109,7 +111,7 @@ impl Knock {
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: error: {}", self.task, err);
+        warn!(error = &*err.to_string());
         self.envoy.export(record::Error {
             task:  self.task,
             test:  self.test,
@@ -119,7 +121,7 @@ impl Knock {
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.task);
+        warn!("timeout");
         self.envoy.export(record::Timeout {
             task: self.task,
             test: self.test,

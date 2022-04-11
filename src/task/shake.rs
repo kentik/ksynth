@@ -4,7 +4,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
-use log::{debug, warn};
+use tracing::{debug, info_span, warn, Instrument};
 use rustls::ServerName;
 use tokio::time::{sleep, timeout};
 use synapi::tasks::ShakeConfig;
@@ -47,25 +47,33 @@ impl Shake {
 
     pub async fn exec(self) -> Result<()> {
         loop {
-            debug!("{}: test {}, target {}", self.task, self.test, self.target);
+            let task = self.task;
+            let test = self.test;
 
-            let result = self.shake();
+            let span = info_span!("shake", task, test);
 
-            match timeout(self.expiry, result).await {
-                Ok(Ok(out)) => self.success(out).await?,
-                Ok(Err(e))  => self.failure(e).await,
-                Err(_)      => self.timeout().await,
-            }
+            async {
+                let _guard = self.active.shake();
+                let result = self.shake(&self.target);
+
+                match timeout(self.expiry, result).await {
+                    Ok(Ok(out)) => self.success(out).await?,
+                    Ok(Err(e))  => self.failure(e).await,
+                    Err(_)      => self.timeout().await,
+                }
+
+                Result::<_, Error>::Ok(())
+            }.instrument(span).await?;
 
             sleep(self.period).await;
         }
     }
 
-    async fn shake(&self) -> Result<Output> {
-        let _guard = self.active.shake();
-
+    async fn shake(&self, target: &str) -> Result<Output> {
         let time = Instant::now();
-        let addr = self.resolver.lookup(&self.target, self.network).await?;
+        let addr = self.resolver.lookup(target, self.network).await?;
+
+        debug!("target {target} ({addr})");
 
         let name = ServerName::try_from(self.target.as_str())?;
         let addr = SocketAddr::new(addr, self.port);
@@ -81,7 +89,7 @@ impl Shake {
     }
 
     async fn success(&self, out: Output) -> Result<()> {
-        debug!("{}: {}", self.task, out);
+        debug!("{out}");
 
         self.envoy.export(record::Shake {
             task:   self.task,
@@ -99,7 +107,7 @@ impl Shake {
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: {}", self.task, err);
+        warn!(error = &*err.to_string());
         self.envoy.export(record::Error {
             task:  self.task,
             test:  self.test,
@@ -109,7 +117,7 @@ impl Shake {
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.task);
+        warn!("timeout");
         self.envoy.export(record::Timeout {
             task: self.task,
             test: self.test,

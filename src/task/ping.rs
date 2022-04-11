@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Error, Result};
 use futures::TryStreamExt;
-use log::{debug, warn};
+use tracing::{debug, warn, info_span, Instrument};
 use tokio::time::{sleep, timeout};
 use netdiag::{self, Pinger};
 use synapi::tasks::PingConfig;
@@ -53,24 +53,31 @@ impl Ping {
 
     pub async fn exec(self) -> Result<()> {
         loop {
-            debug!("{}: test {}, target {}", self.task, self.test, self.target);
+            let task = self.task;
+            let test = self.test;
 
-            let result = self.ping();
+            let span = info_span!("ping", task, test);
 
-            match timeout(self.expiry.task, result).await {
-                Ok(Ok(rtt)) => self.success(rtt).await,
-                Ok(Err(e))  => self.failure(e).await,
-                Err(_)      => self.timeout().await,
-            };
+            async {
+                let _guard = self.active.ping();
+                let result = self.ping(&self.target);
+
+                match timeout(self.expiry.task, result).await {
+                    Ok(Ok(rtt)) => self.success(rtt).await,
+                    Ok(Err(e))  => self.failure(e).await,
+                    Err(_)      => self.timeout().await,
+                };
+            }.instrument(span).await;
 
             sleep(self.period).await;
         }
     }
 
-    async fn ping(&self) -> Result<Output> {
-        let _guard = self.active.ping();
+    async fn ping(&self, target: &str) -> Result<Output> {
+        let addr = self.resolver.lookup(target, self.network).await?;
 
-        let addr = self.resolver.lookup(&self.target, self.network).await?;
+        debug!("target {target} ({addr})");
+
         let rtt  = ping(&self, addr).await?;
 
         let sent = rtt.len();
@@ -87,7 +94,7 @@ impl Ping {
     }
 
     async fn success(&self, out: Output) {
-        debug!("{}: {}", self.task, out);
+        debug!("{out}");
         self.envoy.export(record::Ping {
             task:   self.task,
             test:   self.test,
@@ -102,7 +109,7 @@ impl Ping {
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: error: {}", self.task, err);
+        warn!(error = &*err.to_string());
         self.envoy.export(record::Error {
             task:  self.task,
             test:  self.test,
@@ -112,7 +119,7 @@ impl Ping {
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.task);
+        warn!("timeout");
         self.envoy.export(record::Timeout {
             task: self.task,
             test: self.test,

@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{Error, Result};
-use log::{debug, warn};
+use tracing::{debug, info_span, warn, Instrument};
 use netdiag::Bind;
 use tokio::net::UdpSocket;
 use tokio::time::{sleep, timeout};
@@ -58,25 +58,31 @@ impl Query {
 
     pub async fn exec(mut self) -> Result<()> {
         loop {
-            debug!("{}: test {}, target {}", self.task, self.test, self.target);
+            let task = self.task;
+            let test = self.test;
 
-            let expiry = self.expiry;
-            let result = self.query();
+            let span = info_span!("query", task, test);
 
-            match timeout(expiry, result).await {
-                Ok(Ok(out)) => self.success(out).await,
-                Ok(Err(e))  => self.failure(e).await,
-                Err(_)      => self.timeout().await,
-            };
+            async {
+                let expiry = self.expiry;
+                let result = self.query(self.target.clone());
+
+                match timeout(expiry, result).await {
+                    Ok(Ok(out)) => self.success(out).await,
+                    Ok(Err(e))  => self.failure(e).await,
+                    Err(_)      => self.timeout().await,
+                };
+            }.instrument(span).await;
 
             sleep(self.period).await;
         }
     }
 
-    async fn query(&mut self) -> Result<Output> {
+    async fn query(&mut self, target: Name) -> Result<Output> {
         let _guard = self.active.query();
 
-        let target = self.target.clone();
+        debug!("target {target}");
+
         let class  = DNSClass::IN;
         let record = self.record;
 
@@ -88,7 +94,7 @@ impl Query {
     }
 
     async fn success(&self, out: Output) {
-        debug!("{}: {}", self.task, out);
+        debug!("{out}");
         self.envoy.export(record::Query {
             task:    self.task,
             test:    self.test,
@@ -101,7 +107,7 @@ impl Query {
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: error: {}", self.task, err);
+        warn!(error = &*err.to_string());
         self.envoy.export(record::Error {
             task:  self.task,
             test:  self.test,
@@ -111,7 +117,7 @@ impl Query {
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.task);
+        warn!("timeout");
         self.envoy.export(record::Timeout {
             task: self.task,
             test: self.test,

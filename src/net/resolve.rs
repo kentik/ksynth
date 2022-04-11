@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 use anyhow::{anyhow, Result};
-use log::trace;
+use tracing::{instrument, trace};
 use rand::prelude::*;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::error::{ResolveError, ResolveErrorKind};
@@ -16,6 +16,7 @@ impl Resolver {
         Self { resolver }
     }
 
+    #[instrument(skip_all)]
     pub async fn lookup(&self, host: &str, net: Network) -> Result<IpAddr> {
         if let Ok(ip) = host.parse::<IpAddr>() {
             match net {

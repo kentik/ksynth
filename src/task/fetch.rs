@@ -7,7 +7,7 @@ use anyhow::{Error, Result};
 use hyper::{Body, Method, StatusCode};
 use hyper::body::HttpBody;
 use hyper::header::HeaderMap;
-use log::{debug, warn};
+use tracing::{debug, info_span, warn, Instrument};
 use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
 use crate::export::{record, Envoy};
@@ -64,22 +64,28 @@ impl Fetch {
 
     pub async fn exec(self) -> Result<()> {
         loop {
-            debug!("{}: test {}, target {}", self.task, self.test, self.target);
+            let task = self.task;
+            let test = self.test;
 
-            let result = self.fetch(&self.target);
+            let span = info_span!("fetch", task, test);
 
-            match timeout(self.expiry, result).await {
-                Ok(Ok(stats)) => self.success(stats).await,
-                Ok(Err(e))    => self.failure(e).await,
-                Err(_)        => self.timeout().await,
-            }
+            async {
+                let _guard = self.active.fetch();
+                let result = self.fetch(&self.target);
+
+                match timeout(self.expiry, result).await {
+                    Ok(Ok(stats)) => self.success(stats).await,
+                    Ok(Err(e))    => self.failure(e).await,
+                    Err(_)        => self.timeout().await,
+                }
+            }.instrument(span).await;
 
             sleep(self.period).await;
         }
     }
 
     async fn fetch(&self, target: &str) -> Result<Output> {
-        let _guard = self.active.fetch();
+        debug!("target {}", target);
 
         let network = self.network;
         let method  = self.method.clone();
@@ -105,7 +111,7 @@ impl Fetch {
     }
 
     async fn success(&self, out: Output) {
-        debug!("{}: {}", self.task, out);
+        debug!("{out}");
         self.envoy.export(record::Fetch {
             task:    self.task,
             test:    self.test,
@@ -123,7 +129,7 @@ impl Fetch {
     }
 
     async fn failure(&self, err: Error) {
-        warn!("{}: error: {}", self.task, err);
+        warn!(error = &*err.to_string());
         self.envoy.export(record::Error {
             task:  self.task,
             test:  self.test,
@@ -133,7 +139,7 @@ impl Fetch {
     }
 
     async fn timeout(&self) {
-        warn!("{}: timeout", self.task);
+        warn!("timeout");
         self.envoy.export(record::Timeout {
             task: self.task,
             test: self.test,

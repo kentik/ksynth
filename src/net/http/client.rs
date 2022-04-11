@@ -9,7 +9,7 @@ use http::response::Parts;
 use http::uri::{self, Port, Uri};
 use hyper::{self, body::Body};
 use hyper::client::conn::Builder;
-use log::{error, trace};
+use tracing::{error, trace};
 use netdiag::Bind;
 use rustls::{ClientConfig, RootCertStore, ServerName};
 use tokio_rustls::TlsConnector;

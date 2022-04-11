@@ -11,25 +11,22 @@ use log::{debug, error, info, warn};
 use nix::{unistd::gethostname, sys::utsname::uname};
 use rustls::RootCertStore;
 use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2}}};
-use tracing::Subscriber;
-use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tracing::Subscriber;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::config::{LookupIpStrategy, ResolverConfig, ResolverOpts};
 use trust_dns_resolver::system_conf::read_system_conf;
 use synapi::{Client, Config as ClientConfig, Region};
 use netdiag::Bind;
-use crate::args::Args;
+use crate::args::{App, Args};
 use crate::exec::Executor;
 use crate::export::Exporter;
-use crate::filter::Filter;
 use crate::net::{Network, Resolver, tls::TrustAnchors};
 use crate::output::Output;
 use crate::secure;
 use crate::status::Monitor;
 use crate::task::Config;
 use crate::update::Updater;
-use crate::version::Version;
 use crate::watch::{Event, Watcher};
 
 pub struct Agent {
@@ -81,7 +78,9 @@ fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, tx: Sender<Er
     });
 }
 
-pub fn agent<S: Subscriber>(args: Args<'_, '_>, version: Version, mut filter: Filter<S>) -> Result<()> {
+pub fn agent<S: Subscriber>(app: App<S>, args: Args<'_, '_>) -> Result<()> {
+    let App { version, runtime, mut filter } = app;
+
     let id      = value_t!(args, "id", String)?;
     let name    = args.opt("name")?;
     let global  = args.is_present("global");
@@ -157,10 +156,9 @@ pub fn agent<S: Subscriber>(args: Args<'_, '_>, version: Version, mut filter: Fi
         roots:    roots,
     };
 
-    let runtime = Runtime::new()?;
-    let handle  = runtime.handle().clone();
-    let agent   = Agent::new(client, keys, config);
-    let report  = agent.report();
+    let handle = runtime.handle().clone();
+    let agent  = Agent::new(client, keys, config);
+    let report = agent.report();
 
     handle.spawn(async move {
         if let Err(e) = agent.exec(exporter).await {

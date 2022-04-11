@@ -5,9 +5,16 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::str::FromStr;
 use clap::{ArgMatches, Error, ErrorKind};
+use tokio::runtime::Runtime;
 use yaml_rust::Yaml;
+use crate::{filter::Filter, version::Version};
 
-#[derive(Debug)]
+pub struct App<S> {
+    pub runtime: Runtime,
+    pub version: Version,
+    pub filter:  Filter<S>,
+}
+
 pub struct Args<'a, 'y> {
     args: &'a ArgMatches<'y>,
     yaml: &'y Yaml,

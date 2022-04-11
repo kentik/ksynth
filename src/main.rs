@@ -1,28 +1,35 @@
 use std::process;
 use anyhow::Error;
-use clap::{load_yaml, App};
+use clap::{self, load_yaml};
+use tokio::runtime::Runtime;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, registry};
-use ksynth::{agent::agent, cmd::*, args::Args, filter::Filter, version::Version};
+use ksynth::args::{App, Args};
+use ksynth::{agent::agent, cmd::*, filter::Filter, version::Version};
 
 fn main() -> Result<(), Error> {
     let version = Version::new();
+
     let yaml = load_yaml!("args.yml");
-    let app  = App::from_yaml(yaml);
+    let app  = clap::App::from_yaml(yaml);
     let app  = app.version(&*version.version).long_version(&*version.detail);
     let args = app.get_matches();
     let args = Args::new(&args, yaml);
+
+    let runtime = Runtime::new()?;
 
     let level = args.occurrences_of("verbose");
     let (filter, layer) = Filter::new(module_path!(), level)?;
     let format = fmt::layer().compact();
     registry().with(layer).with(format).init();
 
+    let app = App { runtime, version, filter };
+
     match args.subcommand() {
-        Some(("agent", args)) => agent(args, version, filter),
-        Some(("knock", args)) => knock(args),
-        Some(("ping",  args)) => ping(args),
-        Some(("trace", args)) => trace(args),
+        Some(("agent", args)) => agent(app, args),
+        Some(("knock", args)) => knock(app, args),
+        Some(("ping",  args)) => ping(app, args),
+        Some(("trace", args)) => trace(app, args),
         _                     => unreachable!(),
     }.unwrap_or_else(abort);
 

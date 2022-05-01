@@ -151,15 +151,13 @@ impl Fetch {
 #[derive(Clone)]
 pub struct Fetcher {
     client: HttpClient,
-    expiry: Duration,
 }
 
 impl Fetcher {
     pub fn new(cfg: &Config) -> Result<Self> {
         let Config { bind, resolver, roots, .. } = cfg.clone();
         let client = HttpClient::new(bind, resolver, roots)?;
-        let expiry = Duration::from_secs(60);
-        Ok(Self { client, expiry })
+        Ok(Self { client })
     }
 
     pub async fn execute(&self, start: Instant, req: Request) -> Result<Output> {

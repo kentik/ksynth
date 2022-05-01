@@ -79,7 +79,7 @@ impl Knock {
 
         debug!("target {target}:{port} ({addr})");
 
-        let rtt  = knock(&self, addr, port).await?;
+        let rtt  = knock(self, addr, port).await?;
         let sent = rtt.len();
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();
         let lost = sent - rtt.len();

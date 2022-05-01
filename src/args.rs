@@ -99,6 +99,6 @@ impl<'a, 'y> Deref for Args<'a, 'y> {
     type Target = ArgMatches<'y>;
 
     fn deref(&self) -> &Self::Target {
-        &self.args
+        self.args
     }
 }

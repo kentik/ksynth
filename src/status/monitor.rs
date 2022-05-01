@@ -51,7 +51,6 @@ impl Monitor {
                     failed:  snapshot.tasks.failed,
                     active:  snapshot.tasks.active,
                 },
-                ..Default::default()
             };
 
             match self.client.status(&report).await {

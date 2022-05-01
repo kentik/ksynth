@@ -131,7 +131,7 @@ impl HttpClient {
 
         let (_, tls) = stream.get_ref();
         let certs  = tls.peer_certificates().unwrap_or_default();
-        let server = self.verifier.verify(&certs, &dnsname)?;
+        let server = self.verifier.verify(certs, &dnsname)?;
         let conn   = (stream, server).try_into()?;
 
         Ok((conn, times))

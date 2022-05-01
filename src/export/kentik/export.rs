@@ -49,7 +49,7 @@ impl Exporter {
         let name = "foo";
 
         let sid  = format!("{}:{}:{}", cid, name, did);
-        let flow = encode(&target, &records)?;
+        let flow = encode(target, records)?;
 
         let email = &target.email;
         let token = &target.token;

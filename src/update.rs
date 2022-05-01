@@ -22,7 +22,7 @@ impl Updater {
         let version = normalize(&version);
         let query   = Query { name, version, arch, system, release };
 
-        let public  = PublicKey::from_slice(&NOTARY_PUBLIC_KEY)?;
+        let public  = PublicKey::from_slice(NOTARY_PUBLIC_KEY)?;
         let client  = Client::new(NOTARY_ENDPOINT.to_owned(), public)?;
         let updates = Updates::new(client, query);
         let runtime = Builder::new_current_thread().enable_all().build()?;

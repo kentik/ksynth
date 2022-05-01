@@ -39,7 +39,7 @@ impl Shaker {
     }
 
     pub async fn shake(&self, name: &ServerName, addr: SocketAddr) -> Result<Connection> {
-        self.connect(&name, addr).await
+        self.connect(name, addr).await
     }
 
     async fn connect(&self, name: &ServerName, addr: SocketAddr) -> Result<Connection> {
@@ -57,7 +57,7 @@ impl Shaker {
 
         let (_, tls) = stream.get_ref();
         let certs  = tls.peer_certificates().unwrap_or_default();
-        let server = verifier.verify(&certs, &name)?;
+        let server = verifier.verify(certs, name)?;
 
         Ok(Connection { server, stream })
     }

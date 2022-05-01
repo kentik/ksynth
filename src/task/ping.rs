@@ -78,7 +78,7 @@ impl Ping {
 
         debug!("target {target} ({addr})");
 
-        let rtt  = ping(&self, addr).await?;
+        let rtt  = ping(self, addr).await?;
 
         let sent = rtt.len();
         let rtt  = rtt.into_iter().flatten().collect::<Vec<_>>();

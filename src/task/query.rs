@@ -90,7 +90,7 @@ impl Query {
         let res  = self.client.query(target, class, record).await?;
         let time = time.elapsed();
 
-        Ok(Output::new(record, time, res)?)
+        Output::new(record, time, res)
     }
 
     async fn success(&self, out: Output) {

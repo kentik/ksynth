@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use chrono::{DateTime, TimeZone, Utc};
 use rustls::{Certificate, RootCertStore, ServerName, Error};
 use rustls::client::{ServerCertVerified, ServerCertVerifier, WebPkiVerifier};
-use x509_certificate::X509Certificate;
+use x509_certificate::{X509Certificate, asn1time::Time};
 
 pub struct Verifier {
     default: WebPkiVerifier,
@@ -30,10 +30,12 @@ impl Verifier {
         let default = &self.default;
 
         let (cert, chain) = chain.split_first().ok_or(Error::NoCertificatesPresented)?;
-        let until = match X509Certificate::from_der(cert) {
-            Ok(cert) => *cert.as_ref().tbs_certificate.validity.not_after.as_ref(),
-            Err(_)   => Utc.timestamp(0, 0),
-        };
+        let until = X509Certificate::from_der(cert).map(|cert| {
+            match &cert.as_ref().tbs_certificate.validity.not_after {
+                Time::UtcTime(time)     => *time.clone(),
+                Time::GeneralTime(time) => time.clone().into(),
+            }
+        }).unwrap_or_else(|_| Utc.timestamp(0, 0));
 
         let scts = &mut Vec::new().into_iter();
         let ocsp = &[];

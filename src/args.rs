@@ -9,10 +9,10 @@ use tokio::runtime::Runtime;
 use yaml_rust::Yaml;
 use crate::{filter::Filter, version::Version};
 
-pub struct App<S> {
+pub struct App {
     pub runtime: Runtime,
     pub version: Version,
-    pub filter:  Filter<S>,
+    pub filter:  Filter,
 }
 
 pub struct Args<'a, 'y> {

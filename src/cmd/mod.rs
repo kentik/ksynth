@@ -1,19 +1,18 @@
 use std::net::IpAddr;
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
-use tracing::Subscriber;
 use crate::args::{App, Args};
 use crate::net::{Network, Resolver};
 
-pub fn knock<S: Subscriber>(app: App<S>, args: Args<'_, '_>) -> Result<()> {
+pub fn knock(app: App, args: Args<'_, '_>) -> Result<()> {
     app.runtime.block_on(knock::knock(args))
 }
 
-pub fn ping<S: Subscriber>(app: App<S>, args: Args<'_, '_>) -> Result<()> {
+pub fn ping(app: App, args: Args<'_, '_>) -> Result<()> {
     app.runtime.block_on(ping::ping(args))
 }
 
-pub fn trace<S: Subscriber>(app: App<S>, args: Args<'_, '_>) -> Result<()> {
+pub fn trace(app: App, args: Args<'_, '_>) -> Result<()> {
     app.runtime.block_on(trace::trace(args))
 }
 

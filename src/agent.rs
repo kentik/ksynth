@@ -12,7 +12,6 @@ use nix::{unistd::gethostname, sys::utsname::uname};
 use rustls::RootCertStore;
 use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2}}};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use tracing::Subscriber;
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::config::{LookupIpStrategy, ResolverConfig, ResolverOpts};
 use trust_dns_resolver::system_conf::read_system_conf;
@@ -78,7 +77,7 @@ fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, tx: Sender<Er
     });
 }
 
-pub fn agent<S: Subscriber>(app: App<S>, args: Args<'_, '_>) -> Result<()> {
+pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
     let App { version, runtime, mut filter } = app;
 
     let id      = value_t!(args, "id", String)?;

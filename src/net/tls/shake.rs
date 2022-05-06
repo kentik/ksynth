@@ -5,7 +5,7 @@ use rustls::{ClientConfig, RootCertStore, ServerName};
 use tokio::net::{TcpSocket, TcpStream};
 use tokio_rustls::{TlsConnector, client::TlsStream};
 use netdiag::Bind;
-use crate::task::Config;
+use crate::cfg::Config;
 use super::{Identity, Verifier};
 
 pub struct Shaker {

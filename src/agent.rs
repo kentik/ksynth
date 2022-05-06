@@ -7,6 +7,7 @@ use std::sync::Arc;
 use anyhow::{Error, Result};
 use clap::value_t;
 use ed25519_compact::{KeyPair, Seed};
+use futures::FutureExt;
 use log::{debug, error, info, warn};
 use nix::{unistd::gethostname, sys::utsname::uname};
 use rustls::RootCertStore;
@@ -18,46 +19,49 @@ use trust_dns_resolver::system_conf::read_system_conf;
 use synapi::{Client, Config as ClientConfig, Region};
 use netdiag::Bind;
 use crate::args::{App, Args};
+use crate::cfg::Config;
 use crate::exec::Executor;
 use crate::export::Exporter;
 use crate::net::{Network, Resolver, tls::TrustAnchors};
 use crate::output::Output;
 use crate::secure;
 use crate::status::Monitor;
-use crate::task::Config;
 use crate::update::Updater;
 use crate::watch::{Event, Watcher};
 
 pub struct Agent {
-    client:  Arc<Client>,
-    config:  Config,
-    events:  Receiver<Event>,
-    report:  Sender<Event>,
-    watcher: Watcher,
+    client: Arc<Client>,
+    config: Config,
+    keys:   KeyPair,
+    events: Receiver<Event>,
+    sender: Sender<Event>,
 }
 
 impl Agent {
     pub fn new(client: Arc<Client>, keys: KeyPair, config: Config) -> Self {
-        let (tx, events) = channel(128);
-        let report  = tx.clone();
-        let watcher = Watcher::new(client.clone(), keys, tx);
-        Self { client, config, events, report, watcher }
+        let (sender, events) = channel(128);
+        Self { client, config, keys, events, sender }
     }
 
     pub fn report(&self) -> Sender<Event> {
-        self.report.clone()
+        self.sender.clone()
     }
 
     pub async fn exec(self, exporter: Exporter) -> Result<()> {
-        let Self { client, config, events, watcher, .. } = self;
+        let Self { client, config, keys, events, sender } = self;
 
         let (tx, mut rx) = channel(16);
+
+        let watcher = match config.watcher() {
+            Some(watcher) => watcher.exec(sender).boxed(),
+            None          => Watcher::new(client.clone(), keys, sender).exec().boxed(),
+        };
 
         let executor = Executor::new(events, exporter.clone(), config.clone()).await?;
         let monitor  = Monitor::new(client, executor.status(), config)?;
 
         spawn(monitor.exec(),  tx.clone());
-        spawn(watcher.exec(),  tx.clone());
+        spawn(watcher,         tx.clone());
         spawn(exporter.exec(), tx.clone());
         spawn(executor.exec(), tx.clone());
 
@@ -153,6 +157,7 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
         network:  net,
         resolver: resolver,
         roots:    roots,
+        tasks:    args.opt("config")?,
     };
 
     let handle = runtime.handle().clone();

@@ -59,6 +59,11 @@ subcommands:
             env: AGENT_GLOBAL
             help: global agent
             takes_value: false
+        - config:
+            long: config
+            help: config file
+            takes_value: true
+            hidden: true
         - company:
             long: company
             env: KENTIK_COMPANY

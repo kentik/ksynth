@@ -23,7 +23,7 @@ pub struct Group {
     pub tasks:   Vec<Task>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Task {
     pub task:   u64,
     pub test:   u64,
@@ -32,7 +32,7 @@ pub struct Task {
     pub state:  State,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TaskConfig {
     Fetch(FetchConfig),
@@ -44,7 +44,7 @@ pub enum TaskConfig {
     Unknown,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FetchConfig {
     pub target:   String,
     pub period:   Period,
@@ -59,7 +59,7 @@ pub struct FetchConfig {
     pub insecure: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct KnockConfig {
     pub target:  String,
     pub period:  Period,
@@ -70,7 +70,7 @@ pub struct KnockConfig {
     pub port:    u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PingConfig {
     pub target:  String,
     pub period:  Period,
@@ -80,7 +80,7 @@ pub struct PingConfig {
     pub expiry:  Expiry,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct QueryConfig {
     pub target:  String,
     pub period:  Period,
@@ -92,7 +92,7 @@ pub struct QueryConfig {
     pub record:  String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ShakeConfig {
     pub target:   String,
     pub port:     u16,
@@ -100,7 +100,7 @@ pub struct ShakeConfig {
     pub expiry:   Expiry,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct TraceConfig {
     #[serde(default)]
     pub protocol: String,
@@ -116,7 +116,7 @@ pub struct TraceConfig {
     pub expiry:   Expiry,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum State {
     Created,
@@ -282,9 +282,21 @@ impl From<Count> for usize {
     }
 }
 
+impl From<usize> for Count {
+    fn from(count: usize) -> Self {
+        Self(count)
+    }
+}
+
 impl From<Limit> for usize {
     fn from(limit: Limit) -> Self {
         limit.0
+    }
+}
+
+impl From<usize> for Limit {
+    fn from(count: usize) -> Self {
+        Self(count)
     }
 }
 
@@ -294,15 +306,33 @@ impl From<Delay> for Duration  {
     }
 }
 
+impl From<Duration> for Delay {
+    fn from(delay: Duration) -> Self {
+        Self(delay)
+    }
+}
+
 impl From<Expiry> for Duration  {
     fn from(expiry: Expiry) -> Self {
         expiry.0
     }
 }
 
+impl From<Duration> for Expiry {
+    fn from(expiry: Duration) -> Self {
+        Self(expiry)
+    }
+}
+
 impl From<Period> for Duration  {
     fn from(period: Period) -> Self {
         period.0
+    }
+}
+
+impl From<Duration> for Period {
+    fn from(period: Duration) -> Self {
+        Self(period)
     }
 }
 

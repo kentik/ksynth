@@ -7,6 +7,7 @@ pub mod filter;
 pub mod net;
 pub mod version;
 
+mod cfg;
 mod exec;
 mod export;
 mod output;

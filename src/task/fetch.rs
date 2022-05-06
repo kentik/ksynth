@@ -10,12 +10,13 @@ use hyper::header::HeaderMap;
 use tracing::{debug, info_span, warn, Instrument};
 use tokio::time::{sleep, timeout};
 use synapi::tasks::FetchConfig;
+use crate::cfg::Config;
 use crate::export::{record, Envoy};
 use crate::net::Network;
 use crate::net::http::{HttpClient, Request};
 use crate::net::tls::Identity;
 use crate::status::Active;
-use super::{Config, Task};
+use super::Task;
 
 pub struct Fetch {
     task:    u64,

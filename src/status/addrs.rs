@@ -12,9 +12,9 @@ use parking_lot::Mutex;
 use serde::Deserialize;
 use tokio::task::spawn_blocking;
 use tokio::time::{interval, timeout};
+use crate::cfg::Config;
 use crate::net::Network;
 use crate::net::http::{HttpClient, Request};
-use crate::task::Config;
 
 pub struct Addresses {
     client:  HttpClient,

@@ -7,7 +7,7 @@ use tokio::task::spawn;
 use tokio::time::interval_at;
 use synapi::{Client, Error};
 use synapi::status::{Report, Tasks};
-use crate::task::Config;
+use crate::cfg::Config;
 use super::{Addresses, Status, system};
 use Error::Session;
 

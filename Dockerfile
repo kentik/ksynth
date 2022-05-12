@@ -5,7 +5,7 @@ ARG TARGETPLATFORM
 ARG TARGETVARIANT
 ARG BINARY=binary/${TARGETARCH}${TARGETVARIANT}/ksynth
 
-RUN apt-get update && apt-get install -y busybox-static libcap2-bin
+RUN apt-get update && apt-get install -y busybox-static ca-certificates libcap2-bin
 
 RUN mkdir -p /var/lib/ksynth
 RUN mkdir -p /opt/kentik/ksynth
@@ -26,6 +26,7 @@ VOLUME /var/lib/ksynth
 COPY --from=0 /bin/busybox    /bin/
 COPY --from=0 /etc/group      /etc/
 COPY --from=0 /etc/passwd     /etc/
+COPY --from=0 /etc/ssl        /etc/ssl
 COPY --from=0 /var/lib/ksynth /var/lib/
 COPY --from=0 /opt/kentik     /opt/kentik
 

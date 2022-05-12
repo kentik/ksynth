@@ -32,4 +32,4 @@ COPY --from=0 /opt/kentik     /opt/kentik
 
 WORKDIR /var/lib/ksynth
 
-ENTRYPOINT ["/opt/kentik/ksynth/ksynth", "agent", "-vv"]
+ENTRYPOINT ["/opt/kentik/ksynth/ksynth", "agent"]

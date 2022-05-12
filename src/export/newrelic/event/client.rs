@@ -4,6 +4,7 @@ use hyper::{Body, Client as HttpClient, Request, StatusCode, Uri};
 use hyper::client::HttpConnector;
 use hyper::header::{CONTENT_TYPE, HeaderValue};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use rustls::ClientConfig;
 use crate::export::Record;
 use crate::output::Args;
 use super::encode;
@@ -16,7 +17,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(agent: String, args: Args) -> Result<Self> {
+    pub fn new(agent: String, cfg: ClientConfig, args: Args) -> Result<Self> {
         let account = args.get("account")?;
         let key     = args.get("key")?;
         let region  = args.opt("region").unwrap_or("US");
@@ -34,7 +35,7 @@ impl Client {
         builder.pool_max_idle_per_host(1);
 
         let https = HttpsConnectorBuilder::new()
-            .with_native_roots()
+            .with_tls_config(cfg)
             .https_only()
             .enable_http1()
             .enable_http2()

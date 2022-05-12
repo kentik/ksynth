@@ -144,12 +144,6 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
         roots:   roots.clone(),
     })?);
 
-    let exporter = match output {
-        Some(Output::Influx(args))   => Exporter::influx(name, args)?,
-        Some(Output::NewRelic(args)) => Exporter::newrelic(name, args)?,
-        Some(Output::Kentik) | None  => Exporter::kentik(client.clone())?,
-    };
-
     let resolver = resolver(&bind, net)?;
 
     let config = Config {
@@ -158,6 +152,12 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
         resolver: resolver,
         roots:    roots,
         tasks:    args.opt("config")?,
+    };
+
+    let exporter = match output {
+        Some(Output::Influx(args))   => Exporter::influx(name, &config, args)?,
+        Some(Output::NewRelic(args)) => Exporter::newrelic(name, &config, args)?,
+        Some(Output::Kentik) | None  => Exporter::kentik(client.clone())?,
     };
 
     let handle = runtime.handle().clone();

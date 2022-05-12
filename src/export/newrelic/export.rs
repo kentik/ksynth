@@ -4,8 +4,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use anyhow::Result;
 use log::warn;
+use rustls::ClientConfig;
 use tokio::sync::Mutex;
 use tokio::time::interval;
+use crate::cfg::Config;
 use crate::export::{Envoy, Key, Output, Target};
 use crate::output::Args;
 use super::event::Client;
@@ -16,9 +18,15 @@ pub struct Exporter {
 }
 
 impl Exporter {
-    pub fn new(agent: String, args: Args) -> Result<Self> {
-        let client = Arc::new(Client::new(agent, args)?);
+    pub fn new(agent: String, cfg: &Config, args: Args) -> Result<Self> {
+        let config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(cfg.roots.clone())
+            .with_no_client_auth();
+
+        let client = Arc::new(Client::new(agent, config, args)?);
         let export = Arc::new(Mutex::new(HashMap::new()));
+
         Ok(Self { export, client })
     }
 

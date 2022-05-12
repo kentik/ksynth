@@ -4,6 +4,7 @@ use anyhow::Result;
 use log::info;
 use tokio::sync::Mutex;
 use synapi::Client;
+use crate::cfg::Config;
 use crate::output::Args;
 use super::{Record, Target, influx, kentik, newrelic};
 
@@ -32,8 +33,8 @@ pub struct Output {
 }
 
 impl Exporter {
-    pub fn influx(agent: String, args: Args) -> Result<Self> {
-        let export = influx::Exporter::new(agent, args)?;
+    pub fn influx(agent: String, cfg: &Config, args: Args) -> Result<Self> {
+        let export = influx::Exporter::new(agent, cfg, args)?;
         Ok(Self::Influx(Arc::new(export)))
     }
 
@@ -42,8 +43,8 @@ impl Exporter {
         Ok(Self::Kentik(Arc::new(export)))
     }
 
-    pub fn newrelic(agent: String, args: Args) -> Result<Self> {
-        let export = newrelic::Exporter::new(agent, args)?;
+    pub fn newrelic(agent: String, cfg: &Config, args: Args) -> Result<Self> {
+        let export = newrelic::Exporter::new(agent, cfg, args)?;
         Ok(Self::NewRelic(Arc::new(export)))
     }
 

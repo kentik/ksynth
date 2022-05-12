@@ -4,8 +4,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use anyhow::Result;
 use log::warn;
+use rustls::ClientConfig;
 use tokio::sync::Mutex;
 use tokio::time::interval;
+use crate::cfg::Config;
 use crate::export::{Envoy, Key, Output, Record, Target};
 use crate::output::Args;
 use super::{client::{Auth, Client}, encode};
@@ -17,7 +19,7 @@ pub struct Exporter {
 }
 
 impl Exporter {
-    pub fn new(agent: String, args: Args) -> Result<Self> {
+    pub fn new(agent: String, cfg: &Config, args: Args) -> Result<Self> {
         let endpoint = args.get("endpoint")?;
         let token    = args.opt("token");
         let username = args.opt("username");
@@ -32,8 +34,14 @@ impl Exporter {
             Auth::None
         };
 
-        let client = Arc::new(Client::new(endpoint, auth)?);
+        let config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(cfg.roots.clone())
+            .with_no_client_auth();
+
+        let client = Arc::new(Client::new(endpoint, config, auth)?);
         let export = Arc::new(Mutex::new(HashMap::new()));
+
         Ok(Self { export, client, agent })
     }
 

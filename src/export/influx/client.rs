@@ -7,6 +7,7 @@ use hyper::body::{aggregate, Buf};
 use hyper::client::HttpConnector;
 use hyper::header::{AUTHORIZATION, HeaderValue};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use rustls::ClientConfig;
 
 pub struct Client {
     client:   HttpClient<HttpsConnector<HttpConnector>>,
@@ -22,12 +23,12 @@ pub enum Auth {
 }
 
 impl Client {
-    pub fn new(endpoint: &str, auth: Auth) -> Result<Self> {
+    pub fn new(endpoint: &str, cfg: ClientConfig, auth: Auth) -> Result<Self> {
         let mut builder = HttpClient::builder();
         builder.pool_idle_timeout(Duration::from_secs(60));
 
         let https = HttpsConnectorBuilder::new()
-            .with_native_roots()
+            .with_tls_config(cfg)
             .https_or_http()
             .enable_http1()
             .enable_http2()

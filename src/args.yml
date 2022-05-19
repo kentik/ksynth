@@ -44,56 +44,61 @@ subcommands:
         - id:
             short: i
             long: id
-            env: AGENT_IDENTITY
             help: agent ID
             takes_value: true
             required: true
+            env: AGENT_IDENTITY
         - name:
             short: n
             long: name
-            env: AGENT_NAME
             help: agent name
             takes_value: true
+            env: AGENT_NAME
         - global:
             long: global
-            env: AGENT_GLOBAL
             help: global agent
             takes_value: false
+            env: AGENT_GLOBAL
         - config:
             long: config
             help: config file
             takes_value: true
             hidden: true
+        - control:
+            long: control
+            help: control socket
+            value_name: socket
+            env: AGENT_CONTROL
         - company:
             long: company
-            env: KENTIK_COMPANY
             help: company ID
             takes_value: true
+            env: KENTIK_COMPANY
         - site:
             long: site
-            env: KENTIK_SITE
             help: site ID
             takes_value: true
+            env: KENTIK_SITE
         - proxy:
             long: proxy
-            env: PROXY
             help: HTTP proxy
             takes_value: true
+            env: PROXY
         - region:
             long: region
-            env: KENTIK_REGION
             help: region
             takes_value: true
             default_value: "US"
+            env: KENTIK_REGION
         - user:
             long: user
             help: run as user
             takes_value: true
         - update:
             long: update
-            env: AGENT_UPDATE
             help: enable updates
             takes_value: false
+            env: AGENT_UPDATE
         - rc:
             long: rc
             help: accept RCs
@@ -188,3 +193,37 @@ subcommands:
             help: host
             multiple: true
             required: true
+  - ctl:
+      about: agent control
+      args:
+        - socket:
+            short: s
+            help: control socket
+            takes_value: true
+            required: true
+            env: AGENT_CONTROL
+      settings:
+        - DisableHelpSubcommand
+        - SubcommandRequiredElseHelp
+      subcommands:
+        - trace:
+            about: control tracing
+            subcommands:
+              - filter:
+                  about: change trace filter
+                  args:
+                    - filter:
+                        required: true
+              - print:
+                  about: change print level
+                  args:
+                    - level:
+                        required: true
+              - export:
+                  about: change export level
+                  args:
+                    - level:
+                        required: true
+            settings:
+              - DisableHelpSubcommand
+              - SubcommandRequiredElseHelp

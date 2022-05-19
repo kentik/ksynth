@@ -11,7 +11,7 @@ use futures::FutureExt;
 use log::{debug, error, info, warn};
 use nix::{unistd::gethostname, sys::utsname::uname};
 use rustls::RootCertStore;
-use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM, SIGUSR1, SIGUSR2}}};
+use signal_hook::{iterator::Signals, {consts::signal::{SIGINT, SIGTERM, SIGUSR1}}};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use trust_dns_resolver::TokioAsyncResolver;
 use trust_dns_resolver::config::{LookupIpStrategy, ResolverConfig, ResolverOpts};
@@ -20,6 +20,7 @@ use synapi::{Client, Config as ClientConfig, Region};
 use netdiag::Bind;
 use crate::args::{App, Args};
 use crate::cfg::Config;
+use crate::ctl::Server;
 use crate::exec::Executor;
 use crate::export::Exporter;
 use crate::net::{Network, Resolver, tls::TrustAnchors};
@@ -82,7 +83,7 @@ fn spawn<T: Future<Output = Result<()>> + Send + 'static>(task: T, tx: Sender<Er
 }
 
 pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
-    let App { version, runtime, mut filter } = app;
+    let App { version, runtime, handles } = app;
 
     let id      = value_t!(args, "id", String)?;
     let name    = args.opt("name")?;
@@ -162,7 +163,7 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
 
     let handle = runtime.handle().clone();
     let agent  = Agent::new(client, keys, config);
-    let report = agent.report();
+    let events = agent.report();
 
     handle.spawn(async move {
         if let Err(e) = agent.exec(exporter).await {
@@ -171,8 +172,8 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
         }
     });
 
-    let report = move || {
-        let report = report.clone();
+    let report = || {
+        let report = events.clone();
         handle.spawn(async move {
             match report.send(Event::Report).await {
                 Ok(()) => info!("report requested"),
@@ -181,22 +182,25 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
         });
     };
 
-    let mut toggle = move || {
-        match filter.increment() {
-            Ok((old, new)) => info!("log level {old} -> {new}"),
-            Err(e)         => warn!("log level error: {e}"),
-        };
-    };
+    if let Some(socket) = args.opt("control")? {
+        let report = events.clone();
+        let server = Server::new(socket, handles, report);
+        handle.spawn(async move {
+            match server.exec().await {
+                Ok(()) => debug!("control server finished"),
+                Err(e) => error!("control server failed: {e:?}"),
+            }
+        });
+    }
 
     let updater = Updater::new(version, release, runtime)?;
     let (abort, guard) = updater.exec(update);
 
-    let mut signals = Signals::new(&[SIGINT, SIGTERM, SIGUSR1, SIGUSR2])?;
+    let mut signals = Signals::new(&[SIGINT, SIGTERM, SIGUSR1])?;
     for signal in signals.forever() {
         match signal {
             SIGINT | SIGTERM => break,
             SIGUSR1          => report(),
-            SIGUSR2          => toggle(),
             _                => unreachable!(),
         }
     }

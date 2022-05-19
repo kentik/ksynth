@@ -7,12 +7,12 @@ use std::str::FromStr;
 use clap::{ArgMatches, Error, ErrorKind};
 use tokio::runtime::Runtime;
 use yaml_rust::Yaml;
-use crate::{filter::Filter, version::Version};
+use crate::{trace::Handles, version::Version};
 
 pub struct App {
     pub runtime: Runtime,
     pub version: Version,
-    pub filter:  Filter,
+    pub handles: Handles,
 }
 
 pub struct Args<'a, 'y> {
@@ -36,6 +36,13 @@ impl<'a, 'y> Args<'a, 'y> {
             (name, Some(args)) => self.subargs(name, args),
             _                  => None,
         }
+    }
+
+    pub fn arg<T: FromStr>(&self, name: &str) -> Result<T, Error> where T::Err: Display {
+        self.opt(name)?.ok_or_else(|| {
+            let msg = format!("missing value for {}", name);
+            Error::with_description(&msg, ErrorKind::ArgumentNotFound)
+        })
     }
 
     pub fn opt<T: FromStr>(&self, name: &str) -> Result<Option<T>, Error> where T::Err: Display {

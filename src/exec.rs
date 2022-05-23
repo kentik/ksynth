@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::Arc;
 use anyhow::{anyhow, Result};
-use log::{debug, error, info};
-use tokio::sync::mpsc::Receiver;
+use log::{debug, error};
+use tokio::sync::mpsc::{Sender, Receiver};
 use synapi::agent::Net;
 use synapi::tasks::{State, TaskConfig};
 use synapi::tasks::{FetchConfig, KnockConfig, PingConfig, QueryConfig, ShakeConfig, TraceConfig};
@@ -12,7 +12,7 @@ use crate::export::{Exporter, Target};
 use crate::net::{Network, Resolver};
 use crate::net::tls::Shaker;
 use crate::spawn::{Spawner, Handle};
-use crate::status::{Active, Status};
+use crate::status::{Active, Report, Status};
 use crate::task::{Task, Fetcher};
 use crate::task::{Fetch, Knock, Ping, Query, Shake, Trace};
 use crate::watch::{Event, Tasks};
@@ -78,7 +78,7 @@ impl Executor {
             match event {
                 Event::Tasks(tasks) => self.tasks(tasks).await?,
                 Event::Reset        => self.reset().await?,
-                Event::Report       => self.report().await,
+                Event::Report(tx)   => self.report(tx).await?,
             }
         }
 
@@ -194,32 +194,13 @@ impl Executor {
         Ok(self.spawner.spawn(id, trace.exec()))
     }
 
-    async fn report(&mut self) {
-        let mut tasks = self.tasks.keys().collect::<Vec<_>>();
+    async fn report(&self, tx: Sender<Report>) -> Result<()> {
+        let mut tasks = self.tasks.keys().copied().collect::<Vec<_>>();
         tasks.sort_unstable();
 
-        let counts = [
-            self.active.count.success.swap(0, Ordering::Relaxed),
-            self.active.count.failure.swap(0, Ordering::Relaxed),
-            self.active.count.timeout.swap(0, Ordering::Relaxed),
-        ].iter().map(u64::to_string).collect::<Vec<_>>();
+        let active = &self.active;
+        let export = self.ex.report().await;
 
-        let active = [
-            self.active.tasks.fetch.load(Ordering::Relaxed),
-            self.active.tasks.knock.load(Ordering::Relaxed),
-            self.active.tasks.ping.load(Ordering::Relaxed),
-            self.active.tasks.query.load(Ordering::Relaxed),
-            self.active.tasks.shake.load(Ordering::Relaxed),
-            self.active.tasks.trace.load(Ordering::Relaxed),
-        ];
-
-        let pending = active.iter().sum::<u64>();
-        let active  = active.iter().map(u64::to_string).collect::<Vec<_>>();
-
-        info!("running {} tasks: {:?}", tasks.len(), tasks);
-        info!("execution status: {}", counts.join(" / "));
-        info!("pending {} count: {}", pending, active.join(" / "));
-
-        self.ex.report().await;
+        Ok(tx.send(Report::new(active, export, tasks)).await?)
     }
 }

@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use anyhow::Result;
-use log::info;
 use tokio::sync::Mutex;
 use synapi::Client;
 use crate::cfg::Config;
 use crate::output::Args;
+use crate::status::Queue;
 use super::{Record, Target, influx, kentik, newrelic};
 
 #[derive(Clone)]
@@ -56,17 +56,17 @@ impl Exporter {
         }
     }
 
-    pub async fn report(&self) {
+    pub async fn report(&self) -> Queue {
         let queue = match self {
             Exporter::Influx(export)   => export.queue().await,
             Exporter::Kentik(export)   => export.queue().await,
             Exporter::NewRelic(export) => export.queue().await,
         };
 
-        let count = queue.len();
-        let sum   = queue.values().map(|o| o.values.len()).sum::<usize>();
+        let length  = queue.len();
+        let records = queue.values().map(|o| o.values.len()).sum();
 
-        info!("queue count {}, entries: {}", count, sum);
+        Queue { length, records }
     }
 
     pub async fn exec(self) -> Result<()> {

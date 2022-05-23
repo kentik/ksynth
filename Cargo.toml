@@ -81,7 +81,7 @@ features = []
 
 [dependencies.serde]
 version  = "1.0.137"
-features = ["derive"]
+features = ["derive", "rc"]
 
 [dependencies.tokio]
 version  = "1.18.1"

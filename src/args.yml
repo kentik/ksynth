@@ -206,6 +206,16 @@ subcommands:
         - DisableHelpSubcommand
         - SubcommandRequiredElseHelp
       subcommands:
+        - status:
+            about: status report
+            args:
+              - output:
+                  short: o
+                  help: output format
+                  possible_values:
+                    - "json"
+                    - "yaml"
+                  default_value: "json"
         - trace:
             about: control tracing
             subcommands:

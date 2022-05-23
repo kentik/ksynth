@@ -1,18 +1,19 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
+#[derive(Debug, Default)]
 pub struct Active {
     pub count: Count,
     pub tasks: Tasks,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Count {
     pub success: AtomicU64,
     pub failure: AtomicU64,
     pub timeout: AtomicU64,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Tasks {
     pub fetch: AtomicU64,
     pub knock: AtomicU64,
@@ -66,6 +67,12 @@ impl Active {
 
     pub fn timeout(&self) {
         self.count.timeout.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn reset(&self) {
+        self.count.success.store(0, Ordering::Relaxed);
+        self.count.failure.store(0, Ordering::Relaxed);
+        self.count.timeout.store(0, Ordering::Relaxed);
     }
 }
 

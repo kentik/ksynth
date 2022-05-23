@@ -2,16 +2,17 @@ use std::fs::remove_file;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use futures::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
 use tracing::{debug, error};
 use tracing_subscriber::filter::{Directive, LevelFilter, ParseError};
 use tokio::net::{UnixListener, UnixStream};
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{channel, Sender};
 use tokio::task::spawn;
 use tokio_util::codec::Decoder;
 use tokio_util::codec::length_delimited::LengthDelimitedCodec;
+use crate::status::Report;
 use crate::trace::Handles;
 use crate::watch::Event;
 
@@ -22,7 +23,15 @@ pub struct Server {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Command {
+    Status,
     Trace(Trace),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Response {
+    Empty,
+    Report(Report),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -32,7 +41,6 @@ pub enum Trace {
     Export(Level),
 }
 
-
 #[derive(Debug)]
 pub struct Filter(Directive);
 
@@ -41,12 +49,12 @@ pub struct Level(LevelFilter);
 
 struct State {
     handles: Handles,
-    _report: Sender<Event>,
+    report:  Sender<Event>,
 }
 
 impl Server {
-    pub fn new(sock: PathBuf, handles: Handles, _report: Sender<Event>) -> Self {
-        let state = Arc::new(State { handles, _report  });
+    pub fn new(sock: PathBuf, handles: Handles, report: Sender<Event>) -> Self {
+        let state = Arc::new(State { handles, report  });
         Self { sock, state }
     }
 
@@ -74,20 +82,38 @@ impl Drop for Server {
 
 async fn handle(stream: UnixStream, state: Arc<State>) -> Result<()> {
     let mut codec = LengthDelimitedCodec::new().framed(stream);
-    let handles   = &state.handles;
 
     while let Some(frame) = codec.next().await {
-        let result = match serde_json::from_slice(&frame?)? {
-            Command::Trace(Trace::Filter(filter)) => handles.filter(filter.0)?,
-            Command::Trace(Trace::Print(level))   => handles.print(level.0)?,
-            Command::Trace(Trace::Export(level))  => handles.export(level.0)?,
+        let response = match serde_json::from_slice(&frame?)? {
+            Command::Status   => status(&state.report).await?,
+            Command::Trace(r) => trace(r, &state.handles)?,
         };
-
-        let result = serde_json::to_vec(&result)?;
-        codec.send(result.into()).await?;
+        let response = serde_json::to_vec(&response)?;
+        codec.send(response.into()).await?;
     }
 
     Ok(())
+}
+
+async fn status(events: &Sender<Event>) -> Result<Response> {
+    let (tx, mut rx) = channel(1);
+
+    let request = Event::Report(tx);
+    events.send(request).await?;
+
+    match rx.recv().await {
+        Some(report) => Ok(Response::Report(report)),
+        None         => Err(anyhow!("report missing")),
+    }
+}
+
+fn trace(trace: Trace, handles: &Handles) -> Result<Response> {
+    match trace {
+        Trace::Filter(filter) => handles.filter(filter.0)?,
+        Trace::Print(level)   => handles.print(level.0)?,
+        Trace::Export(level)  => handles.export(level.0)?,
+    };
+    Ok(Response::Empty)
 }
 
 impl FromStr for Filter {

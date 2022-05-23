@@ -10,6 +10,7 @@ use synapi::agent::Agent;
 use synapi::auth::Auth;
 use synapi::tasks::Group;
 use synapi::Error::Unauthorized;
+use crate::status::Report;
 
 pub struct Watcher {
     client: Arc<Client>,
@@ -21,7 +22,7 @@ pub struct Watcher {
 pub enum Event {
     Tasks(Tasks),
     Reset,
-    Report,
+    Report(Sender<Report>),
 }
 
 #[derive(Debug)]

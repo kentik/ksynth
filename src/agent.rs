@@ -44,7 +44,7 @@ impl Agent {
         Self { client, config, keys, events, sender }
     }
 
-    pub fn report(&self) -> Sender<Event> {
+    pub fn events(&self) -> Sender<Event> {
         self.sender.clone()
     }
 
@@ -163,7 +163,7 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
 
     let handle = runtime.handle().clone();
     let agent  = Agent::new(client, keys, config);
-    let events = agent.report();
+    let events = agent.events();
 
     handle.spawn(async move {
         if let Err(e) = agent.exec(exporter).await {
@@ -173,11 +173,19 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
     });
 
     let report = || {
+        let (tx, mut rx) = channel(1);
         let report = events.clone();
+
         handle.spawn(async move {
-            match report.send(Event::Report).await {
+            let request = Event::Report(tx);
+
+            match report.send(request).await {
                 Ok(()) => info!("report requested"),
-                Err(e) => info!("report error: {e:?}"),
+                Err(e) => warn!("report error: {e:?}"),
+            };
+
+            if let Some(report) = rx.recv().await {
+                report.print();
             }
         });
     };

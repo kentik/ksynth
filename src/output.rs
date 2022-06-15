@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use anyhow::{anyhow, Error, Result};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Output {
     Influx(Args),
     NewRelic(Args),
     Kentik,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Args {
     args: HashMap<String, String>,
 }

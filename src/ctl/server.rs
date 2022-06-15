@@ -2,6 +2,7 @@ use std::fs::remove_file;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::collections::HashMap;
 use anyhow::{anyhow, Result};
 use futures::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
@@ -23,7 +24,7 @@ pub struct Server {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Command {
-    Status,
+    Status(String),
     Trace(Trace),
 }
 
@@ -49,11 +50,11 @@ pub struct Level(LevelFilter);
 
 struct State {
     handles: Handles,
-    report:  Sender<Event>,
+    report:  HashMap<String, Sender<Event>>,
 }
 
 impl Server {
-    pub fn new(sock: PathBuf, handles: Handles, report: Sender<Event>) -> Self {
+    pub fn new(sock: PathBuf, handles: Handles, report: HashMap<String, Sender<Event>>) -> Self {
         let state = Arc::new(State { handles, report  });
         Self { sock, state }
     }
@@ -85,8 +86,8 @@ async fn handle(stream: UnixStream, state: Arc<State>) -> Result<()> {
 
     while let Some(frame) = codec.next().await {
         let response = match serde_json::from_slice(&frame?)? {
-            Command::Status   => status(&state.report).await?,
-            Command::Trace(r) => trace(r, &state.handles)?,
+            Command::Status(r) => status(r, &state.report).await?,
+            Command::Trace(r)  => trace(r, &state.handles)?,
         };
         let response = serde_json::to_vec(&response)?;
         codec.send(response.into()).await?;
@@ -95,11 +96,16 @@ async fn handle(stream: UnixStream, state: Arc<State>) -> Result<()> {
     Ok(())
 }
 
-async fn status(events: &Sender<Event>) -> Result<Response> {
+async fn status(region: String, events: &HashMap<String, Sender<Event>>) -> Result<Response> {
     let (tx, mut rx) = channel(1);
 
+    let sender = match events.get(&region) {
+        Some(region) => region,
+        None         => return Err(anyhow!("invalid region: {region}")),
+    };
+
     let request = Event::Report(tx);
-    events.send(request).await?;
+    sender.send(request).await?;
 
     match rx.recv().await {
         Some(report) => Ok(Response::Report(report)),

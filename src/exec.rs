@@ -34,38 +34,17 @@ pub struct Executor {
     tracer:   Arc<Tracer>,
 }
 
+#[derive(Clone)]
+pub struct Factory {
+    config:   Config,
+    fetcher:  Arc<Fetcher>,
+    knocker:  Arc<Knocker>,
+    pinger:   Arc<Pinger>,
+    shaker:   Arc<Shaker>,
+    tracer:   Arc<Tracer>,
+}
+
 impl Executor {
-    pub async fn new(rx: Receiver<Event>, ex: Exporter, cfg: Config) -> Result<Self> {
-        let Config { bind, network, resolver, .. } = cfg.clone();
-
-        let active  = Arc::new(Active::new());
-        let status  = Arc::new(Status::default());
-        let spawner = Spawner::new(status.clone());
-
-        let fetcher = Fetcher::new(&cfg)?;
-        let knocker = Knocker::new(&bind).await?;
-        let pinger  = Pinger::new(&bind).await?;
-        let shaker  = Shaker::new(&cfg)?;
-        let tracer  = Tracer::new(&bind).await?;
-
-        Ok(Self {
-            tasks:    HashMap::new(),
-            rx:       rx,
-            ex:       ex,
-            bind:     bind,
-            network:  network,
-            active:   active,
-            resolver: resolver,
-            status:   status,
-            spawner:  Arc::new(spawner),
-            fetcher:  Arc::new(fetcher),
-            knocker:  Arc::new(knocker),
-            pinger:   Arc::new(pinger),
-            shaker:   Arc::new(shaker),
-            tracer:   Arc::new(tracer),
-        })
-    }
-
     pub fn status(&self) -> Arc<Status> {
         self.status.clone()
     }
@@ -202,5 +181,49 @@ impl Executor {
         let export = self.ex.report().await;
 
         Ok(tx.send(Report::new(active, export, tasks)).await?)
+    }
+}
+
+impl Factory {
+    pub async fn new(cfg: &Config) -> Result<Self> {
+        let fetcher = Fetcher::new(cfg)?;
+        let knocker = Knocker::new(&cfg.bind).await?;
+        let pinger  = Pinger::new(&cfg.bind).await?;
+        let shaker  = Shaker::new(cfg)?;
+        let tracer  = Tracer::new(&cfg.bind).await?;
+
+        Ok(Self {
+            config:  cfg.clone(),
+            fetcher: Arc::new(fetcher),
+            knocker: Arc::new(knocker),
+            pinger:  Arc::new(pinger),
+            shaker:  Arc::new(shaker),
+            tracer:  Arc::new(tracer),
+        })
+    }
+
+    pub fn executor(&self, rx: Receiver<Event>, ex: Exporter) -> Result<Executor> {
+        let Config { bind, network, resolver, .. } = self.config.clone();
+
+        let active  = Arc::new(Active::new());
+        let status  = Arc::new(Status::default());
+        let spawner = Spawner::new(status.clone());
+
+        Ok(Executor {
+            tasks:    HashMap::new(),
+            rx:       rx,
+            ex:       ex,
+            bind:     bind,
+            network:  network,
+            active:   active,
+            resolver: resolver,
+            status:   status,
+            spawner:  Arc::new(spawner),
+            fetcher:  self.fetcher.clone(),
+            knocker:  self.knocker.clone(),
+            pinger:   self.pinger.clone(),
+            shaker:   self.shaker.clone(),
+            tracer:   self.tracer.clone(),
+        })
     }
 }

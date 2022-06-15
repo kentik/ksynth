@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::future::Future;
 use std::io::Read;
@@ -5,7 +6,7 @@ use std::net::SocketAddr;
 use std::process;
 use std::sync::Arc;
 use anyhow::{Error, Result};
-use clap::value_t;
+use clap::{value_t, values_t};
 use ed25519_compact::{KeyPair, Seed};
 use futures::FutureExt;
 use log::{debug, error, info, warn};
@@ -21,7 +22,7 @@ use netdiag::Bind;
 use crate::args::{App, Args};
 use crate::cfg::Config;
 use crate::ctl::Server;
-use crate::exec::Executor;
+use crate::exec::Factory;
 use crate::export::Exporter;
 use crate::net::{Network, Resolver, tls::TrustAnchors};
 use crate::output::Output;
@@ -39,16 +40,7 @@ pub struct Agent {
 }
 
 impl Agent {
-    pub fn new(client: Arc<Client>, keys: KeyPair, config: Config) -> Self {
-        let (sender, events) = channel(128);
-        Self { client, config, keys, events, sender }
-    }
-
-    pub fn events(&self) -> Sender<Event> {
-        self.sender.clone()
-    }
-
-    pub async fn exec(self, exporter: Exporter) -> Result<()> {
+    pub async fn exec(self, exporter: Exporter, factory: Factory) -> Result<()> {
         let Self { client, config, keys, events, sender } = self;
 
         let (tx, mut rx) = channel(16);
@@ -58,7 +50,7 @@ impl Agent {
             None          => Watcher::new(client.clone(), keys, sender).exec().boxed(),
         };
 
-        let executor = Executor::new(events, exporter.clone(), config.clone()).await?;
+        let executor = factory.executor(events, exporter.clone())?;
         let monitor  = Monitor::new(client, executor.status(), config)?;
 
         spawn(monitor.exec(),  tx.clone());
@@ -90,7 +82,7 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
     let global  = args.is_present("global");
     let company = args.opt("company")?;
     let site    = args.opt("site")?;
-    let region  = value_t!(args, "region", Region)?;
+    let regions = values_t!(args, "region", Region)?;
     let proxy   = args.opt("proxy")?;
     let ip4     = !args.is_present("ip6");
     let ip6     = !args.is_present("ip4");
@@ -131,63 +123,82 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
         error!("agent security failure: {e}");
     }
 
-    let roots  = trust_roots();
-    let client = Arc::new(Client::new(ClientConfig {
-        name:    name.clone(),
-        global:  global,
-        region:  region,
-        version: version.version.clone(),
-        machine: machine(),
-        company: company,
-        site:    site,
-        proxy:   proxy,
-        bind:    args.opt("bind")?,
-        roots:   roots.clone(),
-    })?);
-
+    let machine  = machine();
     let resolver = resolver(&bind, net)?;
+    let roots    = trust_roots();
 
     let config = Config {
-        bind:     bind,
+        bind:     bind.clone(),
         network:  net,
-        resolver: resolver,
-        roots:    roots,
+        resolver: resolver.clone(),
+        roots:    roots.clone(),
         tasks:    args.opt("config")?,
     };
 
-    let exporter = match output {
-        Some(Output::Influx(args))   => Exporter::influx(name, &config, args)?,
-        Some(Output::NewRelic(args)) => Exporter::newrelic(name, &config, args)?,
-        Some(Output::Kentik) | None  => Exporter::kentik(client.clone())?,
-    };
+    let factory = runtime.block_on(Factory::new(&config))?;
 
-    let handle = runtime.handle().clone();
-    let agent  = Agent::new(client, keys, config);
-    let events = agent.events();
+    let events = regions.into_iter().map(|region| {
+        let name = name.clone();
 
-    handle.spawn(async move {
-        if let Err(e) = agent.exec(exporter).await {
-            error!("agent failed: {e:?}");
-            process::exit(1);
-        }
-    });
+        let client = Arc::new(Client::new(ClientConfig {
+            name:    name.clone(),
+            global:  global,
+            region:  region.clone(),
+            version: version.version.clone(),
+            machine: machine.clone(),
+            company: company,
+            site:    site,
+            proxy:   proxy.clone(),
+            bind:    args.opt("bind")?,
+            roots:   roots.clone(),
+        })?);
 
-    let report = || {
-        let (tx, mut rx) = channel(1);
-        let report = events.clone();
+        let exporter = match output.clone() {
+            Some(Output::Influx(args))   => Exporter::influx(name, &config, args)?,
+            Some(Output::NewRelic(args)) => Exporter::newrelic(name, &config, args)?,
+            Some(Output::Kentik) | None  => Exporter::kentik(client.clone())?,
+        };
 
-        handle.spawn(async move {
-            let request = Event::Report(tx);
+        let factory  = factory.clone();
+        let (tx, rx) = channel(128);
 
-            match report.send(request).await {
-                Ok(()) => info!("report requested"),
-                Err(e) => warn!("report error: {e:?}"),
-            };
+        let agent = Agent {
+            client: client,
+            keys:   keys,
+            config: config.clone(),
+            events: rx,
+            sender: tx.clone(),
+        };
 
-            if let Some(report) = rx.recv().await {
-                report.print();
+        runtime.spawn(async move {
+            if let Err(e) = agent.exec(exporter, factory).await {
+                error!("agent failed: {e:?}");
+                process::exit(1);
             }
         });
+
+        Ok((region.name, tx))
+    }).collect::<Result<HashMap<_, _>>>()?;
+
+    let handle = runtime.handle().clone();
+    let report = || {
+        for report in events.values() {
+            let (tx, mut rx) = channel(1);
+            let report = report.clone();
+
+            handle.spawn(async move {
+                let request = Event::Report(tx);
+
+                match report.send(request).await {
+                    Ok(()) => info!("report requested"),
+                    Err(e) => warn!("report error: {e:?}"),
+                };
+
+                if let Some(report) = rx.recv().await {
+                    report.print();
+                }
+            });
+        }
     };
 
     if let Some(socket) = args.opt("control")? {

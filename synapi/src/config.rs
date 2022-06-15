@@ -16,7 +16,7 @@ pub struct Config {
     pub roots:   RootCertStore,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Region  {
     pub name: String,
     pub api:  String,

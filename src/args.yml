@@ -88,6 +88,7 @@ subcommands:
             long: region
             help: region
             takes_value: true
+            multiple: true
             default_value: "US"
             env: KENTIK_REGION
         - user:
@@ -216,6 +217,12 @@ subcommands:
                     - "json"
                     - "yaml"
                   default_value: "json"
+              - region:
+                  short: r
+                  help: region
+                  takes_value: true
+                  default_value: "US"
+                  env: KENTIK_REGION
         - trace:
             about: control tracing
             subcommands:

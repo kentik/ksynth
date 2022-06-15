@@ -15,7 +15,8 @@ pub async fn ctl(args: Args<'_, '_>) -> Result<()> {
 }
 
 async fn status(args: Args<'_, '_>, mut client: Client) -> Result<()> {
-    let report = client.send::<Report>(Command::Status).await?;
+    let region = args.opt("region")?.unwrap_or_default();
+    let report = client.send::<Report>(Command::Status(region)).await?;
     let output = match args.arg::<String>("output")?.as_str() {
         "json" => serde_json::to_string(&report)?,
         "yaml" => serde_yaml::to_string(&report)?,

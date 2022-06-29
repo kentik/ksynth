@@ -24,7 +24,7 @@ use crate::cfg::Config;
 use crate::ctl::Server;
 use crate::exec::Factory;
 use crate::export::Exporter;
-use crate::net::{Network, Resolver, tls::TrustAnchors};
+use crate::net::{Listener, Network, Resolver, tls::TrustAnchors};
 use crate::output::Output;
 use crate::secure;
 use crate::status::Monitor;
@@ -88,6 +88,7 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
     let ip6     = !args.is_present("ip4");
     let user    = args.value_of("user");
     let update  = args.is_present("update");
+    let listen  = args.opt("listen")?.unwrap_or_default();
     let output  = args.opt("output")?;
     let release = !args.is_present("rc");
 
@@ -126,11 +127,13 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
     let machine  = machine();
     let resolver = resolver(&bind, net)?;
     let roots    = trust_roots();
+    let listener = runtime.block_on(Listener::new(listen));
 
     let config = Config {
         bind:     bind.clone(),
+        listener: listener,
         network:  net,
-        resolver: resolver.clone(),
+        resolver: resolver,
         roots:    roots.clone(),
         tasks:    args.opt("config")?,
     };

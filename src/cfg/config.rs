@@ -10,13 +10,14 @@ use tokio::time::interval;
 use tracing::{debug, error};
 use synapi::agent::Agent;
 use synapi::tasks::{Device, Group, Kentik, State, Task};
-use crate::net::{Network, Resolver};
+use crate::net::{Listener, Network, Resolver};
 use crate::watch::{self, Event};
 use super::schema::{self, Tasks};
 
 #[derive(Clone)]
 pub struct Config {
     pub bind:     Bind,
+    pub listener: Listener,
     pub network:  Option<Network>,
     pub resolver: Resolver,
     pub roots:    RootCertStore,

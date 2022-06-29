@@ -64,6 +64,11 @@ subcommands:
             help: config file
             takes_value: true
             hidden: true
+        - listen:
+            long: listen
+            help: listen spec
+            takes_value: true
+            env: AGENT_LISTEN
         - control:
             long: control
             help: control socket

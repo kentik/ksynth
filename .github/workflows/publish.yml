@@ -145,17 +145,19 @@ jobs:
           esac
 
           for deb in *.deb; do
-              package_cloud push kentik/$REPO/debian/jessie  $deb
-              package_cloud push kentik/$REPO/debian/stretch $deb
-              package_cloud push kentik/$REPO/debian/buster  $deb
+              package_cloud push kentik/$REPO/debian/stretch  $deb
+              package_cloud push kentik/$REPO/debian/buster   $deb
+              package_cloud push kentik/$REPO/debian/bullseye $deb
 
-              package_cloud push kentik/$REPO/ubuntu/focal   $deb
-              package_cloud push kentik/$REPO/ubuntu/bionic  $deb
+              package_cloud push kentik/$REPO/ubuntu/bionic   $deb
+              package_cloud push kentik/$REPO/ubuntu/focal    $deb
+              package_cloud push kentik/$REPO/ubuntu/jammy    $deb
           done
 
           for rpm in *.rpm; do
               package_cloud push kentik/$REPO/el/7 $rpm
               package_cloud push kentik/$REPO/el/8 $rpm
+              package_cloud push kentik/$REPO/el/9 $rpm
           done
         env:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}

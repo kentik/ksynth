@@ -23,9 +23,12 @@ jobs:
           - target: x86_64-unknown-freebsd
             builder: ubuntu-latest
             cross: true
-          # - target: x86_64-apple-darwin
-          #   builder: macos-latest
-          #   cross: false
+          - target: x86_64-apple-darwin
+            builder: macos-latest
+            cross: false
+          - target: aarch64-apple-darwin
+            builder: macos-latest
+            cross: false
     continue-on-error: ${{ startsWith(matrix.builder, 'macos') }}
     steps:
       - uses: actions-rs/toolchain@v1
@@ -43,7 +46,9 @@ jobs:
           tags: local/cross:${{ matrix.target }}
           push: false
         if: ${{ matrix.cross }}
-      - run: brew install capnp
+      - run: |
+          rustup target add ${{ matrix.target }}
+          brew install capnp
         if: ${{ startsWith(matrix.builder, 'macos') }}
       - id: cargo-args
         run: .github/scripts/cargo-args

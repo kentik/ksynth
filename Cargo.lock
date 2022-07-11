@@ -884,7 +884,7 @@ dependencies = [
  "webpki",
  "webpki-roots",
  "x509-certificate",
- "yaml-rust 0.3.5",
+ "yaml-rust 0.4.5",
 ]
 
 [[package]]

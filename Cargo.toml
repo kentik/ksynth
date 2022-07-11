@@ -16,30 +16,30 @@ capnp         = "0.14.6"
 chrono        = "0.4.19"
 futures       = "0.3.21"
 hex           = "0.4.3"
-http          = "0.2.7"
-itoa          = "1.0.1"
-libc          = "0.2.125"
+http          = "0.2.8"
+itoa          = "1.0.2"
+libc          = "0.2.126"
 log           = "0.4.17"
 netdiag       = "0.3.0"
 nix           = "0.23.1"
-parking_lot   = "0.12.0"
+parking_lot   = "0.12.1"
 rand          = "0.8.5"
-ryu           = "1.0.9"
+ryu           = "1.0.10"
 sha2          = "0.10.2"
-serde_json    = "1.0.80"
-serde_yaml    = "0.8.21"
-signal-hook   = "0.3.13"
-tokio-rustls  = "0.23.3"
+serde_json    = "1.0.82"
+serde_yaml    = "0.8.25"
+signal-hook   = "0.3.14"
+tokio-rustls  = "0.23.4"
 webpki        = "0.22.0"
-webpki-roots  = "0.22.3"
+webpki-roots  = "0.22.4"
 yaml-rust     = "0.3.5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 capo          = "0.0.1"
-procfs        = "0.12.0"
+procfs        = "0.13.0"
 
 [dependencies.anyhow]
-version  = "1.0.57"
+version  = "1.0.58"
 features = ["backtrace"]
 
 [dependencies.clap]
@@ -51,7 +51,7 @@ version  = "1.0.11"
 features = []
 
 [dependencies.hyper]
-version  = "0.14.18"
+version  = "0.14.20"
 features = ["client"]
 
 [dependencies.hyper-rustls]
@@ -72,7 +72,7 @@ version  = "0.9.0"
 features = []
 
 [dependencies.rustls]
-version  = "0.20.4"
+version  = "0.20.6"
 features = ["dangerous_configuration"]
 
 [dependencies.rustls-native-certs]
@@ -80,27 +80,27 @@ version  = "0.6.2"
 features = []
 
 [dependencies.serde]
-version  = "1.0.137"
+version  = "1.0.138"
 features = ["derive", "rc"]
 
 [dependencies.tokio]
-version  = "1.18.1"
+version  = "1.19.2"
 features = ["macros", "net", "rt-multi-thread", "sync", "time"]
 
 [dependencies.tokio-util]
-version  = "0.7.2"
+version  = "0.7.3"
 features = ["codec"]
 
 [dependencies.tracing]
-version  = "0.1.34"
+version  = "0.1.35"
 features = []
 
 [dependencies.tracing-opentelemetry]
-version  = "0.17.2"
+version  = "0.17.4"
 features = []
 
 [dependencies.tracing-subscriber]
-version  = "0.3.11"
+version  = "0.3.14"
 features = ["env-filter", "tracing-log"]
 
 [dependencies.trust-dns-client]
@@ -142,7 +142,7 @@ capnpc = "0.14.7"
 anyhow = "1.0.57"
 
 [build-dependencies.git2]
-version  = "0.14.3"
+version  = "0.14.4"
 features = []
 default-features = false
 

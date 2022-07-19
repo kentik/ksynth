@@ -43,8 +43,8 @@ impl Report {
         let active = Active {
             count: Count {
                 success: active.count.success.load(Ordering::Relaxed),
-                failure: active.count.success.load(Ordering::Relaxed),
-                timeout: active.count.success.load(Ordering::Relaxed),
+                failure: active.count.failure.load(Ordering::Relaxed),
+                timeout: active.count.timeout.load(Ordering::Relaxed),
             },
             tasks: Tasks {
                 fetch: active.tasks.fetch.load(Ordering::Relaxed),

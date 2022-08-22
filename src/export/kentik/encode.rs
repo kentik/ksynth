@@ -89,11 +89,10 @@ struct Times {
 
 impl Columns {
     fn new(target: &Target) -> Result<Self> {
-        let columns = &target.device.columns;
-        let lookup  = |name: &str| {
-            match columns.iter().find(|c| c.name == name) {
-                Some(c) => Ok(c.id as u32),
-                None    => Err(anyhow!("missing column '{}'", name)),
+        let lookup = |name: &str| {
+            match target.device.columns.get(name) {
+                Some(id) => Ok(*id),
+                None     => Err(anyhow!("missing column '{name}'")),
             }
         };
 

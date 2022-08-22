@@ -1,9 +1,9 @@
 use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use serde::Serialize;
-use synapi::tasks::Device;
 use crate::net::tls::Identity;
 use crate::stats::Summary;
 
@@ -14,6 +14,12 @@ pub struct Target {
     pub device:  Device,
     pub email:   String,
     pub token:   String,
+}
+
+#[derive(Clone, Debug)]
+pub struct Device {
+    pub id:      u64,
+    pub columns: HashMap<String, u32>,
 }
 
 #[derive(Clone, Debug)]
@@ -117,6 +123,17 @@ pub struct Error {
 pub struct Timeout {
     pub task: u64,
     pub test: u64,
+}
+
+impl TryFrom<synapi::tasks::Device> for Device {
+    type Error = anyhow::Error;
+
+    fn try_from(device: synapi::tasks::Device) -> Result<Self, Self::Error> {
+        let columns = device.columns.into_iter().map(|c| {
+            Ok((c.name, c.id.try_into()?))
+        }).collect::<Result<_, Self::Error>>()?;
+        Ok(Self { id: device.id, columns })
+    }
 }
 
 impl From<Fetch> for Record  {

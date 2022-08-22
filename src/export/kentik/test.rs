@@ -245,9 +245,9 @@ fn serde<T: Into<Record>>(target: &Target, record: T) -> Result<HashMap<String, 
     let reader = try_read_message(cursor, opts)?.unwrap();
     let packed = reader.get_root::<packed_c_h_f::Reader>()?;
 
-    let columns = target.device.columns.iter().map(|c| {
-        Ok((u32::try_from(c.id)?, &*c.name))
-    }).collect::<Result<HashMap<_, _>>>()?;
+    let columns = target.device.columns.iter().map(|(name, id)| {
+        (id, name)
+    }).collect::<HashMap<_, _>>();
 
     let mut values = HashMap::new();
     for msg in packed.get_msgs()?.iter() {
@@ -321,7 +321,7 @@ fn target<R: Rng>(rng: &mut R) -> Target {
     Target {
         company: random(rng),
         agent:   random(rng),
-        device:  device,
+        device:  device.try_into().unwrap(),
         email:   String::new(),
         token:   String::new(),
     }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use log::{debug, error};
@@ -77,7 +78,7 @@ impl Executor {
             let target = Arc::new(Target {
                 company: group.company,
                 agent:   agent.id,
-                device:  group.device,
+                device:  group.device.try_into()?,
                 email:   group.kentik.email,
                 token:   group.kentik.token,
             });
@@ -128,7 +129,7 @@ impl Executor {
             TaskConfig::Query(cfg) => self.query(id, task, cfg).await?,
             TaskConfig::Shake(cfg) => self.shake(id, task, cfg)?,
             TaskConfig::Trace(cfg) => self.trace(id, task, cfg)?,
-            _                      => Err(anyhow!("unsupported type"))?,
+            TaskConfig::Unknown(v) => Err(anyhow!("unsupported: {v:?}"))?,
         };
 
         self.tasks.insert(id, handle);

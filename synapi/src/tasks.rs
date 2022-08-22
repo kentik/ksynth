@@ -4,6 +4,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::time::Duration;
 use serde::{Deserialize, de::{Deserializer, Error, Visitor}};
+use serde_json::Value;
 use crate::serde::id;
 use super::agent::Net;
 
@@ -32,8 +33,7 @@ pub struct Task {
     pub state:  State,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Debug)]
 pub enum TaskConfig {
     Fetch(FetchConfig),
     Knock(KnockConfig),
@@ -41,7 +41,7 @@ pub enum TaskConfig {
     Query(QueryConfig),
     Shake(ShakeConfig),
     Trace(TraceConfig),
-    Unknown,
+    Unknown(HashMap<String, Value>),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -174,22 +174,28 @@ pub struct Period(Duration);
 impl<'d> Deserialize<'d> for Task {
     fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
         #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        enum Config {
+            Http(FetchConfig),
+            Knock(KnockConfig),
+            Ping(PingConfig),
+            Dns(QueryConfig),
+            Shake(ShakeConfig),
+            Traceroute(TraceConfig),
+        }
+
+        #[derive(Debug, Deserialize)]
         struct TaskContainer {
             #[serde(deserialize_with = "id")]
-            pub id:    u64,
-            #[serde(rename = "http")]
-            pub fetch: Option<FetchConfig>,
-            pub knock: Option<KnockConfig>,
-            pub ping:  Option<PingConfig>,
-            #[serde(rename = "dns")]
-            pub query: Option<QueryConfig>,
-            pub shake: Option<ShakeConfig>,
-            #[serde(rename = "traceroute")]
-            pub trace: Option<TraceConfig>,
-            pub state: State,
+            pub id:      u64,
+            #[serde(flatten)]
+            pub config:  Option<Config>,
+            pub state:   State,
             #[serde(deserialize_with = "id")]
             pub test_id: u64,
             pub family:  Net,
+            #[serde(flatten)]
+            pub rest:    HashMap<String, Value>,
         }
 
         let c = TaskContainer::deserialize(de)?;
@@ -199,20 +205,14 @@ impl<'d> Deserialize<'d> for Task {
         let family = c.family;
         let state  = c.state;
 
-        let config = if let Some(cfg) = c.fetch {
-            TaskConfig::Fetch(cfg)
-        } else if let Some(cfg) = c.knock {
-            TaskConfig::Knock(cfg)
-        } else if let Some(cfg) = c.ping {
-            TaskConfig::Ping(cfg)
-        } else if let Some(cfg) = c.query {
-            TaskConfig::Query(cfg)
-        } else if let Some(cfg) = c.shake {
-            TaskConfig::Shake(cfg)
-        } else if let Some(cfg) = c.trace {
-            TaskConfig::Trace(cfg)
-        } else {
-            TaskConfig::Unknown
+        let config = match c.config {
+            Some(Config::Http(cfg))       => TaskConfig::Fetch(cfg),
+            Some(Config::Knock(cfg))      => TaskConfig::Knock(cfg),
+            Some(Config::Ping(cfg))       => TaskConfig::Ping(cfg),
+            Some(Config::Dns(cfg))        => TaskConfig::Query(cfg),
+            Some(Config::Shake(cfg))      => TaskConfig::Shake(cfg),
+            Some(Config::Traceroute(cfg)) => TaskConfig::Trace(cfg),
+            None                          => TaskConfig::Unknown(c.rest),
         };
 
         Ok(Task { task, test, config, family, state })

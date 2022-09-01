@@ -133,6 +133,7 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
         bind:     bind.clone(),
         listener: listener,
         network:  net,
+        proxy:    proxy.clone(),
         resolver: resolver,
         roots:    roots.clone(),
         tasks:    args.opt("config")?,

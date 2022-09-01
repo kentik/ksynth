@@ -18,6 +18,7 @@ pub struct Task {
 pub struct Config {
     pub bind:     Bind,
     pub network:  Option<Network>,
+    pub proxy:    Option<String>,
     pub resolver: Resolver,
     pub roots:    RootCertStore,
 }

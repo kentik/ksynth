@@ -7,6 +7,7 @@ pub use client::Times;
 pub use stream::Peer;
 
 mod client;
+mod proxy;
 mod stream;
 
 #[cfg(test)]

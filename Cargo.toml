@@ -117,6 +117,17 @@ default-features = false
 version  = "0.13.0"
 features = []
 
+[dependencies.hyper-proxy]
+git      = "https://github.com/kentik/hyper-proxy"
+tag      = "0.9.1"
+features = ["rustls"]
+default-features = false
+
+[dependencies.proxy-env]
+git      = "https://github.com/kentik/proxy-env"
+rev      = "1ddb1bdadc69e440704df958f45a5172c2dd248d"
+features = ["hyper"]
+
 [dependencies.notary]
 version  = "0.0.5"
 features = ["client"]

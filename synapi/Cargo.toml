@@ -26,6 +26,11 @@ version  = "0.3.21"
 features = ["std"]
 default-features = false
 
+[dependencies.proxy-env]
+git      = "https://github.com/kentik/proxy-env"
+rev      = "1ddb1bdadc69e440704df958f45a5172c2dd248d"
+features = ["reqwest"]
+
 [dependencies.reqwest]
 version  = "0.11.10"
 features = ["gzip", "json", "rustls-tls"]

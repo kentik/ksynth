@@ -19,6 +19,7 @@ pub struct Config {
     pub bind:     Bind,
     pub listener: Listener,
     pub network:  Option<Network>,
+    pub proxy:    Option<String>,
     pub resolver: Resolver,
     pub roots:    RootCertStore,
     pub tasks:    Option<String>,

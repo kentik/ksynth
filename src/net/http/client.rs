@@ -9,18 +9,22 @@ use http::response::Parts;
 use http::uri::{self, Port, Uri};
 use hyper::{self, body::Body};
 use hyper::client::conn::Builder;
+use hyper_proxy::{Intercept, Proxy};
+use proxy_env::hyper::connector;
 use tracing::{error, trace};
 use netdiag::Bind;
 use rustls::{ClientConfig, RootCertStore, ServerName};
 use tokio_rustls::TlsConnector;
 use crate::net::{Network, Resolver};
 use crate::net::tls::{Identity, Verifier};
+use super::proxy::{ProxyConnection, ProxyConnector};
 use super::stream::{socket, Connection, Peer};
 
 #[derive(Clone)]
 pub struct HttpClient {
     bind:     Bind,
     resolver: Resolver,
+    proxy:    ProxyConnector,
     tls:      TlsConnector,
     verifier: Arc<Verifier>,
 }
@@ -60,7 +64,7 @@ pub struct Times {
 
 impl HttpClient {
     pub fn new(bind: Bind, resolver: Resolver, roots: RootCertStore) -> Result<Self> {
-        let verifier = Arc::new(Verifier::new(roots));
+        let verifier = Arc::new(Verifier::new(roots.clone()));
 
         let mut config = ClientConfig::builder()
             .with_safe_defaults()
@@ -69,16 +73,66 @@ impl HttpClient {
         config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
         config.dangerous().set_certificate_verifier(verifier.clone());
 
-        let tls = TlsConnector::from(Arc::new(config));
+        let config = Arc::new(config);
+        let proxy  = ProxyConnector::new(config.clone())?;
+        let tls    = TlsConnector::from(config);
 
-        Ok(Self { bind, resolver, tls, verifier })
+        Ok(Self { bind, resolver, proxy, tls, verifier })
+    }
+
+    pub fn configure_proxies(&mut self, proxy: Option<&str>) -> Result<()> {
+        let system = || -> Result<Vec<Proxy>> {
+            let c = connector().map_err(|e| anyhow!(e))?;
+            Ok(c.proxies().iter().cloned().collect())
+        };
+
+        match proxy.map(|uri| uri.parse()) {
+            Some(uri) => self.proxy.add_proxy(Proxy::new(Intercept::All, uri?)),
+            None      => system()?.into_iter().for_each(|p| self.proxy.add_proxy(p)),
+        };
+
+        Ok(())
     }
 
     pub async fn request(&self, request: Request) -> Result<Response> {
+        match self.proxy.check(&request.uri) {
+            Some(_) => self.proxy(request).await,
+            None    => self.direct(request).await,
+        }
+    }
+
+    async fn direct(&self, request: Request) -> Result<Response> {
         let (conn, times) = self.connect(&request).await?;
 
         let http2 = conn.http2();
         let peer  = conn.peer();
+
+        let (mut tx, connection) = Builder::new()
+            .http2_only(http2)
+            .handshake(conn)
+            .await?;
+
+        tokio::spawn(async move {
+            match connection.await {
+                Ok(()) => trace!("connection closed"),
+                Err(e) => error!("connection failed: {}", e),
+            }
+        });
+
+        let req = request.build(http2)?;
+        let res = tx.send_request(req).await?;
+        let (head, body) = res.into_parts();
+
+        Ok(Response { head, body, peer, times })
+    }
+
+    async fn proxy(&self, request: Request) -> Result<Response> {
+        let Request { uri, host, .. } = &request;
+
+        let conn = self.proxy.connect(uri).await?;
+
+        let (peer, http2) = conn.info(host.as_str(), &*self.verifier)?;
+        let times = Times::default();
 
         let (mut tx, connection) = Builder::new()
             .http2_only(http2)

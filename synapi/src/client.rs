@@ -7,6 +7,7 @@ use async_compression::futures::write::GzipEncoder;
 use ed25519_compact::KeyPair;
 use futures::io::AsyncWriteExt;
 use log::error;
+use proxy_env::reqwest::client_builder;
 use reqwest::{Client as HttpClient, Proxy};
 use reqwest::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use rustls::{ClientConfig, RootCertStore};
@@ -61,16 +62,16 @@ impl Client {
             .with_no_client_auth();
         cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
 
-        let mut client = HttpClient::builder();
+        let mut client = match proxy {
+            Some(proxy) => HttpClient::builder().proxy(Proxy::all(proxy)?),
+            None        => client_builder(),
+        };
+
         client = client.timeout(Duration::from_secs(30));
         client = client.use_preconfigured_tls(cfg);
 
         if let Some(addr) = bind {
             client = client.local_address(*addr);
-        }
-
-        if let Some(proxy) = proxy.as_ref().map(Proxy::all) {
-            client = client.proxy(proxy?);
         }
 
         let auth   = format!("{}/auth",   region.api);

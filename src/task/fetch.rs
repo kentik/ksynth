@@ -157,7 +157,10 @@ pub struct Fetcher {
 impl Fetcher {
     pub fn new(cfg: &Config) -> Result<Self> {
         let Config { bind, resolver, roots, .. } = cfg.clone();
-        let client = HttpClient::new(bind, resolver, roots)?;
+
+        let mut client = HttpClient::new(bind, resolver, roots)?;
+        client.configure_proxies(cfg.proxy.as_deref())?;
+
         Ok(Self { client })
     }
 

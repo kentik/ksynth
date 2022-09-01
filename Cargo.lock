@@ -624,6 +624,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
+name = "headers"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cff78e5788be1e0ab65b04d306b2ed5092c815ec97ec70f4ebd5aee158aa55d"
+dependencies = [
+ "base64",
+ "bitflags",
+ "bytes",
+ "headers-core",
+ "http",
+ "httpdate",
+ "mime",
+ "sha-1",
+]
+
+[[package]]
+name = "headers-core"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7f66481bfee273957b1f20485a4ff3362987f85b2c236580d81b4eb7a326429"
+dependencies = [
+ "http",
+]
+
+[[package]]
 name = "heck"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -732,6 +757,24 @@ dependencies = [
  "tower-service",
  "tracing",
  "want",
+]
+
+[[package]]
+name = "hyper-proxy"
+version = "0.9.1"
+source = "git+https://github.com/kentik/hyper-proxy?tag=0.9.1#5c3036d60040a822fdc18a5d8df5b288573c158d"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "headers",
+ "http",
+ "hyper",
+ "hyper-rustls",
+ "rustls-native-certs",
+ "tokio",
+ "tokio-rustls",
+ "tower-service",
+ "webpki",
 ]
 
 [[package]]
@@ -848,6 +891,7 @@ dependencies = [
  "hex",
  "http",
  "hyper",
+ "hyper-proxy",
  "hyper-rustls",
  "itoa",
  "libc",
@@ -860,6 +904,7 @@ dependencies = [
  "opentelemetry-semantic-conventions",
  "parking_lot",
  "procfs",
+ "proxy-env",
  "rand",
  "rcgen",
  "rustls",
@@ -1414,6 +1459,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "proxy-env"
+version = "0.1.0"
+source = "git+https://github.com/kentik/proxy-env?rev=1ddb1bdadc69e440704df958f45a5172c2dd248d#1ddb1bdadc69e440704df958f45a5172c2dd248d"
+dependencies = [
+ "http",
+ "hyper",
+ "hyper-proxy",
+ "hyper-rustls",
+ "ipnet",
+ "lazy_static",
+ "log",
+ "reqwest",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1760,6 +1820,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha-1"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "028f48d513f9678cda28f6e4064755b3fbb2af6acd672f2c209b62323f7aea0f"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
+]
+
+[[package]]
 name = "sha2"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1879,6 +1950,7 @@ dependencies = [
  "futures",
  "hex",
  "log",
+ "proxy-env",
  "rand",
  "reqwest",
  "rustls",

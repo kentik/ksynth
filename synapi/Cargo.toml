@@ -6,14 +6,14 @@ edition = "2018"
 
 [dependencies]
 hex           = "0.4.3"
-log           = "0.4.16"
+log           = "0.4.17"
 rand          = "0.8.5"
-rustls        = "0.20.4"
-serde_json    = "1.0.80"
-time          = "0.3.9"
+rustls        = "0.20.6"
+serde_json    = "1.0.85"
+time          = "0.3.14"
 
 [dependencies.async-compression]
-version  = "0.3.12"
+version  = "0.3.14"
 features = ["futures-write", "gzip"]
 default-features = false
 
@@ -22,29 +22,29 @@ version  = "1.0.11"
 features = []
 
 [dependencies.futures]
-version  = "0.3.21"
+version  = "0.3.24"
 features = ["std"]
 default-features = false
 
 [dependencies.reqwest]
-version  = "0.11.10"
+version  = "0.11.11"
 features = ["gzip", "json", "rustls-tls"]
 default-features = false
 
 [dependencies.serde]
-version  = "1.0.137"
+version  = "1.0.144"
 features = ["derive"]
 
 [dependencies.tokio]
-version  = "1.18.1"
+version  = "1.20.1"
 features = ["sync"]
 
 [dev-dependencies]
-anyhow       = "1.0.57"
-log          = "0.4.16"
+anyhow       = "1.0.63"
+log          = "0.4.17"
 env_logger   = "0.9.0"
-webpki-roots = "0.22.3"
+webpki-roots = "0.22.4"
 
 [dev-dependencies.tokio]
-version  = "1.18.1"
+version  = "1.20.1"
 features = ["full"]

@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use anyhow::Result;
 use serde::{Deserialize, de::{Deserializer, Error, Visitor}};
+use serde_json::{Map, Value};
 use crate::net::Network;
 
 #[derive(Debug, Deserialize)]
@@ -24,6 +25,7 @@ pub struct Task {
 pub enum Config {
     Fetch(Fetch),
     Knock(Knock),
+    Opaque(Opaque),
     Ping(Ping),
     Query(Query),
     Shake(Shake),
@@ -48,6 +50,14 @@ pub struct Knock {
     pub count:  Count,
     pub period: Time,
     pub delay:  Time,
+    pub expiry: Time,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Opaque {
+    pub method: String,
+    pub config: Map<String, Value>,
+    pub period: Time,
     pub expiry: Time,
 }
 

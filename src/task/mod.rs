@@ -4,6 +4,7 @@ pub use task::Task;
 
 pub use fetch::{Fetch, Fetcher};
 pub use knock::Knock;
+pub use opaque::Opaque;
 pub use ping::Ping;
 pub use query::Query;
 pub use shake::Shake;
@@ -14,6 +15,7 @@ mod task;
 
 mod fetch;
 mod knock;
+mod opaque;
 mod ping;
 mod query;
 mod shake;

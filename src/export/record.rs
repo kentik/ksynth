@@ -1,9 +1,12 @@
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
+use anyhow::Result;
 use serde::Serialize;
+use serde_json::{Map, Value};
+use synapi::tasks::{Device, Kind};
 use crate::net::tls::Identity;
 use crate::stats::Summary;
 
@@ -11,21 +14,23 @@ use crate::stats::Summary;
 pub struct Target {
     pub company: u64,
     pub agent:   u64,
-    pub device:  Device,
+    pub device:  u64,
+    pub columns: HashMap<String, Column>,
     pub email:   String,
     pub token:   String,
 }
 
 #[derive(Clone, Debug)]
-pub struct Device {
-    pub id:      u64,
-    pub columns: HashMap<String, u32>,
+pub struct Column {
+    pub id:   u32,
+    pub kind: Kind,
 }
 
 #[derive(Clone, Debug)]
 pub enum Record {
     Fetch(Fetch),
     Knock(Knock),
+    Opaque(Opaque),
     Ping(Ping),
     Query(Query),
     Shake(Shake),
@@ -60,6 +65,13 @@ pub struct Knock {
     pub lost:    u32,
     pub rtt:     Summary,
     pub result:  Vec<Duration>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Opaque {
+    pub task:    u64,
+    pub test:    u64,
+    pub output:  Map<String, Value>,
 }
 
 #[derive(Clone, Debug)]
@@ -125,15 +137,14 @@ pub struct Timeout {
     pub test: u64,
 }
 
-impl TryFrom<synapi::tasks::Device> for Device {
-    type Error = anyhow::Error;
-
-    fn try_from(device: synapi::tasks::Device) -> Result<Self, Self::Error> {
-        let columns = device.columns.into_iter().map(|c| {
-            Ok((c.name, c.id.try_into()?))
-        }).collect::<Result<_, Self::Error>>()?;
-        Ok(Self { id: device.id, columns })
-    }
+pub fn columns(device: Device) -> Result<HashMap<String, Column>> {
+    device.columns.into_iter().map(|c| {
+        let column = Column {
+            id:   c.id.try_into()?,
+            kind: c.kind,
+        };
+        Ok((c.name, column))
+    }).collect()
 }
 
 impl From<Fetch> for Record  {
@@ -145,6 +156,12 @@ impl From<Fetch> for Record  {
 impl From<Knock> for Record  {
     fn from(knock: Knock) -> Self {
         Record::Knock(knock)
+    }
+}
+
+impl From<Opaque> for Record  {
+    fn from(opaque: Opaque) -> Self {
+        Record::Opaque(opaque)
     }
 }
 

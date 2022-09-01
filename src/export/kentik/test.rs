@@ -8,7 +8,7 @@ use anyhow::Result;
 use capnp::message::ReaderOptions;
 use capnp::serialize_packed::try_read_message;
 use rand::{thread_rng, Rng};
-use synapi::tasks::{Column, Device, Kind};
+use synapi::tasks::Kind;
 use crate::chf_capnp::{custom::value::Which, packed_c_h_f};
 use crate::net::tls::Identity;
 use crate::stats::Summary;
@@ -245,8 +245,8 @@ fn serde<T: Into<Record>>(target: &Target, record: T) -> Result<HashMap<String, 
     let reader = try_read_message(cursor, opts)?.unwrap();
     let packed = reader.get_root::<packed_c_h_f::Reader>()?;
 
-    let columns = target.device.columns.iter().map(|(name, id)| {
-        (id, name)
+    let columns = target.columns.iter().map(|(name, column)| {
+        (column.id, name)
     }).collect::<HashMap<_, _>>();
 
     let mut values = HashMap::new();
@@ -286,13 +286,12 @@ fn dst_addr(addr: IpAddr, values: &HashMap<String, Value>) -> Value {
 }
 
 fn target<R: Rng>(rng: &mut R) -> Target {
-    let mut columns = Vec::new();
+    let mut columns = HashMap::new();
     let mut index   = 1;
 
     let mut push = |name: String, kind: Kind| {
-        columns.push(Column {
+        columns.insert(name, Column {
             id:   index,
-            name: name,
             kind: kind
         });
         index += 1;
@@ -313,15 +312,11 @@ fn target<R: Rng>(rng: &mut R) -> Target {
         }
     }
 
-    let device = Device {
-        id:      random(rng),
-        columns: columns
-    };
-
     Target {
         company: random(rng),
         agent:   random(rng),
-        device:  device.try_into().unwrap(),
+        device:  random(rng),
+        columns: columns,
         email:   String::new(),
         token:   String::new(),
     }

@@ -45,7 +45,7 @@ impl Exporter {
 
     async fn send(&self, target: &Target, records: &[Record]) -> Result<()> {
         let cid  = target.company;
-        let did  = target.device.id;
+        let did  = target.device;
         let name = "foo";
 
         let sid  = format!("{}:{}:{}", cid, name, did);

@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::{Error, Result};
 use netdiag::Bind;
 use rustls::RootCertStore;
+use serde_json::Value;
 use tokio::sync::mpsc::Sender;
 use tokio::time::interval;
 use tracing::{debug, error};
@@ -127,12 +128,13 @@ impl TryFrom<schema::Config> for synapi::tasks::TaskConfig {
 
     fn try_from(c: schema::Config) -> Result<Self, Self::Error> {
         Ok(match c {
-            schema::Config::Fetch(c) => Self::Fetch(c.try_into()?),
-            schema::Config::Knock(c) => Self::Knock(c.try_into()?),
-            schema::Config::Ping (c) => Self::Ping (c.try_into()?),
-            schema::Config::Query(c) => Self::Query(c.try_into()?),
-            schema::Config::Shake(c) => Self::Shake(c.try_into()?),
-            schema::Config::Trace(c) => Self::Trace(c.try_into()?),
+            schema::Config::Fetch(c)  => Self::Fetch(c.try_into()?),
+            schema::Config::Knock(c)  => Self::Knock(c.try_into()?),
+            schema::Config::Opaque(c) => Self::Opaque(c.try_into()?),
+            schema::Config::Ping (c)  => Self::Ping (c.try_into()?),
+            schema::Config::Query(c)  => Self::Query(c.try_into()?),
+            schema::Config::Shake(c)  => Self::Shake(c.try_into()?),
+            schema::Config::Trace(c)  => Self::Trace(c.try_into()?),
         })
     }
 }
@@ -164,6 +166,24 @@ impl TryFrom<schema::Knock> for synapi::tasks::KnockConfig {
             expiry: c.expiry.try_into()?,
             delay:  c.delay.try_into()?,
             port:   c.port,
+        })
+    }
+}
+
+impl TryFrom<schema::Opaque> for synapi::tasks::OpaqueConfig {
+    type Error = Error;
+
+    fn try_from(c: schema::Opaque) -> Result<Self, Self::Error> {
+        let schema::Opaque { mut config, expiry, method, period } = c;
+
+        config.insert("expiry".into(), expiry.as_millis()?.into());
+        config.insert("period".into(), period.as_secs().into());
+
+        Ok(Self {
+            method: method,
+            config: Value::Object(config),
+            period: period.try_into()?,
+            expiry: expiry.try_into()?,
         })
     }
 }

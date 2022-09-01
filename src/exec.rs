@@ -1,21 +1,20 @@
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use log::{debug, error};
 use tokio::sync::mpsc::{Sender, Receiver};
 use synapi::agent::Net;
-use synapi::tasks::{State, TaskConfig};
-use synapi::tasks::{FetchConfig, KnockConfig, PingConfig, QueryConfig, ShakeConfig, TraceConfig};
+use synapi::tasks::{config::*, State, TaskConfig};
 use netdiag::{Bind, Knocker, Pinger, Tracer};
 use crate::cfg::Config;
-use crate::export::{Exporter, Target};
+use crate::export::{Exporter, Target, record::columns};
 use crate::net::{Network, Resolver};
 use crate::net::tls::Shaker;
+use crate::script::Machine;
 use crate::spawn::{Spawner, Handle};
 use crate::status::{Active, Report, Status};
 use crate::task::{Task, Fetcher};
-use crate::task::{Fetch, Knock, Ping, Query, Shake, Trace};
+use crate::task::{Fetch, Knock, Opaque, Ping, Query, Shake, Trace};
 use crate::watch::{Event, Tasks};
 
 pub struct Executor {
@@ -33,6 +32,7 @@ pub struct Executor {
     pinger:   Arc<Pinger>,
     shaker:   Arc<Shaker>,
     tracer:   Arc<Tracer>,
+    machine:  Arc<Machine>,
 }
 
 #[derive(Clone)]
@@ -43,6 +43,7 @@ pub struct Factory {
     pinger:   Arc<Pinger>,
     shaker:   Arc<Shaker>,
     tracer:   Arc<Tracer>,
+    machine:  Arc<Machine>,
 }
 
 impl Executor {
@@ -78,7 +79,8 @@ impl Executor {
             let target = Arc::new(Target {
                 company: group.company,
                 agent:   agent.id,
-                device:  group.device.try_into()?,
+                device:  group.device.id,
+                columns: columns(group.device)?,
                 email:   group.kentik.email,
                 token:   group.kentik.token,
             });
@@ -123,13 +125,14 @@ impl Executor {
         let id = task.task;
 
         let handle = match cfg {
-            TaskConfig::Fetch(cfg) => self.fetch(id, task, cfg)?,
-            TaskConfig::Knock(cfg) => self.knock(id, task, cfg)?,
-            TaskConfig::Ping(cfg)  => self.ping(id, task, cfg)?,
-            TaskConfig::Query(cfg) => self.query(id, task, cfg).await?,
-            TaskConfig::Shake(cfg) => self.shake(id, task, cfg)?,
-            TaskConfig::Trace(cfg) => self.trace(id, task, cfg)?,
-            TaskConfig::Unknown(v) => Err(anyhow!("unsupported: {v:?}"))?,
+            TaskConfig::Fetch(cfg)  => self.fetch(id, task, cfg)?,
+            TaskConfig::Knock(cfg)  => self.knock(id, task, cfg)?,
+            TaskConfig::Opaque(cfg) => self.opaque(id, task, cfg)?,
+            TaskConfig::Ping(cfg)   => self.ping(id, task, cfg)?,
+            TaskConfig::Query(cfg)  => self.query(id, task, cfg).await?,
+            TaskConfig::Shake(cfg)  => self.shake(id, task, cfg)?,
+            TaskConfig::Trace(cfg)  => self.trace(id, task, cfg)?,
+            TaskConfig::Unknown(v)  => Err(anyhow!("unsupported: {v:?}"))?,
         };
 
         self.tasks.insert(id, handle);
@@ -153,6 +156,11 @@ impl Executor {
         Ok(self.spawner.spawn(id, knock.exec()))
     }
 
+    fn opaque(&self, id: u64, task: Task, cfg: OpaqueConfig) -> Result<Handle> {
+        let opaque = Opaque::new(task, cfg, self.machine.clone())?;
+        Ok(self.spawner.spawn(id, opaque.exec()))
+    }
+
     fn ping(&self, id: u64, task: Task, cfg: PingConfig) -> Result<Handle> {
         let ping = Ping::new(task, cfg, self.pinger.clone());
         Ok(self.spawner.spawn(id, ping.exec()))
@@ -163,7 +171,6 @@ impl Executor {
         Ok(self.spawner.spawn(id, query.exec()))
     }
 
-    #[allow(dead_code)]
     fn shake(&self, id: u64, task: Task, cfg: ShakeConfig) -> Result<Handle> {
         let shake = Shake::new(task, cfg, self.shaker.clone());
         Ok(self.spawner.spawn(id, shake.exec()))
@@ -192,6 +199,7 @@ impl Factory {
         let pinger  = Pinger::new(&cfg.bind).await?;
         let shaker  = Shaker::new(cfg)?;
         let tracer  = Tracer::new(&cfg.bind).await?;
+        let machine = Machine;
 
         Ok(Self {
             config:  cfg.clone(),
@@ -200,6 +208,7 @@ impl Factory {
             pinger:  Arc::new(pinger),
             shaker:  Arc::new(shaker),
             tracer:  Arc::new(tracer),
+            machine: Arc::new(machine),
         })
     }
 
@@ -225,6 +234,7 @@ impl Factory {
             pinger:   self.pinger.clone(),
             shaker:   self.shaker.clone(),
             tracer:   self.tracer.clone(),
+            machine:  self.machine.clone(),
         })
     }
 }

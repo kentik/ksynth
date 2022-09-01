@@ -15,12 +15,13 @@ pub struct Count {
 
 #[derive(Debug, Default)]
 pub struct Tasks {
-    pub fetch: AtomicU64,
-    pub knock: AtomicU64,
-    pub ping:  AtomicU64,
-    pub query: AtomicU64,
-    pub shake: AtomicU64,
-    pub trace: AtomicU64,
+    pub fetch:  AtomicU64,
+    pub knock:  AtomicU64,
+    pub opaque: AtomicU64,
+    pub ping:   AtomicU64,
+    pub query:  AtomicU64,
+    pub shake:  AtomicU64,
+    pub trace:  AtomicU64,
 }
 
 pub struct Guard<'a>(&'a AtomicU64);
@@ -39,6 +40,10 @@ impl Active {
 
     pub fn knock(&self) -> Guard<'_> {
         Guard::new(&self.tasks.knock)
+    }
+
+    pub fn opaque(&self) -> Guard<'_> {
+        Guard::new(&self.tasks.opaque)
     }
 
     pub fn ping(&self) -> Guard<'_> {

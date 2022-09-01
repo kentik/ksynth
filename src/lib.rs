@@ -12,6 +12,7 @@ mod cfg;
 mod exec;
 mod export;
 mod output;
+mod script;
 mod spawn;
 mod secure;
 mod status;

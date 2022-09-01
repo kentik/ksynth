@@ -86,7 +86,7 @@ impl Envoy {
     pub async fn export<T: Into<Record>>(&self, record: T) {
         let key = Key {
             company: self.target.company,
-            device:  self.target.device.id,
+            device:  self.target.device,
         };
 
         let mut export = self.export.lock().await;

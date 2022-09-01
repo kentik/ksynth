@@ -1,6 +1,7 @@
 use std::net::IpAddr;
 use anyhow::Result;
 use serde::Serialize;
+use serde_json::{Map, Value};
 use crate::export::{Record, record};
 
 #[derive(Debug, Serialize)]
@@ -8,6 +9,7 @@ use crate::export::{Record, record};
 pub enum Event<'a> {
     Fetch(Fetch<'a>),
     Knock(Knock<'a>),
+    Opaque(Opaque<'a>),
     Ping(Ping<'a>),
     Query(Query<'a>),
     Shake(Shake<'a>),
@@ -37,6 +39,13 @@ pub struct Knock<'a> {
     port:   u16,
     sent:   u32,
     lost:   u32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Opaque<'a> {
+    agent:  &'a str,
+    #[serde(flatten)]
+    output: &'a Map<String, Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -86,6 +95,7 @@ pub fn encode(agent: &str, rs: &[Record], buf: &mut Vec<u8>) -> Result<()> {
         Ok(match r {
             Record::Fetch(data)   => fetch(data, agent)?,
             Record::Knock(data)   => knock(data, agent)?,
+            Record::Opaque(data)  => opaque(data, agent)?,
             Record::Ping(data)    => ping(data, agent)?,
             Record::Query(data)   => query(data, agent)?,
             Record::Shake(data)   => shake(data, agent)?,
@@ -118,6 +128,13 @@ fn knock<'a>(data: &'a record::Knock, agent: &'a str) -> Result<Event<'a>> {
         port:   data.port,
         sent:   data.sent,
         lost:   data.lost,
+    }))
+}
+
+fn opaque<'a>(data: &'a record::Opaque, agent: &'a str) -> Result<Event<'a>> {
+    Ok(Event::Opaque(Opaque {
+        agent:  agent,
+        output: &data.output,
     }))
 }
 

@@ -37,6 +37,7 @@ pub struct Task {
 pub enum TaskConfig {
     Fetch(FetchConfig),
     Knock(KnockConfig),
+    Opaque(OpaqueConfig),
     Ping(PingConfig),
     Query(QueryConfig),
     Shake(ShakeConfig),
@@ -114,6 +115,14 @@ pub struct TraceConfig {
     #[serde(default)]
     pub delay:    Delay,
     pub expiry:   Expiry,
+}
+
+#[derive(Clone, Debug)]
+pub struct OpaqueConfig {
+    pub method: String,
+    pub config: Value,
+    pub period: Period,
+    pub expiry: Expiry,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -212,11 +221,35 @@ impl<'d> Deserialize<'d> for Task {
             Some(Config::Dns(cfg))        => TaskConfig::Query(cfg),
             Some(Config::Shake(cfg))      => TaskConfig::Shake(cfg),
             Some(Config::Traceroute(cfg)) => TaskConfig::Trace(cfg),
-            None                          => TaskConfig::Unknown(c.rest),
+            None                          => opaque_or_unknown(c.rest),
         };
 
         Ok(Task { task, test, config, family, state })
     }
+}
+
+fn opaque_or_unknown(data: HashMap<String, Value>) -> TaskConfig {
+    let (method, config) = match data.iter().next() {
+        Some((method, config)) => (method, config),
+        None                   => return TaskConfig::Unknown(data),
+    };
+
+    let period = match config["period"].as_u64() {
+        Some(n) => Period(Duration::from_secs(n)),
+        None    => return TaskConfig::Unknown(data),
+    };
+
+    let expiry = match config["expiry"].as_u64() {
+        Some(n) => Expiry(Duration::from_millis(n)),
+        None    => return TaskConfig::Unknown(data),
+    };
+
+    TaskConfig::Opaque(OpaqueConfig {
+        method: method.to_owned(),
+        config: config.clone(),
+        period: period,
+        expiry: expiry,
+    })
 }
 
 struct U64Visitor;
@@ -344,4 +377,14 @@ impl Default for Delay  {
 
 fn default_trace_count() -> Count {
     Count(3)
+}
+
+pub mod config {
+    pub use super::FetchConfig;
+    pub use super::KnockConfig;
+    pub use super::OpaqueConfig;
+    pub use super::PingConfig;
+    pub use super::QueryConfig;
+    pub use super::ShakeConfig;
+    pub use super::TraceConfig;
 }

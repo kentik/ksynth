@@ -24,12 +24,13 @@ pub struct Count {
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Tasks {
-    pub fetch: u64,
-    pub knock: u64,
-    pub ping:  u64,
-    pub query: u64,
-    pub shake: u64,
-    pub trace: u64,
+    pub fetch:  u64,
+    pub knock:  u64,
+    pub opaque: u64,
+    pub ping:   u64,
+    pub query:  u64,
+    pub shake:  u64,
+    pub trace:  u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -47,12 +48,13 @@ impl Report {
                 timeout: active.count.timeout.load(Ordering::Relaxed),
             },
             tasks: Tasks {
-                fetch: active.tasks.fetch.load(Ordering::Relaxed),
-                knock: active.tasks.knock.load(Ordering::Relaxed),
-                ping:  active.tasks.ping.load(Ordering::Relaxed),
-                query: active.tasks.query.load(Ordering::Relaxed),
-                shake: active.tasks.shake.load(Ordering::Relaxed),
-                trace: active.tasks.trace.load(Ordering::Relaxed),
+                fetch:  active.tasks.fetch.load(Ordering::Relaxed),
+                knock:  active.tasks.knock.load(Ordering::Relaxed),
+                opaque: active.tasks.opaque.load(Ordering::Relaxed),
+                ping:   active.tasks.ping.load(Ordering::Relaxed),
+                query:  active.tasks.query.load(Ordering::Relaxed),
+                shake:  active.tasks.shake.load(Ordering::Relaxed),
+                trace:  active.tasks.trace.load(Ordering::Relaxed),
             }
         };
 

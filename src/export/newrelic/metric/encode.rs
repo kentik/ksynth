@@ -23,6 +23,7 @@ pub fn encode(agent: &str, rs: &[Record], buf: &mut Vec<u8>) -> Result<()> {
         match record {
             Record::Fetch(data)   => fetch(data, agent, timestamp, buf)?,
             Record::Knock(data)   => knock(data, agent, timestamp, buf)?,
+            Record::Opaque(..)    => continue,
             Record::Ping(data)    => ping(data, agent, timestamp, buf)?,
             Record::Query(data)   => query(data, agent, timestamp, buf)?,
             Record::Shake(data)   => shake(data, agent, timestamp, buf)?,

@@ -1,4 +1,5 @@
-use std::convert::TryFrom;
+use std::collections::HashMap;
+use std::convert::{TryFrom, TryInto};
 use std::net::IpAddr;
 use std::time::Duration;
 use anyhow::{anyhow, Result};
@@ -7,7 +8,7 @@ use serde_json::json;
 use crate::chf_capnp::{c_h_f::Builder, packed_c_h_f};
 use crate::export::{Record, Target, record::*};
 use crate::net::tls::Identity;
-use super::Customs;
+use super::{Customs, value::Value};
 
 pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
     let cs = Columns::new(target)?;
@@ -32,6 +33,7 @@ pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
         match record {
             Record::Fetch(data)   => cs.fetch(msg, agent, data)?,
             Record::Knock(data)   => cs.knock(msg, agent, data),
+            Record::Opaque(data)  => cs.opaque(msg, agent, data)?,
             Record::Ping(data)    => cs.ping(msg, agent, data),
             Record::Query(data)   => cs.query(msg, agent, data),
             Record::Shake(data)   => cs.shake(msg, agent, data)?,
@@ -48,27 +50,28 @@ pub fn encode(target: &Target, rs: &[Record]) -> Result<Vec<u8>> {
     Ok(vec)
 }
 
-struct Columns {
-    app:    u32,
-    agent:  u32,
-    kind:   u32,
-    task:   u32,
-    test:   u32,
-    cause:  u32,
-    status: u32,
-    size:   u32,
-    sent:   u32,
-    lost:   u32,
-    rtt:    Stats,
-    route:  u32,
-    time:   u32,
-    port:   u32,
-    data:   u32,
-    record: u32,
-    code:   u32,
-    times:  Times,
-    valid:  u32,
-    until:  u32,
+struct Columns<'a> {
+    app:     u32,
+    agent:   u32,
+    kind:    u32,
+    task:    u32,
+    test:    u32,
+    cause:   u32,
+    status:  u32,
+    size:    u32,
+    sent:    u32,
+    lost:    u32,
+    rtt:     Stats,
+    route:   u32,
+    time:    u32,
+    port:    u32,
+    data:    u32,
+    record:  u32,
+    code:    u32,
+    times:   Times,
+    valid:   u32,
+    until:   u32,
+    columns: &'a HashMap<String, Column>
 }
 
 struct Stats {
@@ -87,12 +90,13 @@ struct Times {
     json: u32,
 }
 
-impl Columns {
-    fn new(target: &Target) -> Result<Self> {
-        let lookup = |name: &str| {
-            match target.device.columns.get(name) {
-                Some(id) => Ok(*id),
-                None     => Err(anyhow!("missing column '{name}'")),
+impl<'a> Columns<'a> {
+    fn new(target: &'a Target) -> Result<Self> {
+        let columns = &target.columns;
+        let lookup  = |name: &str| {
+            match columns.get(name) {
+                Some(c) => Ok(c.id),
+                None    => Err(anyhow!("missing column '{name}'")),
             }
         };
 
@@ -129,6 +133,7 @@ impl Columns {
             },
             valid:   lookup("INT07")?,
             until:   lookup("INT64_03")?,
+            columns: columns,
         })
     }
 
@@ -196,6 +201,33 @@ impl Columns {
         customs.next(self.rtt.avg, |v| v.set_uint32_val(as_micros(rtt.avg)));
         customs.next(self.rtt.std, |v| v.set_uint32_val(as_micros(rtt.std)));
         customs.next(self.rtt.jit, |v| v.set_uint32_val(as_micros(rtt.jit)));
+    }
+
+    fn opaque(&self, msg: Builder, agent: u64, data: &Opaque) -> Result<()> {
+        let Opaque { task, test, ref output, .. } = *data;
+
+        let count = (4 + output.len()).try_into()?;
+
+        let mut customs = Customs::new("opaque", msg,  count);
+        customs.next(self.app,     |v| v.set_uint32_val(AGENT));
+        customs.next(self.agent,   |v| v.set_uint64_val(agent));
+        customs.next(self.task,    |v| v.set_uint64_val(task));
+        customs.next(self.test,    |v| v.set_uint64_val(test));
+
+        for (name, value) in output {
+            let (id, kind) = match self.columns.get(name) {
+                Some(c) => (c.id, c.kind),
+                None    => return Err(anyhow!("missing column '{name}'")),
+            };
+
+            match Value::try_from((kind, value))? {
+                Value::String(s) => customs.next(id, |v| v.set_str_val(s)),
+                Value::UInt32(n) => customs.next(id, |v| v.set_uint32_val(n)),
+                Value::UInt64(n) => customs.next(id, |v| v.set_uint64_val(n)),
+            }
+        }
+
+        Ok(())
     }
 
     fn ping(&self, mut msg: Builder, agent: u64, data: &Ping) {

@@ -7,7 +7,8 @@ authors = ["Will <will@kentik.com>"]
 license = "GPL-2.0"
 
 [features]
-experimental = []
+default = ["script"]
+script  = ["v8", "v8vm"]
 
 [dependencies]
 base64        = "0.13.0"
@@ -33,10 +34,6 @@ tokio-rustls  = "0.23.4"
 webpki        = "0.22.0"
 webpki-roots  = "0.22.4"
 yaml-rust     = "0.3.5"
-
-[target.'cfg(target_os = "linux")'.dependencies]
-capo          = "0.0.1"
-procfs        = "0.14.1"
 
 [dependencies.anyhow]
 version  = "1.0.63"
@@ -113,6 +110,10 @@ version  = "0.21.2"
 features = ["system-config", "tokio-runtime"]
 default-features = false
 
+[dependencies.v8]
+version  = "0.49.0"
+optional = true
+
 [dependencies.x509-certificate]
 version  = "0.13.0"
 features = []
@@ -123,7 +124,16 @@ features = ["client"]
 default-features = false
 
 [dependencies.synapi]
-path = "synapi"
+path     = "synapi"
+
+[dependencies.v8vm]
+git      = "https://github.com/kentik/v8vm.git"
+rev      = "a7811d4474820c5a4e5da3e8f165a31038491a31"
+optional = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+capo   = "0.0.1"
+procfs = "0.14.1"
 
 [dev-dependencies]
 rcgen       = "0.9.3"

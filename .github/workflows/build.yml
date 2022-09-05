@@ -20,9 +20,9 @@ jobs:
           - target: armv7-unknown-linux-musleabihf
             builder: ubuntu-latest
             cross: true
-          - target: x86_64-unknown-freebsd
-            builder: ubuntu-latest
-            cross: true
+          # - target: x86_64-unknown-freebsd
+          #   builder: ubuntu-latest
+          #   cross: true
           - target: x86_64-apple-darwin
             builder: macos-latest
             cross: false
@@ -34,7 +34,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: beta
+          toolchain: stable
           target: ${{ matrix.target }}
       - uses: actions/checkout@v2
         with:
@@ -52,11 +52,20 @@ jobs:
         if: ${{ startsWith(matrix.builder, 'macos') }}
       - id: cargo-args
         run: .github/scripts/cargo-args
+      - id: cargo-env
+        run: |
+          case "${{ matrix.target }}" in
+            *musl*) MIRROR="https://github.com/wg/static-v8"      ;;
+                 *) MIRROR="https://github.com/denoland/rusty_v8" ;;
+          esac
+          echo "::set-output name=mirror::${MIRROR}"
       - uses: actions-rs/cargo@v1
         with:
           use-cross: ${{ matrix.cross }}
           command: build
           args: --release --target ${{ matrix.target }} ${{ steps.cargo-args.outputs.args }}
+        env:
+          RUSTY_V8_MIRROR: ${{ steps.cargo-env.outputs.mirror }}/releases/download
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ env.BINARY }}-${{ matrix.target }}
@@ -187,7 +196,7 @@ jobs:
           - x86_64-unknown-linux-musl
           - aarch64-unknown-linux-musl
           - armv7-unknown-linux-musleabihf
-          - x86_64-unknown-freebsd
+          # - x86_64-unknown-freebsd
     steps:
       - uses: aws-actions/configure-aws-credentials@v1
         with:

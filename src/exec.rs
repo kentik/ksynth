@@ -199,7 +199,8 @@ impl Factory {
         let pinger  = Pinger::new(&cfg.bind).await?;
         let shaker  = Shaker::new(cfg)?;
         let tracer  = Tracer::new(&cfg.bind).await?;
-        let machine = Machine;
+
+        let machine = Machine::new(cfg).await?;
 
         Ok(Self {
             config:  cfg.clone(),

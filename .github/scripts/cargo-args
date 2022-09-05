@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-set -eu -o pipefail
+set -e -o pipefail
 
 features=()
 
-if [ "$GITHUB_REF" = "refs/heads/next" ]; then
-    features+=("experimental")
-fi
+#if [ "$GITHUB_REF" = "refs/heads/next" ]; then
+#    features+=("experimental")
+#fi
 
 arguments=()
 

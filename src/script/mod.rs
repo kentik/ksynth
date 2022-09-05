@@ -1,12 +1,6 @@
-use anyhow::Result;
-use serde_json::{Map, Value};
+pub use vm::Export;
+pub use vm::Machine;
+pub use vm::initialize;
 
-pub struct Machine;
-
-impl Machine {
-    pub fn invoke(&self, _args: Value) -> Result<Value> {
-        let mut data = Map::new();
-        data.insert("INT00".into(), 11.into());
-        Ok(data.into())
-    }
-}
+mod fetch;
+mod vm;

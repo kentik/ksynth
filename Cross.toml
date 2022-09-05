@@ -1,3 +1,6 @@
+[build.env]
+passthrough = ["RUSTY_V8_MIRROR"]
+
 [target.aarch64-unknown-linux-musl]
 image = "local/cross:aarch64-unknown-linux-musl"
 

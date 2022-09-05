@@ -1,42 +1,43 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use anyhow::{anyhow, Error, Result};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value};
 use tracing::{debug, warn, info_span, Instrument};
 use tokio::time::{sleep, timeout};
 use synapi::tasks::OpaqueConfig;
 use crate::export::{record, Envoy};
-use crate::script::Machine;
+use crate::script::{Export, Machine};
 use crate::status::Active;
 use super::Task;
 
 pub struct Opaque {
-    task:    u64,
-    test:    u64,
-    method:  String,
-    config:  Value,
-    period:  Duration,
-    expiry:  Duration,
-    envoy:   Envoy,
-    active:  Arc<Active>,
-    machine: Arc<Machine>,
+    task:   u64,
+    test:   u64,
+    method: String,
+    config: Value,
+    period: Duration,
+    expiry: Duration,
+    envoy:  Envoy,
+    active: Arc<Active>,
+    export: Export,
 }
 
 impl Opaque {
     pub fn new(task: Task, cfg: OpaqueConfig, machine: Arc<Machine>) -> Result<Self> {
+        let export = machine.find(&cfg.method)?;
         let period = cfg.period.into();
         let expiry = cfg.expiry.into();
 
         Ok(Self {
-            task:    task.task,
-            test:    task.test,
-            method:  cfg.method,
-            config:  cfg.config,
-            period:  period,
-            expiry:  expiry,
-            envoy:   task.envoy,
-            active:  task.active,
-            machine: machine,
+            task:   task.task,
+            test:   task.test,
+            method: cfg.method,
+            config: cfg.config,
+            period: period,
+            expiry: expiry,
+            envoy:  task.envoy,
+            active: task.active,
+            export: export,
         })
     }
 
@@ -49,7 +50,9 @@ impl Opaque {
 
             async {
                 let _guard = self.active.opaque();
-                let result = self.invoke();
+
+                let config = self.config.clone();
+                let result = self.invoke(config);
 
                 match timeout(self.expiry, result).await {
                     Ok(Ok(rtt)) => self.success(rtt).await,
@@ -62,17 +65,12 @@ impl Opaque {
         }
     }
 
-    async fn invoke(&self) -> Result<Output> {
+    async fn invoke(&self, arg: Value) -> Result<Output> {
         let start = Instant::now();
 
-        let input = json!({
-            "method": self.method,
-            "args":   self.config,
-        });
-
-        let data = match self.machine.invoke(input)? {
+        let data = match self.export.call(arg).await? {
             Value::Object(map) => Ok(map),
-            _                  => Err(anyhow!("invalid script output")),
+            value              => Err(anyhow!("invalid output: {value}")),
         };
 
         Ok(Output {

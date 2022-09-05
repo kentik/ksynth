@@ -26,6 +26,7 @@ use crate::exec::Factory;
 use crate::export::Exporter;
 use crate::net::{Listener, Network, Resolver, tls::TrustAnchors};
 use crate::output::Output;
+use crate::script;
 use crate::secure;
 use crate::status::Monitor;
 use crate::update::Updater;
@@ -123,6 +124,8 @@ pub fn agent(app: App, args: Args<'_, '_>) -> Result<()> {
     if let Err(e) = secure::apply(user) {
         error!("agent security failure: {e}");
     }
+
+    script::initialize();
 
     let machine  = machine();
     let resolver = resolver(&bind, net)?;

@@ -43,7 +43,7 @@ version  = "1.0.57"
 features = ["backtrace"]
 
 [dependencies.clap]
-version  = "2.33.3"
+version  = "2.34.0"
 features = ["yaml"]
 
 [dependencies.ed25519-compact]
@@ -151,3 +151,7 @@ debug = true
 
 [profile.release.package."*"]
 debug = false
+
+[patch.crates-io.clap]
+git   = "https://github.com/kentik/clap"
+rev   = "040d70fec261e25d3fe6a8fea1a314d7ca66b388"

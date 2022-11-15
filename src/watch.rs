@@ -78,7 +78,7 @@ impl Watcher {
     }
 
     async fn tasks(&mut self, agent: Agent) -> Result<()> {
-        let delay = Duration::from_secs(60);
+        let delay = Duration::from_secs(10);
         let reset = Duration::from_secs(60 * 60 * 24);
         let start = Instant::now();
 

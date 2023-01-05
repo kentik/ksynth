@@ -133,7 +133,7 @@ jobs:
         run: |
           BUCKET=$BUCKET/${{ needs.version.outputs.version }}
           aws s3 cp $BUCKET . --include "*.deb" --include "*.rpm" --recursive
-      - uses: actions/setup-ruby@v1
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 2.6
       - run: |

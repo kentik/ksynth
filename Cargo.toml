@@ -142,7 +142,7 @@ capnpc = "0.14.7"
 anyhow = "1.0.57"
 
 [build-dependencies.git2]
-version  = "0.14.3"
+version  = "0.16.1"
 features = []
 default-features = false
 

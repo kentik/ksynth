@@ -84,7 +84,7 @@ version  = "1.0.137"
 features = ["derive", "rc"]
 
 [dependencies.tokio]
-version  = "1.18.1"
+version  = "1.18.5"
 features = ["macros", "net", "rt-multi-thread", "sync", "time"]
 
 [dependencies.tokio-util]
